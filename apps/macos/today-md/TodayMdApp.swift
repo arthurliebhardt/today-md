@@ -2,6 +2,29 @@ import AppKit
 import SwiftUI
 import SwiftData
 
+private struct MainWindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+
+            window.minSize = NSSize(width: 1200, height: 720)
+            window.setContentSize(NSSize(width: 1500, height: 920))
+            window.center()
+        }
+
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            window.minSize = NSSize(width: 1200, height: 720)
+        }
+    }
+}
+
 @MainActor
 final class AppUndoController: ObservableObject {
     let manager: UndoManager
@@ -56,7 +79,9 @@ struct TodayMdApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(undoController)
+                .background(MainWindowConfigurator())
         }
+        .defaultSize(width: 1500, height: 920)
         .modelContainer(container)
         .commands {
             CommandGroup(after: .saveItem) {
