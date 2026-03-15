@@ -12,15 +12,64 @@ struct BoardView: View {
     @State private var backlogCollapsed = false
     @State private var thisWeekCollapsed = false
 
+    private var isFocusTodayActive: Bool {
+        backlogCollapsed && thisWeekCollapsed
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ForEach(TimeBlock.allCases) { block in
-                if block == .backlog || block == .thisWeek {
-                    let isCollapsed = block == .backlog ? backlogCollapsed : thisWeekCollapsed
-                    if isCollapsed {
-                        collapsedLane(block: block) {
-                            if block == .backlog { backlogCollapsed = false }
-                            else { thisWeekCollapsed = false }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        let shouldCollapse = !isFocusTodayActive
+                        backlogCollapsed = shouldCollapse
+                        thisWeekCollapsed = shouldCollapse
+                    }
+                } label: {
+                    Label(
+                        isFocusTodayActive ? "Show All Lanes" : "Focus Today",
+                        systemImage: isFocusTodayActive ? "rectangle.3.group" : "line.3.horizontal.decrease.circle"
+                    )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(isFocusTodayActive ? .orange : .secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.orange.opacity(isFocusTodayActive ? 0.16 : 0.08))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(isFocusTodayActive ? "Expand This Week and Backlog" : "Collapse This Week and Backlog")
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(TimeBlock.allCases) { block in
+                    if block == .backlog || block == .thisWeek {
+                        let isCollapsed = block == .backlog ? backlogCollapsed : thisWeekCollapsed
+                        if isCollapsed {
+                            collapsedLane(block: block) {
+                                if block == .backlog { backlogCollapsed = false }
+                                else { thisWeekCollapsed = false }
+                            }
+                        } else {
+                            LaneView(
+                                block: block,
+                                tasks: tasks(block),
+                                selectedTask: $selectedTask,
+                                onAdd: { title in onAdd(title, block) },
+                                onMove: onMove,
+                                onReorderActive: { draggedID, beforeID in
+                                    onReorderInBlock(draggedID, block, beforeID)
+                                },
+                                onDelete: onDelete,
+                                onToggle: onToggle,
+                                onCollapse: {
+                                    if block == .backlog { backlogCollapsed = true }
+                                    else { thisWeekCollapsed = true }
+                                }
+                            )
                         }
                     } else {
                         LaneView(
@@ -28,31 +77,14 @@ struct BoardView: View {
                             tasks: tasks(block),
                             selectedTask: $selectedTask,
                             onAdd: { title in onAdd(title, block) },
-                            onDrop: { id in onMove(id, block) },
+                            onMove: onMove,
                             onReorderActive: { draggedID, beforeID in
                                 onReorderInBlock(draggedID, block, beforeID)
                             },
                             onDelete: onDelete,
-                            onToggle: onToggle,
-                            onCollapse: {
-                                if block == .backlog { backlogCollapsed = true }
-                                else { thisWeekCollapsed = true }
-                            }
+                            onToggle: onToggle
                         )
                     }
-                } else {
-                    LaneView(
-                        block: block,
-                        tasks: tasks(block),
-                        selectedTask: $selectedTask,
-                        onAdd: { title in onAdd(title, block) },
-                        onDrop: { id in onMove(id, block) },
-                        onReorderActive: { draggedID, beforeID in
-                            onReorderInBlock(draggedID, block, beforeID)
-                        },
-                        onDelete: onDelete,
-                        onToggle: onToggle
-                    )
                 }
             }
         }
@@ -99,7 +131,7 @@ struct LaneView: View {
     let tasks: [TaskItem]
     @Binding var selectedTask: TaskItem?
     let onAdd: (String) -> Void
-    let onDrop: (UUID) -> Void
+    let onMove: (UUID, TimeBlock) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
@@ -119,13 +151,54 @@ struct LaneView: View {
         case end
     }
 
+    private var isTodayLane: Bool {
+        block == .today
+    }
+
+    private var accentColor: Color {
+        switch block {
+        case .today:
+            return .orange
+        case .thisWeek:
+            return .blue
+        case .backlog:
+            return .secondary
+        }
+    }
+
+    private var laneBackgroundColor: Color {
+        if isTargeted {
+            return accentColor.opacity(isTodayLane ? 0.14 : 0.08)
+        }
+
+        if isTodayLane {
+            return accentColor.opacity(0.06)
+        }
+
+        return Color(nsColor: .controlBackgroundColor)
+    }
+
+    private var laneBorderColor: Color {
+        if isTodayLane {
+            return accentColor.opacity(0.35)
+        }
+
+        return Color(nsColor: .separatorColor).opacity(0.18)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             ScrollView {
                 LazyVStack(spacing: 5) {
                     ForEach(activeTasks) { task in
-                        TaskCardView(task: task, isSelected: selectedTask == task, onToggle: { onToggle(task) }, onDelete: { onDelete(task) })
+                        TaskCardView(
+                            task: task,
+                            isSelected: selectedTask == task,
+                            onToggle: { onToggle(task) },
+                            onMove: { targetBlock in onMove(task.id, targetBlock) },
+                            onDelete: { onDelete(task) }
+                        )
                             .onTapGesture { selectedTask = task }
                             .draggable(TaskItemTransfer(id: task.id))
                             .overlay {
@@ -157,29 +230,47 @@ struct LaneView: View {
         .frame(minWidth: 160, maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isTargeted ? Color.blue.opacity(0.08) : Color(nsColor: .controlBackgroundColor))
+                .fill(laneBackgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(laneBorderColor, lineWidth: isTodayLane ? 1.5 : 1)
         )
         .dropDestination(for: TaskItemTransfer.self) { items, _ in
-            for item in items { onDrop(item.id) }
+            for item in items { onMove(item.id, block) }
             return !items.isEmpty
-        } isTargeted: { isTargeted = $0 }
+        } isTargeted: { targeted in
+            guard isTargeted != targeted else { return }
+            isTargeted = targeted
+        }
     }
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: block.icon)
-                .foregroundStyle(block == .today ? .orange : block == .thisWeek ? .blue : .secondary)
-            Text(block.label)
-                .font(.headline)
-                .lineLimit(1)
-                .fixedSize()
+            HStack(spacing: 6) {
+                Image(systemName: block.icon)
+                    .foregroundStyle(accentColor)
+                Text(block.label)
+                    .font(.headline.weight(isTodayLane ? .semibold : .regular))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(accentColor.opacity(isTodayLane ? 0.18 : block == .thisWeek ? 0.10 : 0.08))
+            )
             Spacer()
             Text("\(activeTasks.count)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isTodayLane ? accentColor : .secondary)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(Color(nsColor: .separatorColor).opacity(0.3)))
+                .background(
+                    Capsule()
+                        .fill(isTodayLane ? accentColor.opacity(0.14) : Color(nsColor: .separatorColor).opacity(0.3))
+                )
             if let onCollapse = onCollapse {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { onCollapse() }
@@ -193,7 +284,13 @@ struct LaneView: View {
         }
         .padding(.horizontal, 12)
         .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.bottom, 8)
+        .background(alignment: .bottom) {
+            Capsule()
+                .fill(accentColor.opacity(isTodayLane ? 0.8 : block == .thisWeek ? 0.35 : 0.18))
+                .frame(height: isTodayLane ? 4 : 2)
+                .padding(.horizontal, 12)
+        }
     }
 
     private var addCard: some View {
@@ -228,7 +325,13 @@ struct LaneView: View {
     private var doneSection: some View {
         DisclosureGroup("Done (\(doneTasks.count))") {
             ForEach(doneTasks) { task in
-                TaskCardView(task: task, isSelected: selectedTask == task, onToggle: { onToggle(task) }, onDelete: { onDelete(task) })
+                TaskCardView(
+                    task: task,
+                    isSelected: selectedTask == task,
+                    onToggle: { onToggle(task) },
+                    onMove: { targetBlock in onMove(task.id, targetBlock) },
+                    onDelete: { onDelete(task) }
+                )
                     .onTapGesture { selectedTask = task }
             }
         }
@@ -255,6 +358,7 @@ struct LaneView: View {
 
     private func updateDropTarget(targeted: Bool, target: ReorderTarget) {
         if targeted {
+            guard currentDropTarget != target else { return }
             currentDropTarget = target
         } else if currentDropTarget == target {
             currentDropTarget = nil

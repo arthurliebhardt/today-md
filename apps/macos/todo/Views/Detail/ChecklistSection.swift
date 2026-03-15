@@ -113,24 +113,28 @@ struct ChecklistSection: View {
         var lines = note.content.components(separatedBy: "\n")
         guard lineIndex < lines.count else { return }
         let line = lines[lineIndex]
-        if line.contains("- [ ] ") {
-            lines[lineIndex] = line.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
-        } else {
-            lines[lineIndex] = line
-                .replacingOccurrences(of: "- [x] ", with: "- [ ] ")
-                .replacingOccurrences(of: "- [X] ", with: "- [ ] ")
+        performChecklistChange(actionName: "Toggle Checklist Item") {
+            if line.contains("- [ ] ") {
+                lines[lineIndex] = line.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
+            } else {
+                lines[lineIndex] = line
+                    .replacingOccurrences(of: "- [x] ", with: "- [ ] ")
+                    .replacingOccurrences(of: "- [X] ", with: "- [ ] ")
+            }
+            note.content = lines.joined(separator: "\n")
+            note.lastModified = Date()
         }
-        note.content = lines.joined(separator: "\n")
-        note.lastModified = Date()
     }
 
     private func removeItem(at lineIndex: Int) {
         guard let note = task.note else { return }
         var lines = note.content.components(separatedBy: "\n")
         guard lineIndex < lines.count else { return }
-        lines.remove(at: lineIndex)
-        note.content = lines.joined(separator: "\n")
-        note.lastModified = Date()
+        performChecklistChange(actionName: "Delete Checklist Item") {
+            lines.remove(at: lineIndex)
+            note.content = lines.joined(separator: "\n")
+            note.lastModified = Date()
+        }
     }
 
     private func addItem() {
@@ -138,18 +142,25 @@ struct ChecklistSection: View {
         guard !title.isEmpty else { return }
         let entry = "- [ ] \(title)"
 
-        if let note = task.note {
-            if note.content.isEmpty {
-                note.content = entry
+        performChecklistChange(actionName: "Add Checklist Item") {
+            if let note = task.note {
+                if note.content.isEmpty {
+                    note.content = entry
+                } else {
+                    note.content += "\n" + entry
+                }
+                note.lastModified = Date()
             } else {
-                note.content += "\n" + entry
+                let note = TaskNote(content: entry)
+                note.parentTask = task
+                modelContext.insert(note)
             }
-            note.lastModified = Date()
-        } else {
-            let note = TaskNote(content: entry)
-            note.parentTask = task
-            modelContext.insert(note)
         }
         newItemTitle = ""
+    }
+
+    private func performChecklistChange(actionName: String, update: () -> Void) {
+        update()
+        modelContext.undoManager?.setActionName(actionName)
     }
 }
