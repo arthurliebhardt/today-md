@@ -4,7 +4,7 @@ import SwiftData
 import UniformTypeIdentifiers
 
 @MainActor
-enum TodoTransferService {
+enum TodayMdTransferService {
     private static var activePanel: NSOpenPanel?
 
     static func exportData(from context: ModelContext) {
@@ -72,7 +72,7 @@ enum TodoTransferService {
             decoder.dateDecodingStrategy = .iso8601
 
             let data = try Data(contentsOf: url)
-            let archive = try decoder.decode(TodoArchive.self, from: data)
+            let archive = try decoder.decode(TodayMdArchive.self, from: data)
             try applyImport(archive, into: context, mode: mode)
         }
     }
@@ -112,15 +112,15 @@ enum TodoTransferService {
         return try operation()
     }
 
-    private static func makeArchive(from context: ModelContext) throws -> TodoArchive {
+    private static func makeArchive(from context: ModelContext) throws -> TodayMdArchive {
         let lists = try context.fetch(FetchDescriptor<TaskList>(sortBy: [SortDescriptor(\.sortOrder)]))
         let tasks = try context.fetch(FetchDescriptor<TaskItem>())
 
-        return TodoArchive(
+        return TodayMdArchive(
             version: 1,
             exportedAt: Date(),
             lists: lists.map { list in
-                TodoArchive.ListArchive(
+                TodayMdArchive.ListArchive(
                     name: list.name,
                     icon: list.icon,
                     colorName: list.colorName,
@@ -137,15 +137,15 @@ enum TodoTransferService {
         )
     }
 
-    private static func makeTaskArchive(_ task: TaskItem) -> TodoArchive.TaskArchive {
-        TodoArchive.TaskArchive(
+    private static func makeTaskArchive(_ task: TaskItem) -> TodayMdArchive.TaskArchive {
+        TodayMdArchive.TaskArchive(
             title: task.title,
             isDone: task.isDone,
             blockRaw: task.blockRaw,
             sortOrder: task.sortOrder,
             creationDate: task.creationDate,
             note: task.note.map {
-                TodoArchive.NoteArchive(
+                TodayMdArchive.NoteArchive(
                     content: $0.content,
                     lastModified: $0.lastModified
                 )
@@ -153,7 +153,7 @@ enum TodoTransferService {
             subtasks: task.subtasks
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map {
-                    TodoArchive.SubTaskArchive(
+                    TodayMdArchive.SubTaskArchive(
                         title: $0.title,
                         isCompleted: $0.isCompleted,
                         sortOrder: $0.sortOrder
@@ -162,7 +162,7 @@ enum TodoTransferService {
         )
     }
 
-    private static func applyImport(_ archive: TodoArchive, into context: ModelContext, mode: ImportMode) throws {
+    private static func applyImport(_ archive: TodayMdArchive, into context: ModelContext, mode: ImportMode) throws {
         if mode == .replaceExisting {
             try clearExistingData(in: context)
         }
@@ -196,7 +196,7 @@ enum TodoTransferService {
     }
 
     private static func insertTask(
-        from archive: TodoArchive.TaskArchive,
+        from archive: TodayMdArchive.TaskArchive,
         into context: ModelContext,
         list: TaskList?,
         sortOrder: Int
@@ -272,7 +272,7 @@ enum TodoTransferService {
     private static func defaultExportFilename() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        return "todo-backup-\(formatter.string(from: Date())).json"
+        return "today-md-backup-\(formatter.string(from: Date())).json"
     }
 
     private static func taskSort(lhs: TaskItem, rhs: TaskItem) -> Bool {
@@ -298,7 +298,7 @@ enum ImportMode {
     case replaceExisting
 }
 
-private struct TodoArchive: Codable {
+private struct TodayMdArchive: Codable {
     let version: Int
     let exportedAt: Date
     let lists: [ListArchive]

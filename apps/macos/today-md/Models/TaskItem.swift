@@ -92,5 +92,5 @@ struct TaskItemTransfer: Codable, Transferable {
 }
 
 extension UTType {
-    static let taskItem = UTType(exportedAs: "com.todo.app.taskitem")
+    static let taskItem = UTType(exportedAs: "com.today-md.app.taskitem")
 }

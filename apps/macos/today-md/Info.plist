@@ -12,7 +12,7 @@
 			<key>UTTypeDescription</key>
 			<string>Task Item</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.todo.app.taskitem</string>
+			<string>com.today-md.app.taskitem</string>
 			<key>UTTypeTagSpecification</key>
 			<dict/>
 		</dict>

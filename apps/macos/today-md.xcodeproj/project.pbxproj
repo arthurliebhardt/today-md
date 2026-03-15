@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA000001 /* TodoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001; };
+		AA000001 /* TodayMdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002; };
 		AA000003 /* TaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003; };
 		AA000004 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004; };
@@ -25,12 +25,12 @@
 		AA000016 /* BacklogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018; };
 		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019; };
 		AA000020 /* ChecklistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020; };
-		AA000021 /* TodoTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021; };
+		AA000021 /* TodayMdTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AB000000 /* todo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = todo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AB000001 /* TodoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoApp.swift; sourceTree = "<group>"; };
+		AB000000 /* today-md.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = today-md.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000001 /* TodayMdApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdApp.swift; sourceTree = "<group>"; };
 		AB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AB000003 /* TaskList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskList.swift; sourceTree = "<group>"; };
 		AB000004 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
@@ -45,12 +45,12 @@
 		AB000013 /* MarkdownEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditorView.swift; sourceTree = "<group>"; };
 		AB000014 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		AB000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		AB000016 /* todo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = todo.entitlements; sourceTree = "<group>"; };
+		AB000016 /* today-md.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = today-md.entitlements; sourceTree = "<group>"; };
 		AB000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB000018 /* BacklogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklogView.swift; sourceTree = "<group>"; };
 		AB000019 /* WeeklyReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewView.swift; sourceTree = "<group>"; };
 		AB000020 /* ChecklistSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistSection.swift; sourceTree = "<group>"; };
-		AB000021 /* TodoTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoTransferService.swift; sourceTree = "<group>"; };
+		AB000021 /* TodayMdTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdTransferService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,30 +67,30 @@
 		AD000001 = {
 			isa = PBXGroup;
 			children = (
-				AD000002 /* todo */,
+				AD000002 /* today-md */,
 				AD000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		AD000002 /* todo */ = {
+		AD000002 /* today-md */ = {
 			isa = PBXGroup;
 			children = (
-				AB000001 /* TodoApp.swift */,
+				AB000001 /* TodayMdApp.swift */,
 				AB000002 /* ContentView.swift */,
-				AB000016 /* todo.entitlements */,
+				AB000016 /* today-md.entitlements */,
 				AB000017 /* Info.plist */,
 				AB000015 /* Assets.xcassets */,
 				AD000004 /* Models */,
 				AD000005 /* Views */,
 				AD000009 /* Helpers */,
 			);
-			path = todo;
+			path = "today-md";
 			sourceTree = "<group>";
 		};
 		AD000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AB000000 /* todo.app */,
+				AB000000 /* today-md.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -151,7 +151,7 @@
 			isa = PBXGroup;
 			children = (
 				AB000014 /* MarkdownRenderer.swift */,
-				AB000021 /* TodoTransferService.swift */,
+				AB000021 /* TodayMdTransferService.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -159,9 +159,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AE000001 /* todo */ = {
+		AE000001 /* today-md */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AF000003 /* Build configuration list for PBXNativeTarget "todo" */;
+			buildConfigurationList = AF000003 /* Build configuration list for PBXNativeTarget "today-md" */;
 			buildPhases = (
 				AE000002 /* Sources */,
 				AC000001 /* Frameworks */,
@@ -171,9 +171,9 @@
 			);
 			dependencies = (
 			);
-			name = todo;
-			productName = todo;
-			productReference = AB000000 /* todo.app */;
+			name = "today-md";
+			productName = "today-md";
+			productReference = AB000000 /* today-md.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -191,7 +191,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AF000001 /* Build configuration list for PBXProject "todo" */;
+			buildConfigurationList = AF000001 /* Build configuration list for PBXProject "today-md" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -204,7 +204,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AE000001 /* todo */,
+				AE000001 /* today-md */,
 			);
 		};
 /* End PBXProject section */
@@ -225,7 +225,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA000001 /* TodoApp.swift in Sources */,
+				AA000001 /* TodayMdApp.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000003 /* TaskList.swift in Sources */,
 				AA000004 /* TaskItem.swift in Sources */,
@@ -242,7 +242,7 @@
 				AA000016 /* BacklogView.swift in Sources */,
 				AA000017 /* WeeklyReviewView.swift in Sources */,
 				AA000020 /* ChecklistSection.swift in Sources */,
-				AA000021 /* TodoTransferService.swift in Sources */,
+				AA000021 /* TodayMdTransferService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -370,14 +370,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = todo/todo.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = todo/Info.plist;
+				INFOPLIST_FILE = "today-md/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -385,7 +385,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.todo.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -397,14 +397,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = todo/todo.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = todo/Info.plist;
+				INFOPLIST_FILE = "today-md/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -412,7 +412,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.todo.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -422,7 +422,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AF000001 /* Build configuration list for PBXProject "todo" */ = {
+		AF000001 /* Build configuration list for PBXProject "today-md" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AF000010 /* Debug */,
@@ -431,7 +431,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AF000003 /* Build configuration list for PBXNativeTarget "todo" */ = {
+		AF000003 /* Build configuration list for PBXNativeTarget "today-md" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AF000020 /* Debug */,
