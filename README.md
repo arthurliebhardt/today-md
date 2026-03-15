@@ -2,6 +2,8 @@
 
 A macOS task manager built with SwiftUI and SwiftData. The app organizes work into lists and three planning lanes: Today, This Week, and Backlog.
 
+![todo app screenshot](docs/image.png)
+
 ## Features
 
 - Multiple task lists with custom names, icons, and colors
