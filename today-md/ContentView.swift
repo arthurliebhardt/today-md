@@ -60,7 +60,7 @@ struct ContentView: View {
         switch result {
         case .success(let folderURL):
             do {
-                try TodoTransferService.exportData(from: modelContext, to: folderURL)
+                try TodayMdTransferService.exportData(from: modelContext, to: folderURL)
             } catch {
                 presentTransferError(title: "Export Failed", error: error)
             }
@@ -74,7 +74,7 @@ struct ContentView: View {
         pendingImportURL = nil
 
         do {
-            try TodoTransferService.importData(into: modelContext, from: url, mode: mode)
+            try TodayMdTransferService.importData(into: modelContext, from: url, mode: mode)
         } catch {
             presentTransferError(title: "Import Failed", error: error)
         }

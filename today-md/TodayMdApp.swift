@@ -32,13 +32,13 @@ final class AppUndoController: ObservableObject {
 }
 
 @main
-struct TodoApp: App {
+struct TodayMdApp: App {
     @StateObject private var undoController = AppUndoController()
     let container: ModelContainer
 
     init() {
         let schema = Schema([TaskList.self, TaskItem.self, SubTask.self, TaskNote.self])
-        let config = ModelConfiguration("TodoStore3", schema: schema)
+        let config = ModelConfiguration("TodayMdStore", schema: schema)
         do {
             container = try ModelContainer(for: schema, configurations: [config])
         } catch {
@@ -61,12 +61,12 @@ struct TodoApp: App {
         .commands {
             CommandGroup(after: .saveItem) {
                 Button("Import...") {
-                    TodoTransferService.importData(into: container.mainContext)
+                    TodayMdTransferService.importData(into: container.mainContext)
                 }
                 .keyboardShortcut("I", modifiers: [.command, .shift])
 
                 Button("Export...") {
-                    TodoTransferService.exportData(from: container.mainContext)
+                    TodayMdTransferService.exportData(from: container.mainContext)
                 }
                 .keyboardShortcut("E", modifiers: [.command, .shift])
             }

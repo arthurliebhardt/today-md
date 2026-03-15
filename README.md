@@ -1,8 +1,8 @@
-# todo
+# today-md
 
 A macOS task manager built with SwiftUI and SwiftData. The app organizes work into lists and three planning lanes: Today, This Week, and Backlog.
 
-![todo app screenshot](docs/image.png)
+![today-md screenshot](docs/image.png)
 
 ## Features
 
@@ -27,19 +27,19 @@ A macOS task manager built with SwiftUI and SwiftData. The app organizes work in
 
 ## Getting Started
 
-1. Open `todo.xcodeproj` in Xcode.
-2. Select the `todo` target.
+1. Open `today-md.xcodeproj` in Xcode.
+2. Select the `today-md` target.
 3. Build and run the app on macOS.
 
 The app stores its local data with SwiftData and creates sample lists and tasks the first time it launches.
 
 ## Project Structure
 
-- `todo/TodoApp.swift`: app entry point and SwiftData container setup
-- `todo/ContentView.swift`: split-view shell, settings, import, and export flows
-- `todo/Models`: SwiftData models for lists, tasks, notes, and subtasks
-- `todo/Views`: board, sidebar, and task detail UI
-- `todo/Helpers/TodoTransferService.swift`: JSON backup import/export
+- `today-md/TodayMdApp.swift`: app entry point and SwiftData container setup
+- `today-md/ContentView.swift`: split-view shell, settings, import, and export flows
+- `today-md/Models`: SwiftData models for lists, tasks, notes, and subtasks
+- `today-md/Views`: board, sidebar, and task detail UI
+- `today-md/Helpers/TodayMdTransferService.swift`: JSON backup import/export
 
 ## Data Portability
 
