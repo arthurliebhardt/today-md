@@ -4,6 +4,7 @@ import SwiftData
 struct AllTasksView: View {
     @Query(sort: \TaskItem.sortOrder) private var allTasks: [TaskItem]
     @Binding var selectedTask: TaskItem?
+    let onMove: (UUID, TimeBlock) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
@@ -27,6 +28,7 @@ struct AllTasksView: View {
                         task: task,
                         isSelected: selectedTask == task,
                         onToggle: { onToggle(task) },
+                        onMove: { targetBlock in onMove(task.id, targetBlock) },
                         onDelete: { onDelete(task) }
                     )
                     .onTapGesture { selectedTask = task }
@@ -59,6 +61,7 @@ struct AllTasksView: View {
                                 task: task,
                                 isSelected: selectedTask == task,
                                 onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
                                 onDelete: { onDelete(task) }
                             )
                                 .onTapGesture { selectedTask = task }
@@ -92,6 +95,7 @@ struct AllTasksView: View {
 
     private func updateDropTarget(targeted: Bool, target: ReorderTarget) {
         if targeted {
+            guard currentDropTarget != target else { return }
             currentDropTarget = target
         } else if currentDropTarget == target {
             currentDropTarget = nil
@@ -131,6 +135,7 @@ struct AllTasksCardView: View {
     let task: TaskItem
     var isSelected: Bool = false
     let onToggle: () -> Void
+    let onMove: (TimeBlock) -> Void
     let onDelete: () -> Void
 
     private var listColor: Color {
@@ -138,6 +143,8 @@ struct AllTasksCardView: View {
     }
 
     var body: some View {
+        let metadata = task.cardMetadata
+
         HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(listColor)
@@ -160,16 +167,16 @@ struct AllTasksCardView: View {
                         .foregroundStyle(task.isDone ? .secondary : .primary)
 
                     HStack(spacing: 8) {
-                        if task.checkboxTotal > 0 {
+                        if metadata.checkboxTotal > 0 {
                             HStack(spacing: 3) {
                                 Image(systemName: "checklist")
                                     .font(.caption)
-                                Text("\(task.checkboxDone)/\(task.checkboxTotal)")
+                                Text("\(metadata.checkboxDone)/\(metadata.checkboxTotal)")
                                     .font(.caption)
                             }
                             .foregroundStyle(.tertiary)
                         }
-                        if task.note != nil {
+                        if metadata.hasNote {
                             Image(systemName: "doc.text")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
@@ -211,7 +218,7 @@ struct AllTasksCardView: View {
         .contextMenu {
             ForEach(TimeBlock.allCases) { b in
                 if b != task.block {
-                    Button("Move to \(b.label)") { task.block = b }
+                    Button("Move to \(b.label)") { onMove(b) }
                 }
             }
             Divider()

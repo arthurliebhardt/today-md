@@ -368,13 +368,30 @@ struct MarkdownEditorView: View {
     }
 
     private func saveNote() {
-        if let note = task.note {
-            note.content = markdownText
-            note.lastModified = Date()
-        } else if !markdownText.isEmpty {
-            let note = TaskNote(content: markdownText)
-            note.parentTask = task
-            modelContext.insert(note)
+        performWithoutModelUndoRegistration {
+            if let note = task.note {
+                note.content = markdownText
+                note.lastModified = Date()
+            } else if !markdownText.isEmpty {
+                let note = TaskNote(content: markdownText)
+                note.parentTask = task
+                modelContext.insert(note)
+            }
+        }
+    }
+
+    private func performWithoutModelUndoRegistration(_ update: () -> Void) {
+        let undoManager = modelContext.undoManager
+        let wasUndoRegistrationEnabled = undoManager?.isUndoRegistrationEnabled ?? false
+
+        if wasUndoRegistrationEnabled {
+            undoManager?.disableUndoRegistration()
+        }
+
+        update()
+
+        if wasUndoRegistrationEnabled {
+            undoManager?.enableUndoRegistration()
         }
     }
 }

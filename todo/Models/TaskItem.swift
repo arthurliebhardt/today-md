@@ -3,6 +3,14 @@ import SwiftData
 import CoreTransferable
 import UniformTypeIdentifiers
 
+struct TaskCardMetadata {
+    let hasNote: Bool
+    let checkboxDone: Int
+    let checkboxTotal: Int
+
+    static let empty = TaskCardMetadata(hasNote: false, checkboxDone: 0, checkboxTotal: 0)
+}
+
 @Model
 final class TaskItem {
     @Attribute(.unique) var id: UUID
@@ -29,25 +37,40 @@ final class TaskItem {
     }
 
     var checkboxTotal: Int {
-        note?.content.components(separatedBy: "\n")
-            .filter { line in
-                let t = line.trimmingCharacters(in: .whitespaces)
-                return t.hasPrefix("- [ ] ") || t.hasPrefix("- [x] ") || t.hasPrefix("- [X] ")
-            }.count ?? 0
+        cardMetadata.checkboxTotal
     }
 
     var checkboxDone: Int {
-        note?.content.components(separatedBy: "\n")
-            .filter { line in
-                let t = line.trimmingCharacters(in: .whitespaces)
-                return t.hasPrefix("- [x] ") || t.hasPrefix("- [X] ")
-            }.count ?? 0
+        cardMetadata.checkboxDone
     }
 
     var note: TaskNote? {
         notes.max { lhs, rhs in
             lhs.lastModified < rhs.lastModified
         }
+    }
+
+    var cardMetadata: TaskCardMetadata {
+        guard let note else { return .empty }
+
+        var checkboxDone = 0
+        var checkboxTotal = 0
+
+        for line in note.content.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- [ ] ") {
+                checkboxTotal += 1
+            } else if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                checkboxTotal += 1
+                checkboxDone += 1
+            }
+        }
+
+        return TaskCardMetadata(
+            hasNote: true,
+            checkboxDone: checkboxDone,
+            checkboxTotal: checkboxTotal
+        )
     }
 
     init(title: String, block: TimeBlock = .backlog, sortOrder: Int = 0) {
