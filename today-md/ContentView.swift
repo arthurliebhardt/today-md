@@ -32,6 +32,36 @@ struct ContentView: View {
         return list.items.filter { $0.block == block }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
+    private var preferredVisibleTasks: [TaskItem] {
+        switch selection {
+        case .all:
+            let activeTasks = allTasks.filter { !$0.isDone }
+            let doneTasks = allTasks.filter(\.isDone)
+            return activeTasks + doneTasks
+        case .list:
+            let activeTasks = TimeBlock.allCases.flatMap { block in
+                listTasks(for: block).filter { !$0.isDone }
+            }
+            let doneTasks = TimeBlock.allCases.flatMap { block in
+                listTasks(for: block).filter(\.isDone)
+            }
+            return activeTasks + doneTasks
+        }
+    }
+
+    private func syncSelectedTask() {
+        guard let currentTask = selectedTask else {
+            selectedTask = preferredVisibleTasks.first
+            return
+        }
+
+        if preferredVisibleTasks.contains(where: { $0.id == currentTask.id }) {
+            return
+        }
+
+        selectedTask = preferredVisibleTasks.first
+    }
+
     private func startImport() {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -312,6 +342,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle(boardTitle)
+            .navigationSplitViewColumnWidth(min: 560, ideal: 760)
         } detail: {
             if let task = selectedTask {
                 TaskDetailView(task: task, onToggle: toggleTask, onDelete: deleteTask)
@@ -319,6 +350,7 @@ struct ContentView: View {
                 ContentUnavailableView("Select a Task", systemImage: "checkmark.circle", description: Text("Click a task to view details."))
             }
         }
+        .navigationSplitViewColumnWidth(min: 460, ideal: 560)
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -387,12 +419,13 @@ struct ContentView: View {
         }
         .onAppear {
             modelContext.undoManager = undoController.manager
+            syncSelectedTask()
         }
-        .onChange(of: allTasks.map(\.id), initial: true) { _, taskIDs in
-            guard let selectedTask else { return }
-            if !taskIDs.contains(selectedTask.id) {
-                self.selectedTask = nil
-            }
+        .onChange(of: selection, initial: true) { _, _ in
+            syncSelectedTask()
+        }
+        .onChange(of: preferredVisibleTasks.map(\.id), initial: true) { _, _ in
+            syncSelectedTask()
         }
         .onChange(of: allLists.map(\.persistentModelID), initial: false) { _, lists in
             guard case .list(let currentList) = selection else { return }

@@ -227,7 +227,7 @@ struct LaneView: View {
                 .padding(.vertical, 8)
             }
         }
-        .frame(minWidth: 160, maxWidth: .infinity)
+        .frame(minWidth: 210, maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(laneBackgroundColor)
