@@ -55,7 +55,7 @@ The app stores its local data in SQLite at `~/Library/Application Support/today-
 
 Download the latest `.zip` from the [Releases](https://github.com/arthurliebhardt/today-md/releases) page.
 
-**Quick install** (after downloading the zip to ~/Downloads):
+**Quick install** (downloads the latest release automatically):
 
 ```bash
 curl -sL https://raw.githubusercontent.com/arthurliebhardt/today-md/main/scripts/install.sh | bash
@@ -77,6 +77,12 @@ Alternatively, remove the quarantine flag via Terminal before opening:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/today-md.app
+```
+
+If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
+
+```bash
+bash scripts/install.sh ~/Downloads/today-md-v1.1.0-macos.zip
 ```
 
 ## Data Portability
