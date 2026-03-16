@@ -1,0 +1,206 @@
+import Foundation
+
+struct TodayMdArchive: Codable {
+    let version: Int
+    let exportedAt: Date
+    let lists: [ListArchive]
+    let unassignedTasks: [TaskArchive]
+
+    init(
+        version: Int = 1,
+        exportedAt: Date = Date(),
+        lists: [ListArchive],
+        unassignedTasks: [TaskArchive]
+    ) {
+        self.version = version
+        self.exportedAt = exportedAt
+        self.lists = lists
+        self.unassignedTasks = unassignedTasks
+    }
+
+    init(lists: [TaskList], unassignedTasks: [TaskItem], exportedAt: Date = Date()) {
+        self.version = 1
+        self.exportedAt = exportedAt
+        self.lists = lists
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { list in
+                ListArchive(
+                    id: list.id,
+                    name: list.name,
+                    icon: list.icon,
+                    colorName: list.colorName,
+                    sortOrder: list.sortOrder,
+                    tasks: list.items
+                        .sorted(by: taskSort)
+                        .map(TaskArchive.init(task:))
+                )
+            }
+        self.unassignedTasks = unassignedTasks
+            .sorted(by: taskSort)
+            .map(TaskArchive.init(task:))
+    }
+
+    func instantiate() -> (lists: [TaskList], unassignedTasks: [TaskItem]) {
+        let hydratedLists = lists
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { listArchive in
+                TaskList(
+                    id: listArchive.id,
+                    name: listArchive.name,
+                    icon: listArchive.icon,
+                    color: ListColor(rawValue: listArchive.colorName) ?? .blue,
+                    sortOrder: listArchive.sortOrder
+                )
+            }
+
+        let listsByID = Dictionary(uniqueKeysWithValues: hydratedLists.map { ($0.id, $0) })
+
+        for listArchive in lists {
+            guard let list = listsByID[listArchive.id] else { continue }
+            list.items = listArchive.tasks.map { archive in
+                let task = archive.makeTask()
+                task.list = list
+                return task
+            }
+        }
+
+        let hydratedUnassigned = unassignedTasks.map { $0.makeTask() }
+        return (hydratedLists, hydratedUnassigned)
+    }
+
+    struct ListArchive: Codable {
+        let id: UUID
+        let name: String
+        let icon: String
+        let colorName: String
+        let sortOrder: Int
+        let tasks: [TaskArchive]
+
+        init(id: UUID, name: String, icon: String, colorName: String, sortOrder: Int, tasks: [TaskArchive]) {
+            self.id = id
+            self.name = name
+            self.icon = icon
+            self.colorName = colorName
+            self.sortOrder = sortOrder
+            self.tasks = tasks
+        }
+    }
+
+    struct TaskArchive: Codable {
+        let id: UUID
+        let title: String
+        let isDone: Bool
+        let blockRaw: String
+        let sortOrder: Int
+        let creationDate: Date
+        let note: NoteArchive?
+        let subtasks: [SubTaskArchive]
+
+        init(
+            id: UUID,
+            title: String,
+            isDone: Bool,
+            blockRaw: String,
+            sortOrder: Int,
+            creationDate: Date,
+            note: NoteArchive?,
+            subtasks: [SubTaskArchive]
+        ) {
+            self.id = id
+            self.title = title
+            self.isDone = isDone
+            self.blockRaw = blockRaw
+            self.sortOrder = sortOrder
+            self.creationDate = creationDate
+            self.note = note
+            self.subtasks = subtasks
+        }
+
+        init(task: TaskItem) {
+            self.id = task.id
+            self.title = task.title
+            self.isDone = task.isDone
+            self.blockRaw = task.blockRaw
+            self.sortOrder = task.sortOrder
+            self.creationDate = task.creationDate
+            self.note = task.note.map(NoteArchive.init(note:))
+            self.subtasks = task.subtasks
+                .sorted { $0.sortOrder < $1.sortOrder }
+                .map(SubTaskArchive.init(subtask:))
+        }
+
+        func makeTask() -> TaskItem {
+            TaskItem(
+                id: id,
+                title: title,
+                block: TimeBlock(rawValue: blockRaw) ?? .backlog,
+                sortOrder: sortOrder,
+                creationDate: creationDate,
+                isDone: isDone,
+                subtasks: subtasks.map { $0.makeSubtask() },
+                note: note?.makeNote()
+            )
+        }
+    }
+
+    struct NoteArchive: Codable {
+        let content: String
+        let lastModified: Date
+
+        init(content: String, lastModified: Date) {
+            self.content = content
+            self.lastModified = lastModified
+        }
+
+        init(note: TaskNote) {
+            self.content = note.content
+            self.lastModified = note.lastModified
+        }
+
+        func makeNote() -> TaskNote {
+            TaskNote(content: content, lastModified: lastModified)
+        }
+    }
+
+    struct SubTaskArchive: Codable {
+        let id: UUID
+        let title: String
+        let isCompleted: Bool
+        let sortOrder: Int
+
+        init(id: UUID, title: String, isCompleted: Bool, sortOrder: Int) {
+            self.id = id
+            self.title = title
+            self.isCompleted = isCompleted
+            self.sortOrder = sortOrder
+        }
+
+        init(subtask: SubTask) {
+            self.id = subtask.id
+            self.title = subtask.title
+            self.isCompleted = subtask.isCompleted
+            self.sortOrder = subtask.sortOrder
+        }
+
+        func makeSubtask() -> SubTask {
+            SubTask(id: id, title: title, isCompleted: isCompleted, sortOrder: sortOrder)
+        }
+    }
+}
+
+func taskSort(lhs: TaskItem, rhs: TaskItem) -> Bool {
+    let lhsTuple = (blockRank(lhs.block), lhs.sortOrder, lhs.creationDate, lhs.id.uuidString)
+    let rhsTuple = (blockRank(rhs.block), rhs.sortOrder, rhs.creationDate, rhs.id.uuidString)
+    return lhsTuple < rhsTuple
+}
+
+func blockRank(_ block: TimeBlock) -> Int {
+    switch block {
+    case .today:
+        return 0
+    case .thisWeek:
+        return 1
+    case .backlog:
+        return 2
+    }
+}

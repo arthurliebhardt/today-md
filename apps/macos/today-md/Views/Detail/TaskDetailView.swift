@@ -1,11 +1,12 @@
 import SwiftUI
-import SwiftData
 
 struct TaskDetailView: View {
-    @Bindable var task: TaskItem
+    @Environment(TodayMdStore.self) private var store
+
+    let task: TaskItem
     let onToggle: (TaskItem) -> Void
     let onDelete: (TaskItem) -> Void
-    @Environment(\.modelContext) private var modelContext
+
     @State private var draftTitle = ""
 
     var body: some View {
@@ -14,6 +15,8 @@ struct TaskDetailView: View {
                 headerSection
                 Divider()
                 ChecklistSection(task: task)
+                Divider()
+                SubTaskListView(task: task)
                 Divider()
                 MarkdownEditorView(task: task)
             }
@@ -25,11 +28,6 @@ struct TaskDetailView: View {
         }
         .onChange(of: task.id, initial: true) { _, _ in
             draftTitle = task.title
-        }
-        .onChange(of: task.title) { _, newValue in
-            if newValue != draftTitle {
-                draftTitle = newValue
-            }
         }
         .toolbar {
             ToolbarItem(placement: .destructiveAction) {
@@ -56,9 +54,7 @@ struct TaskDetailView: View {
                     .font(.title2.bold())
                     .textFieldStyle(.plain)
                     .onChange(of: draftTitle) { _, newValue in
-                        performWithoutModelUndoRegistration {
-                            task.title = newValue
-                        }
+                        store.updateTaskTitle(id: task.id, title: newValue)
                     }
             }
             HStack(spacing: 12) {
@@ -71,21 +67,6 @@ struct TaskDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private func performWithoutModelUndoRegistration(_ update: () -> Void) {
-        let undoManager = modelContext.undoManager
-        let wasUndoRegistrationEnabled = undoManager?.isUndoRegistrationEnabled ?? false
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.disableUndoRegistration()
-        }
-
-        update()
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.enableUndoRegistration()
         }
     }
 }

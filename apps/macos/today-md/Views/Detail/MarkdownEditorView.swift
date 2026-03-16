@@ -1,9 +1,9 @@
 import SwiftUI
-import SwiftData
 
 struct MarkdownEditorView: View {
-    @Bindable var task: TaskItem
-    @Environment(\.modelContext) private var modelContext
+    @Environment(TodayMdStore.self) private var store
+    let task: TaskItem
+
     @State private var showPreview = false
     @State private var markdownText = ""
     @State private var saveTask: DispatchWorkItem?
@@ -38,21 +38,19 @@ struct MarkdownEditorView: View {
         .onAppear {
             markdownText = task.note?.content ?? ""
         }
-        .onChange(of: task.id) {
+        .onChange(of: task.id, initial: true) { _, _ in
             markdownText = task.note?.content ?? ""
             showPreview = false
             cachedTextView = nil
         }
-        .onChange(of: task.note?.content) {
-            let current = task.note?.content ?? ""
+        .onChange(of: task.note?.content) { _, newValue in
+            let current = newValue ?? ""
             if current != markdownText {
                 suppressAutoContinue = true
                 markdownText = current
             }
         }
     }
-
-    // MARK: - Markdown Toolbar
 
     private var mdToolbar: some View {
         HStack(spacing: 1) {
@@ -93,7 +91,6 @@ struct MarkdownEditorView: View {
                 tv.window?.makeFirstResponder(tv)
             }
             action()
-            // Restore focus to the text editor after the toolbar action
             DispatchQueue.main.async {
                 if let tv = cachedTextView {
                     tv.window?.makeFirstResponder(tv)
@@ -101,9 +98,9 @@ struct MarkdownEditorView: View {
             }
         } label: {
             Group {
-                if let icon = icon {
+                if let icon {
                     Image(systemName: icon)
-                } else if let label = label {
+                } else if let label {
                     Text(label).fontWeight(.bold)
                 }
             }
@@ -116,8 +113,6 @@ struct MarkdownEditorView: View {
         .buttonStyle(.borderless)
         .help(tip)
     }
-
-    // MARK: - NSTextView Helpers
 
     private func captureActiveEditorTextView() {
         guard let tv = NSApp.keyWindow?.firstResponder as? NSTextView,
@@ -234,8 +229,6 @@ struct MarkdownEditorView: View {
         restoreSelection(caret, in: selection.tv)
     }
 
-    // MARK: - Editor & Preview
-
     private var editorView: some View {
         TextEditor(text: $markdownText)
             .font(.body.monospaced())
@@ -265,12 +258,10 @@ struct MarkdownEditorView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
-        .onChange(of: markdownText) {
+        .onChange(of: markdownText) { _, _ in
             debouncedSave()
         }
     }
-
-    // MARK: - Auto-continue lists
 
     private func autoContinueList(old: String, new: String) {
         guard !suppressAutoContinue else {
@@ -335,7 +326,7 @@ struct MarkdownEditorView: View {
             }
         }
 
-        if let prefix = prefix {
+        if let prefix {
             suppressAutoContinue = true
             let afterNewline = new.index(after: newlineIndex)
             markdownText = String(new[new.startIndex...newlineIndex]) + prefix + String(new[afterNewline...])
@@ -358,8 +349,6 @@ struct MarkdownEditorView: View {
         return nil
     }
 
-    // MARK: - Save
-
     private func debouncedSave() {
         saveTask?.cancel()
         let work = DispatchWorkItem { saveNote() }
@@ -368,30 +357,6 @@ struct MarkdownEditorView: View {
     }
 
     private func saveNote() {
-        performWithoutModelUndoRegistration {
-            if let note = task.note {
-                note.content = markdownText
-                note.lastModified = Date()
-            } else if !markdownText.isEmpty {
-                let note = TaskNote(content: markdownText)
-                note.parentTask = task
-                modelContext.insert(note)
-            }
-        }
-    }
-
-    private func performWithoutModelUndoRegistration(_ update: () -> Void) {
-        let undoManager = modelContext.undoManager
-        let wasUndoRegistrationEnabled = undoManager?.isUndoRegistrationEnabled ?? false
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.disableUndoRegistration()
-        }
-
-        update()
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.enableUndoRegistration()
-        }
+        store.updateTaskNote(id: task.id, content: markdownText)
     }
 }

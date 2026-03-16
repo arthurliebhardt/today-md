@@ -1,9 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct AllTasksView: View {
-    @Query(sort: \TaskItem.sortOrder) private var allTasks: [TaskItem]
-    @Binding var selectedTask: TaskItem?
+    let tasks: [TaskItem]
+    @Binding var selectedTaskID: UUID?
     let onMove: (UUID, TimeBlock) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
@@ -11,8 +10,8 @@ struct AllTasksView: View {
 
     @State private var currentDropTarget: ReorderTarget?
 
-    private var activeTasks: [TaskItem] { allTasks.filter { !$0.isDone } }
-    private var doneTasks: [TaskItem] { allTasks.filter { $0.isDone } }
+    private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
+    private var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
 
     private enum ReorderTarget: Hashable {
         case before(UUID)
@@ -26,12 +25,12 @@ struct AllTasksView: View {
                 ForEach(activeTasks) { task in
                     AllTasksCardView(
                         task: task,
-                        isSelected: selectedTask == task,
+                        isSelected: selectedTaskID == task.id,
                         onToggle: { onToggle(task) },
                         onMove: { targetBlock in onMove(task.id, targetBlock) },
                         onDelete: { onDelete(task) }
                     )
-                    .onTapGesture { selectedTask = task }
+                    .onTapGesture { selectedTaskID = task.id }
                     .draggable(TaskItemTransfer(id: task.id))
                     .overlay {
                         if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
@@ -41,9 +40,7 @@ struct AllTasksView: View {
                     }
                     .contentShape(Rectangle())
                     .dropDestination(for: TaskItemTransfer.self) { items, location in
-                        let target: ReorderTarget = location.y > 40
-                            ? .after(task.id)
-                            : .before(task.id)
+                        let target: ReorderTarget = location.y > 40 ? .after(task.id) : .before(task.id)
                         return handleReorderDrop(items, target: target)
                     } isTargeted: { targeted in
                         updateDropTarget(targeted: targeted, target: .before(task.id))
@@ -59,12 +56,12 @@ struct AllTasksView: View {
                         ForEach(doneTasks) { task in
                             AllTasksCardView(
                                 task: task,
-                                isSelected: selectedTask == task,
+                                isSelected: selectedTaskID == task.id,
                                 onToggle: { onToggle(task) },
                                 onMove: { targetBlock in onMove(task.id, targetBlock) },
                                 onDelete: { onDelete(task) }
                             )
-                                .onTapGesture { selectedTask = task }
+                            .onTapGesture { selectedTaskID = task.id }
                         }
                     }
                     .font(.caption)
@@ -216,9 +213,9 @@ struct AllTasksCardView: View {
             }
         }
         .contextMenu {
-            ForEach(TimeBlock.allCases) { b in
-                if b != task.block {
-                    Button("Move to \(b.label)") { onMove(b) }
+            ForEach(TimeBlock.allCases) { block in
+                if block != task.block {
+                    Button("Move to \(block.label)") { onMove(block) }
                 }
             }
             Divider()

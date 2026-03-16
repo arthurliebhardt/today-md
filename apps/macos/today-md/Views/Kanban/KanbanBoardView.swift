@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BoardView: View {
     let tasks: (TimeBlock) -> [TaskItem]
-    @Binding var selectedTask: TaskItem?
+    @Binding var selectedTaskID: UUID?
     let onAdd: (String, TimeBlock) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onReorderInBlock: (UUID, TimeBlock, UUID?) -> Void
@@ -31,14 +31,11 @@ struct BoardView: View {
                         isFocusTodayActive ? "Show All Lanes" : "Focus Today",
                         systemImage: isFocusTodayActive ? "rectangle.3.group" : "line.3.horizontal.decrease.circle"
                     )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(isFocusTodayActive ? .orange : .secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.orange.opacity(isFocusTodayActive ? 0.16 : 0.08))
-                        )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isFocusTodayActive ? .orange : .secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.orange.opacity(isFocusTodayActive ? 0.16 : 0.08)))
                 }
                 .buttonStyle(.plain)
                 .help(isFocusTodayActive ? "Expand This Week and Backlog" : "Collapse This Week and Backlog")
@@ -57,7 +54,7 @@ struct BoardView: View {
                             LaneView(
                                 block: block,
                                 tasks: tasks(block),
-                                selectedTask: $selectedTask,
+                                selectedTaskID: $selectedTaskID,
                                 onAdd: { title in onAdd(title, block) },
                                 onMove: onMove,
                                 onReorderActive: { draggedID, beforeID in
@@ -75,7 +72,7 @@ struct BoardView: View {
                         LaneView(
                             block: block,
                             tasks: tasks(block),
-                            selectedTask: $selectedTask,
+                            selectedTaskID: $selectedTaskID,
                             onAdd: { title in onAdd(title, block) },
                             onMove: onMove,
                             onReorderActive: { draggedID, beforeID in
@@ -129,7 +126,7 @@ struct BoardView: View {
 struct LaneView: View {
     let block: TimeBlock
     let tasks: [TaskItem]
-    @Binding var selectedTask: TaskItem?
+    @Binding var selectedTaskID: UUID?
     let onAdd: (String) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
@@ -194,28 +191,26 @@ struct LaneView: View {
                     ForEach(activeTasks) { task in
                         TaskCardView(
                             task: task,
-                            isSelected: selectedTask == task,
+                            isSelected: selectedTaskID == task.id,
                             onToggle: { onToggle(task) },
                             onMove: { targetBlock in onMove(task.id, targetBlock) },
                             onDelete: { onDelete(task) }
                         )
-                            .onTapGesture { selectedTask = task }
-                            .draggable(TaskItemTransfer(id: task.id))
-                            .overlay {
-                                if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
-                                }
+                        .onTapGesture { selectedTaskID = task.id }
+                        .draggable(TaskItemTransfer(id: task.id))
+                        .overlay {
+                            if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
                             }
-                            .contentShape(Rectangle())
-                            .dropDestination(for: TaskItemTransfer.self) { items, location in
-                                let target: ReorderTarget = location.y > 40
-                                    ? .after(task.id)
-                                    : .before(task.id)
-                                return handleReorderDrop(items, target: target)
-                            } isTargeted: { targeted in
-                                updateDropTarget(targeted: targeted, target: .before(task.id))
-                            }
+                        }
+                        .contentShape(Rectangle())
+                        .dropDestination(for: TaskItemTransfer.self) { items, location in
+                            let target: ReorderTarget = location.y > 40 ? .after(task.id) : .before(task.id)
+                            return handleReorderDrop(items, target: target)
+                        } isTargeted: { targeted in
+                            updateDropTarget(targeted: targeted, target: .before(task.id))
+                        }
                     }
                     reorderDropZone(target: .end, height: 48)
                     addCard
@@ -257,10 +252,7 @@ struct LaneView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(accentColor.opacity(isTodayLane ? 0.18 : block == .thisWeek ? 0.10 : 0.08))
-            )
+            .background(Capsule().fill(accentColor.opacity(isTodayLane ? 0.18 : block == .thisWeek ? 0.10 : 0.08)))
             Spacer()
             Text("\(activeTasks.count)")
                 .font(.caption)
@@ -271,7 +263,7 @@ struct LaneView: View {
                     Capsule()
                         .fill(isTodayLane ? accentColor.opacity(0.14) : Color(nsColor: .separatorColor).opacity(0.3))
                 )
-            if let onCollapse = onCollapse {
+            if let onCollapse {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { onCollapse() }
                 } label: {
@@ -327,12 +319,12 @@ struct LaneView: View {
             ForEach(doneTasks) { task in
                 TaskCardView(
                     task: task,
-                    isSelected: selectedTask == task,
+                    isSelected: selectedTaskID == task.id,
                     onToggle: { onToggle(task) },
                     onMove: { targetBlock in onMove(task.id, targetBlock) },
                     onDelete: { onDelete(task) }
                 )
-                    .onTapGesture { selectedTask = task }
+                .onTapGesture { selectedTaskID = task.id }
             }
         }
         .font(.caption)
@@ -398,6 +390,7 @@ struct LaneView: View {
         guard !title.isEmpty else { return }
         onAdd(title)
         newTitle = ""
+        isAdding = false
     }
 
     private func cancelAdd() {

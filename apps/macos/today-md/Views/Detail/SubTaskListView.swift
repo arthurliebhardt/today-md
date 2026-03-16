@@ -1,9 +1,9 @@
 import SwiftUI
-import SwiftData
 
 struct SubTaskListView: View {
-    @Bindable var task: TaskItem
-    @Environment(\.modelContext) private var modelContext
+    @Environment(TodayMdStore.self) private var store
+    let task: TaskItem
+
     @State private var newSubtaskTitle = ""
 
     private var sortedSubtasks: [SubTask] {
@@ -41,7 +41,7 @@ struct SubTaskListView: View {
 
     private func subtaskRow(_ subtask: SubTask) -> some View {
         HStack(spacing: 8) {
-            Button(action: { subtask.isCompleted.toggle() }) {
+            Button(action: { store.toggleSubtask(taskID: task.id, subtaskID: subtask.id) }) {
                 Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
                     .foregroundStyle(subtask.isCompleted ? .green : .secondary)
@@ -54,7 +54,7 @@ struct SubTaskListView: View {
 
             Spacer()
 
-            Button(action: { deleteSubtask(subtask) }) {
+            Button(action: { store.deleteSubtask(taskID: task.id, subtaskID: subtask.id) }) {
                 Image(systemName: "xmark")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -66,15 +66,7 @@ struct SubTaskListView: View {
     }
 
     private func addSubtask() {
-        let title = newSubtaskTitle.trimmingCharacters(in: .whitespaces)
-        guard !title.isEmpty else { return }
-        let subtask = SubTask(title: title, sortOrder: task.subtasks.count)
-        subtask.parentTask = task
-        modelContext.insert(subtask)
+        store.addSubtask(taskID: task.id, title: newSubtaskTitle)
         newSubtaskTitle = ""
-    }
-
-    private func deleteSubtask(_ subtask: SubTask) {
-        modelContext.delete(subtask)
     }
 }
