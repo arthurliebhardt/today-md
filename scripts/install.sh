@@ -2,19 +2,19 @@
 set -e
 
 APP_NAME="today-md"
-ZIP_NAME="today-md-v1.0-macos.zip"
 
-# Find the zip in common locations
+# Find the newest matching zip in common locations
 ZIP_PATH=""
 for dir in "$HOME/Downloads" "$(pwd)"; do
-    if [ -f "$dir/$ZIP_NAME" ]; then
-        ZIP_PATH="$dir/$ZIP_NAME"
+    CANDIDATE=$(find "$dir" -maxdepth 1 -type f -name 'today-md-v*-macos.zip' | sort | tail -n 1)
+    if [ -n "$CANDIDATE" ]; then
+        ZIP_PATH="$CANDIDATE"
         break
     fi
 done
 
 if [ -z "$ZIP_PATH" ]; then
-    echo "Error: $ZIP_NAME not found in ~/Downloads or current directory."
+    echo "Error: no today-md release zip found in ~/Downloads or current directory."
     echo "Usage: place the zip in ~/Downloads and re-run, or run from the same directory."
     exit 1
 fi
