@@ -1,25 +1,26 @@
 import SwiftUI
-import SwiftData
 import UniformTypeIdentifiers
 
 enum SidebarSelection: Hashable {
     case all
-    case list(TaskList)
+    case list(UUID)
 }
 
-private struct TaskPlacementSnapshot: Equatable {
+private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
-    let block: TimeBlock
-    let sortOrder: Int
+    let title: String
+    let listName: String
+    let blockRaw: String
+    let noteContent: String
+    let noteLastModified: Date
 }
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var undoController: AppUndoController
-    @Query(sort: \TaskItem.sortOrder) private var allTasks: [TaskItem]
-    @Query(sort: \TaskList.sortOrder) private var allLists: [TaskList]
+
     @State private var selection: SidebarSelection = .all
-    @State private var selectedTask: TaskItem?
+    @State private var selectedTaskID: UUID?
     @State private var showingSettingsSheet = false
     @State private var showingImportPicker = false
     @State private var showingExportPicker = false
@@ -27,39 +28,58 @@ struct ContentView: View {
     @State private var showingImportModeDialog = false
     @State private var transferAlert: TransferAlert?
 
+    private var selectedList: TaskList? {
+        guard case .list(let id) = selection else { return nil }
+        return store.list(id: id)
+    }
+
+    private var selectedTask: TaskItem? {
+        guard let selectedTaskID else { return nil }
+        return store.task(id: selectedTaskID)
+    }
+
     private func listTasks(for block: TimeBlock) -> [TaskItem] {
-        guard case .list(let list) = selection else { return [] }
-        return list.items.filter { $0.block == block }.sorted { $0.sortOrder < $1.sortOrder }
+        guard let list = selectedList else { return [] }
+        return store.filteredTasks(
+            list.items
+                .filter { $0.block == block }
+                .sorted { $0.sortOrder < $1.sortOrder }
+        )
     }
 
     private var preferredVisibleTasks: [TaskItem] {
+        if store.hasActiveSearch {
+            return store.rankedTasks(store.allTasks)
+        }
+
+        let tasks: [TaskItem]
+
         switch selection {
         case .all:
-            let activeTasks = allTasks.filter { !$0.isDone }
-            let doneTasks = allTasks.filter(\.isDone)
-            return activeTasks + doneTasks
+            tasks = store.allTasks
         case .list:
-            let activeTasks = TimeBlock.allCases.flatMap { block in
-                listTasks(for: block).filter { !$0.isDone }
-            }
-            let doneTasks = TimeBlock.allCases.flatMap { block in
-                listTasks(for: block).filter(\.isDone)
-            }
-            return activeTasks + doneTasks
+            tasks = TimeBlock.allCases.flatMap(listTasks)
         }
+
+        let activeTasks = tasks.filter { !$0.isDone }
+        let doneTasks = tasks.filter(\.isDone)
+        return activeTasks + doneTasks
     }
 
     private func syncSelectedTask() {
-        guard let currentTask = selectedTask else {
-            selectedTask = preferredVisibleTasks.first
+        if let selectedTaskID,
+           preferredVisibleTasks.contains(where: { $0.id == selectedTaskID }) {
             return
         }
 
-        if preferredVisibleTasks.contains(where: { $0.id == currentTask.id }) {
-            return
-        }
+        selectedTaskID = preferredVisibleTasks.first?.id
+    }
 
-        selectedTask = preferredVisibleTasks.first
+    private func validateSelection() {
+        guard case .list(let id) = selection else { return }
+        if store.list(id: id) == nil {
+            selection = .all
+        }
     }
 
     private func startImport() {
@@ -90,7 +110,7 @@ struct ContentView: View {
         switch result {
         case .success(let folderURL):
             do {
-                try TodayMdTransferService.exportData(from: modelContext, to: folderURL)
+                try TodayMdTransferService.exportData(from: store, to: folderURL)
             } catch {
                 presentTransferError(title: "Export Failed", error: error)
             }
@@ -104,7 +124,7 @@ struct ContentView: View {
         pendingImportURL = nil
 
         do {
-            try TodayMdTransferService.importData(into: modelContext, from: url, mode: mode)
+            try TodayMdTransferService.importData(into: store, from: url, mode: mode)
         } catch {
             presentTransferError(title: "Import Failed", error: error)
         }
@@ -115,6 +135,43 @@ struct ContentView: View {
             title: title,
             message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         )
+    }
+
+    private var markdownArchivePath: String? {
+        try? TodayMdMarkdownArchiveService.archivePath()
+    }
+
+    private var markdownArchiveSnapshots: [MarkdownArchiveSnapshot] {
+        store.allTasks
+            .compactMap { task -> MarkdownArchiveSnapshot? in
+                guard let note = task.note else { return nil }
+
+                return MarkdownArchiveSnapshot(
+                    id: task.id,
+                    title: task.title,
+                    listName: task.list?.name ?? "Unassigned",
+                    blockRaw: task.blockRaw,
+                    noteContent: note.content,
+                    noteLastModified: note.lastModified
+                )
+            }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    private func syncMarkdownArchive() {
+        do {
+            try TodayMdMarkdownArchiveService.syncNotes(for: store.allTasks)
+        } catch {
+            presentTransferError(title: "Markdown Archive Sync Failed", error: error)
+        }
+    }
+
+    private func openMarkdownArchive() {
+        do {
+            try TodayMdMarkdownArchiveService.revealArchiveFolder()
+        } catch {
+            presentTransferError(title: "Open Markdown Archive Failed", error: error)
+        }
     }
 
     private var settingsSheetView: some View {
@@ -153,7 +210,7 @@ struct ContentView: View {
                         Text("Settings")
                             .font(.system(size: 28, weight: .bold))
 
-                        Text("Manage backups now and leave room for app preferences, shortcuts, and workflow options later.")
+                        Text("Manage backups, local search, and note archives without coupling the app to Xcode-only persistence.")
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
@@ -162,10 +219,7 @@ struct ContentView: View {
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(
-                                Capsule()
-                                    .fill(Color.orange.opacity(0.12))
-                            )
+                            .background(Capsule().fill(Color.orange.opacity(0.12)))
                     }
 
                     Spacer()
@@ -186,10 +240,18 @@ struct ContentView: View {
 
                         settingsActionCard(
                             title: "Export Backup",
-                            subtitle: "Choose a folder and create a timestamped JSON backup of everything in the app.",
+                            subtitle: "Choose a folder and create a timestamped JSON backup plus separate markdown note files.",
                             systemImage: "square.and.arrow.up",
                             tint: .orange,
                             action: startExport
+                        )
+
+                        settingsActionCard(
+                            title: "Open Markdown Archive",
+                            subtitle: "Open the folder where task notes are mirrored as reusable .md files.",
+                            systemImage: "doc.text",
+                            tint: .green,
+                            action: openMarkdownArchive
                         )
                     }
                     .padding(18)
@@ -201,39 +263,40 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
                     )
+
+                    if let markdownArchivePath {
+                        Text("Markdown archive: \(markdownArchivePath)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Coming Next")
+                    Text("Search")
                         .font(.headline)
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        settingsFutureRow(
-                            title: "Appearance",
-                            subtitle: "Theme, density, and board presentation."
-                        )
-                        settingsFutureRow(
-                            title: "Behavior",
-                            subtitle: "Default task placement, archive rules, and import preferences."
-                        )
-                        settingsFutureRow(
-                            title: "Shortcuts",
-                            subtitle: "Keyboard controls and quick actions."
-                        )
-                    }
-                    .padding(18)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
-                    )
+                    Text("Task title, note content, and subtasks are indexed in the local SQLite database using full-text search.")
+                        .foregroundStyle(.secondary)
+
+                    TextField("Search tasks", text: Binding(
+                        get: { store.searchText },
+                        set: { store.searchText = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
                 }
+                .padding(18)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                )
 
                 HStack {
-                    Text("More settings can slot into these sections without changing the layout.")
+                    Text("Future settings can build on top of the current local-first store without changing the app architecture again.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -297,33 +360,15 @@ struct ContentView: View {
         .buttonStyle(.plain)
     }
 
-    private func settingsFutureRow(title: String, subtitle: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.5))
-                .frame(width: 7, height: 7)
-                .padding(.top, 7)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-    }
-
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } content: {
             Group {
-                if case .all = selection {
+                if store.hasActiveSearch || selection == .all {
                     AllTasksView(
-                        selectedTask: $selectedTask,
+                        tasks: preferredVisibleTasks,
+                        selectedTaskID: $selectedTaskID,
                         onMove: moveTask,
                         onDelete: deleteTask,
                         onToggle: toggleTask,
@@ -332,7 +377,7 @@ struct ContentView: View {
                 } else {
                     BoardView(
                         tasks: listTasks,
-                        selectedTask: $selectedTask,
+                        selectedTaskID: $selectedTaskID,
                         onAdd: addTask,
                         onMove: moveTask,
                         onReorderInBlock: reorderTaskInCurrentListBlock,
@@ -345,13 +390,54 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 560, ideal: 760)
         } detail: {
             if let task = selectedTask {
-                TaskDetailView(task: task, onToggle: toggleTask, onDelete: deleteTask)
+                TaskDetailView(
+                    task: task,
+                    onToggle: toggleTask,
+                    onDelete: deleteTask
+                )
             } else {
-                ContentUnavailableView("Select a Task", systemImage: "checkmark.circle", description: Text("Click a task to view details."))
+                ContentUnavailableView(
+                    "Select a Task",
+                    systemImage: "checkmark.circle",
+                    description: Text("Click a task to view details.")
+                )
             }
         }
         .navigationSplitViewColumnWidth(min: 460, ideal: 560)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+
+                    TextField(
+                        "Search tasks, notes, and subtasks",
+                        text: Binding(
+                            get: { store.searchText },
+                            set: { store.searchText = $0 }
+                        )
+                    )
+                    .textFieldStyle(.plain)
+
+                    if store.hasActiveSearch {
+                        Button {
+                            store.searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(minWidth: 280, idealWidth: 360, maxWidth: 420)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+            }
+
             ToolbarItemGroup {
                 Button {
                     showingSettingsSheet = true
@@ -418,281 +504,78 @@ struct ContentView: View {
             )
         }
         .onAppear {
-            modelContext.undoManager = undoController.manager
             syncSelectedTask()
         }
         .onChange(of: selection, initial: true) { _, _ in
             syncSelectedTask()
         }
-        .onChange(of: preferredVisibleTasks.map(\.id), initial: true) { _, _ in
+        .onChange(of: markdownArchiveSnapshots, initial: true) { _, _ in
+            syncMarkdownArchive()
+        }
+        .onChange(of: store.dataRevision, initial: true) { _, _ in
+            validateSelection()
             syncSelectedTask()
         }
-        .onChange(of: allLists.map(\.persistentModelID), initial: false) { _, lists in
-            guard case .list(let currentList) = selection else { return }
-            if !lists.contains(currentList.persistentModelID) {
-                selection = .all
-            }
-        }
         .onDeleteCommand {
-            if let task = selectedTask { deleteTask(task) }
+            if let selectedTaskID {
+                deleteTask(id: selectedTaskID)
+            }
         }
     }
 
     private var boardTitle: String {
+        if store.hasActiveSearch {
+            return store.hasActiveSearch ? "Search Results" : "All Tasks"
+        }
+
         switch selection {
-        case .all: return "All Tasks"
-        case .list(let l): return l.name
+        case .all:
+            return "All Tasks"
+        case .list(let id):
+            return store.list(id: id)?.name ?? "Tasks"
         }
     }
 
     private func addTask(title: String, block: TimeBlock) {
-        guard case .list(let list) = selection else { return }
-        let task = TaskItem(title: title, block: block, sortOrder: listTasks(for: block).count)
-        task.list = list
-        performModelChange(actionName: "Add Task") {
-            modelContext.insert(task)
+        guard case .list(let listID) = selection,
+              let task = store.addTask(title: title, block: block, listID: listID)
+        else {
+            return
         }
-        selectedTask = task
+
+        selectedTaskID = task.id
     }
 
     private func moveTask(id: UUID, to block: TimeBlock) {
-        guard let task = allTasks.first(where: { $0.id == id }) else { return }
-        let previousBlock = task.block
-        guard previousBlock != block else { return }
-
-        if let list = task.list {
-            performPlacementChange(actionName: "Move Task", tasks: list.items) {
-                task.block = block
-                task.sortOrder = nextSortOrder(for: list, in: block)
-                normalizeSortOrder(for: list, in: previousBlock)
-            }
-        } else {
-            performPlacementChange(actionName: "Move Task", tasks: allTasks) {
-                task.block = block
-                task.sortOrder = nextGlobalSortOrder(in: block)
-                normalizeGlobalSortOrder(in: previousBlock)
-                normalizeGlobalSortOrder(in: block)
-            }
-        }
+        store.moveTask(id: id, to: block)
     }
 
     private func deleteTask(_ task: TaskItem) {
-        if selectedTask == task { selectedTask = nil }
-        performModelChange(actionName: "Delete Task") {
-            modelContext.delete(task)
+        deleteTask(id: task.id)
+    }
+
+    private func deleteTask(id: UUID) {
+        if selectedTaskID == id {
+            selectedTaskID = nil
         }
+        store.deleteTask(id: id)
     }
 
     private func toggleTask(_ task: TaskItem) {
-        performModelChange(actionName: task.isDone ? "Mark Task Incomplete" : "Complete Task") {
-            task.isDone.toggle()
-        }
+        toggleTask(id: task.id)
+    }
+
+    private func toggleTask(id: UUID) {
+        store.toggleTask(id: id)
     }
 
     private func reorderActiveTask(_ draggedID: UUID, _ beforeID: UUID?) {
-        if beforeID == draggedID { return }
-
-        performPlacementChange(actionName: "Reorder Tasks", tasks: allTasks) {
-            var active = allTasks
-                .filter { !$0.isDone }
-                .sorted { $0.sortOrder < $1.sortOrder }
-
-            let done = allTasks
-                .filter { $0.isDone }
-                .sorted { $0.sortOrder < $1.sortOrder }
-            let originalOrder = (active + done).map(\.id)
-
-            guard let draggedIndex = active.firstIndex(where: { $0.id == draggedID }) else { return }
-            let draggedTask = active.remove(at: draggedIndex)
-
-            let insertIndex: Int
-            if let beforeID,
-               let idx = active.firstIndex(where: { $0.id == beforeID }) {
-                insertIndex = idx
-            } else {
-                insertIndex = active.count
-            }
-
-            active.insert(draggedTask, at: insertIndex)
-
-            let reordered = active + done
-            guard reordered.map(\.id) != originalOrder else { return }
-
-            applySortOrder(reordered)
-        }
+        store.reorderAllActiveTask(draggedID, before: beforeID)
     }
 
     private func reorderTaskInCurrentListBlock(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
-        if beforeID == draggedID { return }
-        guard case .list(let list) = selection else { return }
-        guard let draggedTask = list.items.first(where: { $0.id == draggedID }) else { return }
-        guard !draggedTask.isDone else { return }
-
-        performPlacementChange(actionName: "Move Task", tasks: list.items) {
-            let previousBlock = draggedTask.block
-            let originalOrder = list.items
-                .filter { $0.block == block }
-                .sorted { $0.sortOrder < $1.sortOrder }
-                .map(\.id)
-
-            if draggedTask.block != block {
-                draggedTask.block = block
-                draggedTask.sortOrder = nextSortOrder(for: list, in: block)
-            }
-
-            var active = list.items
-                .filter { $0.block == block && !$0.isDone }
-                .sorted { $0.sortOrder < $1.sortOrder }
-
-            guard let draggedIndex = active.firstIndex(where: { $0.id == draggedID }) else { return }
-            let moving = active.remove(at: draggedIndex)
-
-            let insertIndex: Int
-            if let beforeID,
-               let idx = active.firstIndex(where: { $0.id == beforeID }) {
-                insertIndex = idx
-            } else {
-                insertIndex = active.count
-            }
-
-            active.insert(moving, at: insertIndex)
-
-            let done = list.items
-                .filter { $0.block == block && $0.isDone }
-                .sorted { $0.sortOrder < $1.sortOrder }
-
-            let reordered = active + done
-            if reordered.map(\.id) != originalOrder {
-                applySortOrder(reordered)
-            }
-
-            if previousBlock != block {
-                normalizeSortOrder(for: list, in: previousBlock)
-            }
-        }
-    }
-
-    private func normalizeSortOrder(for list: TaskList, in block: TimeBlock) {
-        let ordered = list.items
-            .filter { $0.block == block }
-            .sorted { $0.sortOrder < $1.sortOrder }
-
-        applySortOrder(ordered)
-    }
-
-    private func normalizeGlobalSortOrder(in block: TimeBlock) {
-        let ordered = allTasks
-            .filter { $0.list == nil && $0.block == block }
-            .sorted { $0.sortOrder < $1.sortOrder }
-
-        applySortOrder(ordered)
-    }
-
-    private func nextSortOrder(for list: TaskList, in block: TimeBlock) -> Int {
-        list.items
-            .filter { $0.block == block }
-            .map(\.sortOrder)
-            .max()
-            .map { $0 + 1 } ?? 0
-    }
-
-    private func nextGlobalSortOrder(in block: TimeBlock) -> Int {
-        allTasks
-            .filter { $0.list == nil && $0.block == block }
-            .map(\.sortOrder)
-            .max()
-            .map { $0 + 1 } ?? 0
-    }
-
-    private func applySortOrder(_ tasks: [TaskItem]) {
-        for (index, task) in tasks.enumerated() where task.sortOrder != index {
-            task.sortOrder = index
-        }
-    }
-
-    private func performPlacementChange(actionName: String, tasks: [TaskItem], change: () -> Void) {
-        let before = snapshot(for: tasks)
-        let undoManager = undoController.manager
-        let wasUndoRegistrationEnabled = undoManager.isUndoRegistrationEnabled
-
-        if wasUndoRegistrationEnabled {
-            undoManager.disableUndoRegistration()
-        }
-
-        change()
-
-        if wasUndoRegistrationEnabled {
-            undoManager.enableUndoRegistration()
-        }
-
-        let after = snapshot(for: tasks)
-        guard after != before else { return }
-
-        registerPlacementUndo(actionName: actionName, snapshots: before)
-    }
-
-    private func performModelChange(actionName: String, change: () -> Void) {
-        change()
-        undoController.manager.setActionName(actionName)
-    }
-
-    private func registerPlacementUndo(actionName: String, snapshots: [TaskPlacementSnapshot]) {
-        undoController.manager.registerUndo(withTarget: modelContext) { context in
-            Self.restorePlacements(in: context, snapshots: snapshots, actionName: actionName)
-        }
-        undoController.manager.setActionName(actionName)
-    }
-
-    private func snapshot(for tasks: [TaskItem]) -> [TaskPlacementSnapshot] {
-        tasks
-            .map { TaskPlacementSnapshot(id: $0.id, block: $0.block, sortOrder: $0.sortOrder) }
-            .sorted { lhs, rhs in
-                lhs.id.uuidString < rhs.id.uuidString
-            }
-    }
-
-    private static func restorePlacements(in context: ModelContext, snapshots: [TaskPlacementSnapshot], actionName: String) {
-        let current = Self.snapshots(for: snapshots, in: context)
-        let undoManager = context.undoManager
-        let wasUndoRegistrationEnabled = undoManager?.isUndoRegistrationEnabled ?? false
-
-        undoManager?.registerUndo(withTarget: context) { context in
-            restorePlacements(in: context, snapshots: current, actionName: actionName)
-        }
-        undoManager?.setActionName(actionName)
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.disableUndoRegistration()
-        }
-
-        applyPlacements(snapshots, in: context)
-
-        if wasUndoRegistrationEnabled {
-            undoManager?.enableUndoRegistration()
-        }
-    }
-
-    private static func snapshots(for targetSnapshots: [TaskPlacementSnapshot], in context: ModelContext) -> [TaskPlacementSnapshot] {
-        let ids = Set(targetSnapshots.map(\.id))
-        let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
-
-        return tasks
-            .filter { ids.contains($0.id) }
-            .map { TaskPlacementSnapshot(id: $0.id, block: $0.block, sortOrder: $0.sortOrder) }
-            .sorted { lhs, rhs in
-                lhs.id.uuidString < rhs.id.uuidString
-            }
-    }
-
-    private static func applyPlacements(_ snapshots: [TaskPlacementSnapshot], in context: ModelContext) {
-        let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
-        let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
-
-        for snapshot in snapshots {
-            guard let task = tasksByID[snapshot.id] else { continue }
-            task.block = snapshot.block
-            task.sortOrder = snapshot.sortOrder
-        }
+        guard case .list(let listID) = selection else { return }
+        store.reorderTaskInListBlock(listID: listID, draggedID: draggedID, block: block, before: beforeID)
     }
 }
 

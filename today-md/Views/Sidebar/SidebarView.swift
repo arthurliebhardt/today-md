@@ -1,10 +1,9 @@
 import SwiftUI
-import SwiftData
 
 struct SidebarView: View {
+    @Environment(TodayMdStore.self) private var store
     @Binding var selection: SidebarSelection
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \TaskList.sortOrder) private var lists: [TaskList]
+
     @State private var isAddingList = false
     @State private var newListName = ""
     @State private var newListIcon = "checklist"
@@ -22,7 +21,7 @@ struct SidebarView: View {
     ]
 
     private var allActiveCount: Int {
-        lists.reduce(0) { $0 + $1.items.filter { !$0.isDone }.count }
+        store.allTasks.filter { !$0.isDone }.count
     }
 
     var body: some View {
@@ -34,7 +33,7 @@ struct SidebarView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .frame(width: 24)
 
-                        Text("All Tasks")
+                        Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
 
                         Spacer()
 
@@ -52,7 +51,7 @@ struct SidebarView: View {
             }
 
             Section("Lists") {
-                ForEach(lists) { list in
+                ForEach(store.lists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
                     listRow(list)
                 }
             }
@@ -71,7 +70,7 @@ struct SidebarView: View {
 
     private func listRow(_ list: TaskList) -> some View {
         let activeCount = list.items.filter { !$0.isDone }.count
-        return Button(action: { selection = .list(list) }) {
+        return Button(action: { selection = .list(list.id) }) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -97,32 +96,36 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(
-            selection == .list(list) ? list.listColor.color.opacity(0.1) : Color.clear
+            selection == .list(list.id) ? list.listColor.color.opacity(0.1) : Color.clear
         )
         .contextMenu {
             Button("Rename...") {
                 startEditing(list)
             }
             Menu("Color") {
-                ForEach(ListColor.allCases) { c in
-                    Button(action: { list.listColor = c }) {
-                        Label(c.label, systemImage: list.listColor == c ? "checkmark.circle.fill" : "circle.fill")
+                ForEach(ListColor.allCases) { color in
+                    Button(action: {
+                        store.updateList(id: list.id, name: list.name, icon: list.icon, color: color)
+                    }) {
+                        Label(color.label, systemImage: list.listColor == color ? "checkmark.circle.fill" : "circle.fill")
                     }
                 }
             }
             Menu("Icon") {
                 ForEach(availableIcons, id: \.self) { icon in
-                    Button(action: { list.icon = icon }) {
+                    Button(action: {
+                        store.updateList(id: list.id, name: list.name, icon: icon, color: list.listColor)
+                    }) {
                         Label(iconLabel(for: icon), systemImage: list.icon == icon ? "checkmark.circle.fill" : icon)
                     }
                 }
             }
             Divider()
             Button("Delete", role: .destructive) {
-                if case .list(let sel) = selection, sel == list {
+                if case .list(let selectedID) = selection, selectedID == list.id {
                     selection = .all
                 }
-                modelContext.delete(list)
+                store.deleteList(id: list.id)
             }
         }
     }
@@ -136,15 +139,15 @@ struct SidebarView: View {
                 .onSubmit { addList() }
             iconPicker(selection: $newListIcon)
             HStack(spacing: 6) {
-                ForEach(ListColor.allCases) { c in
-                    Button(action: { newListColor = c }) {
+                ForEach(ListColor.allCases) { color in
+                    Button(action: { newListColor = color }) {
                         Circle()
-                            .fill(c.color)
+                            .fill(color.color)
                             .frame(width: 22, height: 22)
                             .overlay(
-                                Circle().strokeBorder(.white, lineWidth: newListColor == c ? 2 : 0)
+                                Circle().strokeBorder(.white, lineWidth: newListColor == color ? 2 : 0)
                             )
-                            .shadow(color: newListColor == c ? c.color.opacity(0.5) : .clear, radius: 3)
+                            .shadow(color: newListColor == color ? color.color.opacity(0.5) : .clear, radius: 3)
                     }
                     .buttonStyle(.plain)
                 }
@@ -155,7 +158,7 @@ struct SidebarView: View {
                     newListIcon = "checklist"
                     isAddingList = false
                 }
-                    .keyboardShortcut(.cancelAction)
+                .keyboardShortcut(.cancelAction)
                 Button("Add") { addList() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(newListName.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -173,15 +176,15 @@ struct SidebarView: View {
                 .onSubmit { renameList(list) }
             iconPicker(selection: $editIcon)
             HStack(spacing: 6) {
-                ForEach(ListColor.allCases) { c in
-                    Button(action: { editColor = c }) {
+                ForEach(ListColor.allCases) { color in
+                    Button(action: { editColor = color }) {
                         Circle()
-                            .fill(c.color)
+                            .fill(color.color)
                             .frame(width: 22, height: 22)
                             .overlay(
-                                Circle().strokeBorder(.white, lineWidth: editColor == c ? 2 : 0)
+                                Circle().strokeBorder(.white, lineWidth: editColor == color ? 2 : 0)
                             )
-                            .shadow(color: editColor == c ? c.color.opacity(0.5) : .clear, radius: 3)
+                            .shadow(color: editColor == color ? color.color.opacity(0.5) : .clear, radius: 3)
                     }
                     .buttonStyle(.plain)
                 }
@@ -200,13 +203,12 @@ struct SidebarView: View {
     private func addList() {
         let name = newListName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        let list = TaskList(name: name, icon: newListIcon, color: newListColor, sortOrder: lists.count)
-        modelContext.insert(list)
-        selection = .list(list)
+        let list = store.addList(name: name, icon: newListIcon, color: newListColor)
+        selection = .list(list.id)
         newListName = ""
         newListIcon = "checklist"
         isAddingList = false
-        // Cycle to next color for the next list
+
         let allColors = ListColor.allCases
         if let idx = allColors.firstIndex(of: newListColor) {
             newListColor = allColors[(idx + 1) % allColors.count]
@@ -216,9 +218,7 @@ struct SidebarView: View {
     private func renameList(_ list: TaskList) {
         let name = editName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        list.name = name
-        list.icon = editIcon
-        list.listColor = editColor
+        store.updateList(id: list.id, name: name, icon: editIcon, color: editColor)
         editingList = nil
     }
 

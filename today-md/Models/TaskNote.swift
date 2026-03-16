@@ -1,14 +1,13 @@
 import Foundation
-import SwiftData
+import Observation
 
-@Model
+@Observable
 final class TaskNote {
     var content: String
     var lastModified: Date
-    var parentTask: TaskItem?
 
-    init(content: String = "") {
+    init(content: String = "", lastModified: Date = Date()) {
         self.content = content
-        self.lastModified = Date()
+        self.lastModified = lastModified
     }
 }

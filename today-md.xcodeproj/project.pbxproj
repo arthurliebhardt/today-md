@@ -26,6 +26,9 @@
 		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019; };
 		AA000020 /* ChecklistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020; };
 		AA000021 /* TodayMdTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021; };
+		AA000022 /* TodayMdArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022; };
+		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023; };
+		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +54,9 @@
 		AB000019 /* WeeklyReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewView.swift; sourceTree = "<group>"; };
 		AB000020 /* ChecklistSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistSection.swift; sourceTree = "<group>"; };
 		AB000021 /* TodayMdTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdTransferService.swift; sourceTree = "<group>"; };
+		AB000022 /* TodayMdArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdArchive.swift; sourceTree = "<group>"; };
+		AB000023 /* TodayMdDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdDatabase.swift; sourceTree = "<group>"; };
+		AB000024 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +64,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA000024 /* libsqlite3.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,6 +109,7 @@
 				AB000004 /* TaskItem.swift */,
 				AB000005 /* SubTask.swift */,
 				AB000006 /* TaskNote.swift */,
+				AB000022 /* TodayMdArchive.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -152,6 +160,8 @@
 			children = (
 				AB000014 /* MarkdownRenderer.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
+				AB000023 /* TodayMdDatabase.swift */,
+				AB000024 /* libsqlite3.tbd */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -243,6 +253,8 @@
 				AA000017 /* WeeklyReviewView.swift in Sources */,
 				AA000020 /* ChecklistSection.swift in Sources */,
 				AA000021 /* TodayMdTransferService.swift in Sources */,
+				AA000022 /* TodayMdArchive.swift in Sources */,
+				AA000023 /* TodayMdDatabase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

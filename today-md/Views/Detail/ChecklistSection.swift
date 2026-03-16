@@ -1,14 +1,14 @@
 import SwiftUI
-import SwiftData
 
 struct ChecklistSection: View {
-    @Bindable var task: TaskItem
-    @Environment(\.modelContext) private var modelContext
+    @Environment(TodayMdStore.self) private var store
+    let task: TaskItem
+
     @State private var newItemTitle = ""
     @State private var isExpanded = true
 
     private struct CheckItem: Identifiable {
-        let id: Int // line index
+        let id: Int
         let title: String
         let isChecked: Bool
     }
@@ -16,11 +16,11 @@ struct ChecklistSection: View {
     private var items: [CheckItem] {
         guard let content = task.note?.content else { return [] }
         return content.components(separatedBy: "\n").enumerated().compactMap { index, line in
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.hasPrefix("- [x] ") || t.hasPrefix("- [X] ") {
-                return CheckItem(id: index, title: String(t.dropFirst(6)), isChecked: true)
-            } else if t.hasPrefix("- [ ] ") {
-                return CheckItem(id: index, title: String(t.dropFirst(6)), isChecked: false)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                return CheckItem(id: index, title: String(trimmed.dropFirst(6)), isChecked: true)
+            } else if trimmed.hasPrefix("- [ ] ") {
+                return CheckItem(id: index, title: String(trimmed.dropFirst(6)), isChecked: false)
             }
             return nil
         }
@@ -81,7 +81,7 @@ struct ChecklistSection: View {
     private func checkRow(_ item: CheckItem) -> some View {
         HStack(spacing: 8) {
             Button {
-                toggleItem(at: item.id)
+                store.toggleChecklistItem(taskID: task.id, lineIndex: item.id)
             } label: {
                 Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
@@ -96,7 +96,7 @@ struct ChecklistSection: View {
             Spacer()
 
             Button {
-                removeItem(at: item.id)
+                store.removeChecklistItem(taskID: task.id, lineIndex: item.id)
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
@@ -108,59 +108,8 @@ struct ChecklistSection: View {
         .padding(.vertical, 2)
     }
 
-    private func toggleItem(at lineIndex: Int) {
-        guard let note = task.note else { return }
-        var lines = note.content.components(separatedBy: "\n")
-        guard lineIndex < lines.count else { return }
-        let line = lines[lineIndex]
-        performChecklistChange(actionName: "Toggle Checklist Item") {
-            if line.contains("- [ ] ") {
-                lines[lineIndex] = line.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
-            } else {
-                lines[lineIndex] = line
-                    .replacingOccurrences(of: "- [x] ", with: "- [ ] ")
-                    .replacingOccurrences(of: "- [X] ", with: "- [ ] ")
-            }
-            note.content = lines.joined(separator: "\n")
-            note.lastModified = Date()
-        }
-    }
-
-    private func removeItem(at lineIndex: Int) {
-        guard let note = task.note else { return }
-        var lines = note.content.components(separatedBy: "\n")
-        guard lineIndex < lines.count else { return }
-        performChecklistChange(actionName: "Delete Checklist Item") {
-            lines.remove(at: lineIndex)
-            note.content = lines.joined(separator: "\n")
-            note.lastModified = Date()
-        }
-    }
-
     private func addItem() {
-        let title = newItemTitle.trimmingCharacters(in: .whitespaces)
-        guard !title.isEmpty else { return }
-        let entry = "- [ ] \(title)"
-
-        performChecklistChange(actionName: "Add Checklist Item") {
-            if let note = task.note {
-                if note.content.isEmpty {
-                    note.content = entry
-                } else {
-                    note.content += "\n" + entry
-                }
-                note.lastModified = Date()
-            } else {
-                let note = TaskNote(content: entry)
-                note.parentTask = task
-                modelContext.insert(note)
-            }
-        }
+        store.addChecklistItem(taskID: task.id, title: newItemTitle)
         newItemTitle = ""
-    }
-
-    private func performChecklistChange(actionName: String, update: () -> Void) {
-        update()
-        modelContext.undoManager?.setActionName(actionName)
     }
 }

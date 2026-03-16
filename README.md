@@ -1,6 +1,6 @@
 # today-md
 
-A macOS task manager built with SwiftUI and SwiftData. The app organizes work into lists and three planning lanes: Today, This Week, and Backlog.
+A macOS task manager built with SwiftUI, `@Observable` models, and a local SQLite store. The app organizes work into lists and three planning lanes: Today, This Week, and Backlog.
 
 ![today-md screenshot](docs/image.png)
 
@@ -10,36 +10,42 @@ A macOS task manager built with SwiftUI and SwiftData. The app organizes work in
 - Kanban-style planning lanes for `Today`, `This Week`, and `Backlog`
 - Task detail view with subtasks and Markdown notes
 - Drag-and-drop task movement and reordering
-- Import and export of task data as JSON backups
+- Full-text search across task titles, notes, and subtasks
+- Import and export of task data as JSON backups, with markdown note exports alongside them
+- Automatic mirror of task notes as `.md` files in Application Support
 - Seeded sample data on first launch for local testing
 
 ## Tech Stack
 
-- Swift 5
+- Swift 6
 - SwiftUI
-- SwiftData
+- Observation (`@Observable`)
+- SQLite with FTS-backed search
 - AppKit integrations for file import/export panels
 
 ## Requirements
 
 - macOS 14.0+
-- Xcode 15+
+- Swift 6.2+
 
 ## Getting Started
 
-1. Open `today-md.xcodeproj` in Xcode.
-2. Select the `today-md` target.
-3. Build and run the app on macOS.
+```bash
+swift build
+swift run today-md
+```
 
-The app stores its local data with SwiftData and creates sample lists and tasks the first time it launches.
+The app stores its local data in SQLite at `~/Library/Application Support/today-md/today-md.sqlite` and creates sample lists and tasks the first time it launches.
 
 ## Project Structure
 
-- `today-md/TodayMdApp.swift`: app entry point and SwiftData container setup
-- `today-md/ContentView.swift`: split-view shell, settings, import, and export flows
-- `today-md/Models`: SwiftData models for lists, tasks, notes, and subtasks
+- `Package.swift`: Swift Package manifest for `swift build` / `swift run`
+- `today-md/TodayMdApp.swift`: app entry point and SQLite-backed observable store
+- `today-md/ContentView.swift`: split-view shell, search, settings, import, and export flows
+- `today-md/Models`: observable models plus codable archive types
+- `today-md/Helpers/TodayMdDatabase.swift`: SQLite schema, load/save, and full-text search
+- `today-md/Helpers/TodayMdTransferService.swift`: JSON backup import/export and markdown archive mirroring
 - `today-md/Views`: board, sidebar, and task detail UI
-- `today-md/Helpers/TodayMdTransferService.swift`: JSON backup import/export
 
 ## Installation
 
@@ -71,4 +77,6 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 
 ## Data Portability
 
-Backups are exported as JSON files. Imported data can either be merged into the existing store or replace it completely.
+Backups are exported as JSON files, and each export also writes a sibling folder with the task notes as separate Markdown files. Imported data can either be merged into the existing store or replace it completely.
+
+Task notes are also mirrored automatically as Markdown files in `~/Library/Application Support/today-md/Markdown Archive/` so they can be reused outside the app.

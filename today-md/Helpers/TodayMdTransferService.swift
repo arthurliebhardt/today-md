@@ -1,13 +1,12 @@
 import AppKit
 import Foundation
-import SwiftData
 import UniformTypeIdentifiers
 
 @MainActor
 enum TodayMdTransferService {
     private static var activePanel: NSOpenPanel?
 
-    static func exportData(from context: ModelContext) {
+    static func exportData(from store: TodayMdStore) {
         NSApp.activate(ignoringOtherApps: true)
 
         let panel = NSOpenPanel()
@@ -16,33 +15,37 @@ enum TodayMdTransferService {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
         panel.title = "Export Tasks"
-        panel.message = "Choose a folder for the JSON backup."
+        panel.message = "Choose a folder for the JSON backup and markdown exports."
         panel.prompt = "Export Here"
 
         present(panel) { folderURL in
             guard let folderURL else { return }
 
             do {
-                try exportData(from: context, to: folderURL)
+                try exportData(from: store, to: folderURL)
             } catch {
                 presentError(title: "Export Failed", error: error)
             }
         }
     }
 
-    static func exportData(from context: ModelContext, to folderURL: URL) throws {
+    static func exportData(from store: TodayMdStore, to folderURL: URL) throws {
         try withSecurityScopedAccess(to: folderURL) {
-            let exportURL = folderURL.appendingPathComponent(defaultExportFilename())
+            let exportBaseName = defaultExportBasename()
+            let exportURL = folderURL.appendingPathComponent("\(exportBaseName).json")
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
 
-            let data = try encoder.encode(makeArchive(from: context))
+            let data = try encoder.encode(store.makeArchive())
             try data.write(to: exportURL, options: .atomic)
+
+            let markdownFolderURL = folderURL.appendingPathComponent("\(exportBaseName)-markdown", isDirectory: true)
+            try TodayMdMarkdownArchiveService.exportNotes(for: store.allTasks, to: markdownFolderURL)
         }
     }
 
-    static func importData(into context: ModelContext) {
+    static func importData(into store: TodayMdStore) {
         NSApp.activate(ignoringOtherApps: true)
 
         let panel = NSOpenPanel()
@@ -59,21 +62,21 @@ enum TodayMdTransferService {
 
             do {
                 guard let mode = chooseImportMode() else { return }
-                try importData(into: context, from: url, mode: mode)
+                try importData(into: store, from: url, mode: mode)
             } catch {
                 presentError(title: "Import Failed", error: error)
             }
         }
     }
 
-    static func importData(into context: ModelContext, from url: URL, mode: ImportMode) throws {
+    static func importData(into store: TodayMdStore, from url: URL, mode: ImportMode) throws {
         try withSecurityScopedAccess(to: url) {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
 
             let data = try Data(contentsOf: url)
             let archive = try decoder.decode(TodayMdArchive.self, from: data)
-            try applyImport(archive, into: context, mode: mode)
+            store.applyImport(archive, mode: mode)
         }
     }
 
@@ -112,136 +115,6 @@ enum TodayMdTransferService {
         return try operation()
     }
 
-    private static func makeArchive(from context: ModelContext) throws -> TodayMdArchive {
-        let lists = try context.fetch(FetchDescriptor<TaskList>(sortBy: [SortDescriptor(\.sortOrder)]))
-        let tasks = try context.fetch(FetchDescriptor<TaskItem>())
-
-        return TodayMdArchive(
-            version: 1,
-            exportedAt: Date(),
-            lists: lists.map { list in
-                TodayMdArchive.ListArchive(
-                    name: list.name,
-                    icon: list.icon,
-                    colorName: list.colorName,
-                    sortOrder: list.sortOrder,
-                    tasks: list.items
-                        .sorted(by: taskSort)
-                        .map(makeTaskArchive)
-                )
-            },
-            unassignedTasks: tasks
-                .filter { $0.list == nil }
-                .sorted(by: taskSort)
-                .map(makeTaskArchive)
-        )
-    }
-
-    private static func makeTaskArchive(_ task: TaskItem) -> TodayMdArchive.TaskArchive {
-        TodayMdArchive.TaskArchive(
-            title: task.title,
-            isDone: task.isDone,
-            blockRaw: task.blockRaw,
-            sortOrder: task.sortOrder,
-            creationDate: task.creationDate,
-            note: task.note.map {
-                TodayMdArchive.NoteArchive(
-                    content: $0.content,
-                    lastModified: $0.lastModified
-                )
-            },
-            subtasks: task.subtasks
-                .sorted { $0.sortOrder < $1.sortOrder }
-                .map {
-                    TodayMdArchive.SubTaskArchive(
-                        title: $0.title,
-                        isCompleted: $0.isCompleted,
-                        sortOrder: $0.sortOrder
-                    )
-                }
-        )
-    }
-
-    private static func applyImport(_ archive: TodayMdArchive, into context: ModelContext, mode: ImportMode) throws {
-        if mode == .replaceExisting {
-            try clearExistingData(in: context)
-        }
-
-        let existingLists = try context.fetch(FetchDescriptor<TaskList>(sortBy: [SortDescriptor(\.sortOrder)]))
-        let existingTasks = try context.fetch(FetchDescriptor<TaskItem>())
-
-        let listSortBase = ((existingLists.map(\.sortOrder).max() ?? -1) + 1)
-        let taskSortBase = ((existingTasks.filter { $0.list == nil }.map(\.sortOrder).max() ?? -1) + 1)
-
-        for (index, listArchive) in archive.lists.enumerated() {
-            let list = TaskList(
-                name: listArchive.name,
-                icon: listArchive.icon,
-                color: ListColor(rawValue: listArchive.colorName) ?? .blue,
-                sortOrder: mode == .replaceExisting ? listArchive.sortOrder : listSortBase + index
-            )
-            context.insert(list)
-
-            for taskArchive in listArchive.tasks {
-                insertTask(from: taskArchive, into: context, list: list, sortOrder: taskArchive.sortOrder)
-            }
-        }
-
-        for (index, taskArchive) in archive.unassignedTasks.enumerated() {
-            let sortOrder = mode == .replaceExisting ? taskArchive.sortOrder : taskSortBase + index
-            insertTask(from: taskArchive, into: context, list: nil, sortOrder: sortOrder)
-        }
-
-        try context.save()
-    }
-
-    private static func insertTask(
-        from archive: TodayMdArchive.TaskArchive,
-        into context: ModelContext,
-        list: TaskList?,
-        sortOrder: Int
-    ) {
-        let task = TaskItem(
-            title: archive.title,
-            block: TimeBlock(rawValue: archive.blockRaw) ?? .backlog,
-            sortOrder: sortOrder
-        )
-        task.isDone = archive.isDone
-        task.creationDate = archive.creationDate
-        task.list = list
-        context.insert(task)
-
-        if let noteArchive = archive.note {
-            let note = TaskNote(content: noteArchive.content)
-            note.lastModified = noteArchive.lastModified
-            note.parentTask = task
-            context.insert(note)
-        }
-
-        for subtaskArchive in archive.subtasks {
-            let subtask = SubTask(
-                title: subtaskArchive.title,
-                isCompleted: subtaskArchive.isCompleted,
-                sortOrder: subtaskArchive.sortOrder
-            )
-            subtask.parentTask = task
-            context.insert(subtask)
-        }
-    }
-
-    private static func clearExistingData(in context: ModelContext) throws {
-        let allTasks = try context.fetch(FetchDescriptor<TaskItem>())
-        let allLists = try context.fetch(FetchDescriptor<TaskList>())
-
-        for task in allTasks where task.list == nil {
-            context.delete(task)
-        }
-
-        for list in allLists {
-            context.delete(list)
-        }
-    }
-
     private static func chooseImportMode() -> ImportMode? {
         let alert = NSAlert()
         alert.alertStyle = .informational
@@ -269,27 +142,10 @@ enum TodayMdTransferService {
         alert.runModal()
     }
 
-    private static func defaultExportFilename() -> String {
+    private static func defaultExportBasename() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        return "today-md-backup-\(formatter.string(from: Date())).json"
-    }
-
-    private static func taskSort(lhs: TaskItem, rhs: TaskItem) -> Bool {
-        let lhsTuple = (blockRank(lhs.block), lhs.sortOrder, lhs.creationDate)
-        let rhsTuple = (blockRank(rhs.block), rhs.sortOrder, rhs.creationDate)
-        return lhsTuple < rhsTuple
-    }
-
-    private static func blockRank(_ block: TimeBlock) -> Int {
-        switch block {
-        case .today:
-            return 0
-        case .thisWeek:
-            return 1
-        case .backlog:
-            return 2
-        }
+        return "today-md-backup-\(formatter.string(from: Date()))"
     }
 }
 
@@ -298,38 +154,146 @@ enum ImportMode {
     case replaceExisting
 }
 
-private struct TodayMdArchive: Codable {
-    let version: Int
-    let exportedAt: Date
-    let lists: [ListArchive]
-    let unassignedTasks: [TaskArchive]
-
-    struct ListArchive: Codable {
-        let name: String
-        let icon: String
-        let colorName: String
-        let sortOrder: Int
-        let tasks: [TaskArchive]
+@MainActor
+enum TodayMdMarkdownArchiveService {
+    static func syncNotes(for tasks: [TaskItem]) throws {
+        let directoryURL = try archiveDirectoryURL()
+        try writeNotes(tasks, to: directoryURL, removeStaleFiles: true)
     }
 
-    struct TaskArchive: Codable {
-        let title: String
-        let isDone: Bool
-        let blockRaw: String
-        let sortOrder: Int
-        let creationDate: Date
-        let note: NoteArchive?
-        let subtasks: [SubTaskArchive]
+    static func exportNotes(for tasks: [TaskItem], to directoryURL: URL) throws {
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        try writeNotes(tasks, to: directoryURL, removeStaleFiles: true)
     }
 
-    struct NoteArchive: Codable {
-        let content: String
-        let lastModified: Date
+    private static func writeNotes(
+        _ tasks: [TaskItem],
+        to directoryURL: URL,
+        removeStaleFiles: Bool
+    ) throws {
+        let fileManager = FileManager.default
+
+        let noteFiles = tasks
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+            .compactMap { task -> (filename: String, content: String)? in
+                guard let note = task.note else { return nil }
+                guard !note.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+
+                return (
+                    filename: archiveFilename(for: task),
+                    content: renderMarkdown(for: task, note: note)
+                )
+            }
+
+        let expectedFilenames = Set(noteFiles.map(\.filename))
+        if removeStaleFiles {
+            let existingFiles = try fileManager.contentsOfDirectory(
+                at: directoryURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+
+            for fileURL in existingFiles where fileURL.pathExtension.lowercased() == "md" {
+                guard !expectedFilenames.contains(fileURL.lastPathComponent) else { continue }
+                try? fileManager.removeItem(at: fileURL)
+            }
+        }
+
+        for noteFile in noteFiles {
+            let fileURL = directoryURL.appendingPathComponent(noteFile.filename, isDirectory: false)
+            try noteFile.content.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
     }
 
-    struct SubTaskArchive: Codable {
-        let title: String
-        let isCompleted: Bool
-        let sortOrder: Int
+    static func archivePath() throws -> String {
+        try archiveDirectoryURL().path
+    }
+
+    static func revealArchiveFolder() throws {
+        let directoryURL = try archiveDirectoryURL()
+        NSWorkspace.shared.open(directoryURL)
+    }
+
+    private static func archiveDirectoryURL() throws -> URL {
+        guard let applicationSupportURL = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw MarkdownArchiveError.applicationSupportUnavailable
+        }
+
+        let directoryURL = applicationSupportURL
+            .appendingPathComponent("today-md", isDirectory: true)
+            .appendingPathComponent("Markdown Archive", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        return directoryURL
+    }
+
+    private static func archiveFilename(for task: TaskItem) -> String {
+        let slug = slugify(task.title)
+        return "\(slug)--\(task.id.uuidString.lowercased()).md"
+    }
+
+    private static func slugify(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        let scalars = value.lowercased().unicodeScalars.map { scalar -> String in
+            allowed.contains(scalar) ? String(scalar) : "-"
+        }
+
+        let collapsed = scalars.joined()
+            .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+
+        let fallback = collapsed.isEmpty ? "untitled-task" : collapsed
+        return String(fallback.prefix(60))
+    }
+
+    private static func renderMarkdown(for task: TaskItem, note: TaskNote) -> String {
+        let lines = [
+            "---",
+            "task_id: \"\(task.id.uuidString)\"",
+            "title: \"\(yamlEscaped(task.title))\"",
+            "list: \"\(yamlEscaped(task.list?.name ?? "Unassigned"))\"",
+            "lane: \"\(yamlEscaped(task.block.label))\"",
+            "created_at: \"\(iso8601String(from: task.creationDate))\"",
+            "updated_at: \"\(iso8601String(from: note.lastModified))\"",
+            "---",
+            "",
+            note.content
+        ]
+
+        return lines.joined(separator: "\n")
+    }
+
+    private static func yamlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    private static func iso8601String(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+}
+
+private enum MarkdownArchiveError: LocalizedError {
+    case applicationSupportUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .applicationSupportUnavailable:
+            return "The Application Support folder is unavailable."
+        }
     }
 }
