@@ -10,7 +10,7 @@ A macOS task manager built with SwiftUI, `@Observable` models, and a local SQLit
 - Kanban-style planning lanes for `Today`, `This Week`, and `Backlog`
 - Task detail view with subtasks and Markdown notes
 - Drag-and-drop task movement and reordering
-- Full-text search across task titles, notes, and subtasks
+- Global search across task titles, notes, and subtasks from the centered toolbar search field
 - Import and export of task data as JSON backups, with markdown note exports alongside them
 - Automatic mirror of task notes as `.md` files in Application Support
 - Seeded sample data on first launch for local testing
@@ -30,10 +30,14 @@ A macOS task manager built with SwiftUI, `@Observable` models, and a local SQLit
 
 ## Getting Started
 
+Build from the command line:
+
 ```bash
 swift build
 swift run today-md
 ```
+
+Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 
 The app stores its local data in SQLite at `~/Library/Application Support/today-md/today-md.sqlite` and creates sample lists and tasks the first time it launches.
 
@@ -77,6 +81,8 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 
 ## Data Portability
 
-Backups are exported as JSON files, and each export also writes a sibling folder with the task notes as separate Markdown files. Imported data can either be merged into the existing store or replace it completely.
+Backups are exported as JSON files, and each export also writes a sibling folder with the task notes as separate Markdown files. Imported data can either be merged into the existing SQLite store or replace it completely.
 
 Task notes are also mirrored automatically as Markdown files in `~/Library/Application Support/today-md/Markdown Archive/` so they can be reused outside the app.
+
+Search is powered by a local SQLite full-text index over task titles, markdown notes, and subtask text.
