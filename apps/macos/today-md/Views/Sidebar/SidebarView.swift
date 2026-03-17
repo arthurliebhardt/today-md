@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(TodayMdStore.self) private var store
+    @EnvironmentObject private var presentationState: AppPresentationState
     @Binding var selection: SidebarSelection
 
     @State private var isAddingList = false
@@ -56,6 +57,9 @@ struct SidebarView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            shortcutHintFooter
+        }
         .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         .toolbar {
             ToolbarItem {
@@ -66,6 +70,34 @@ struct SidebarView: View {
         }
         .sheet(isPresented: $isAddingList) { addListSheet }
         .sheet(item: $editingList) { list in renameListSheet(list) }
+    }
+
+    private var shortcutHintFooter: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            Button(action: { presentationState.presentKeyboardShortcuts() }) {
+                HStack(spacing: 8) {
+                    ShortcutSequenceView(
+                        shortcut: "Cmd + /",
+                        tone: .secondary,
+                        font: .system(size: 11, weight: .semibold, design: .rounded)
+                    )
+
+                    Text("to show keyboard shortcuts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open the keyboard shortcuts cheatsheet")
+            .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+        }
     }
 
     private func listRow(_ list: TaskList) -> some View {

@@ -21,12 +21,17 @@ struct TaskCardView: View {
                 .padding(.vertical, 4)
 
             HStack(spacing: 8) {
-                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 17))
-                    .foregroundStyle(task.isDone ? .green : .secondary)
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onToggle)
+                Button(action: onToggle) {
+                    Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(task.isDone ? .green : listColor)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle()
+                                .fill((task.isDone ? Color.green : listColor).opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title.isEmpty ? "New task" : task.title)
@@ -58,13 +63,13 @@ struct TaskCardView: View {
             .padding(10)
         }
         .background {
-            RoundedRectangle(cornerRadius: 8)
+            Rectangle()
                 .fill(Color(nsColor: .windowBackgroundColor))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(Rectangle())
         .overlay {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
+                Rectangle()
                     .strokeBorder(listColor.opacity(0.5), lineWidth: 1.5)
             }
         }
