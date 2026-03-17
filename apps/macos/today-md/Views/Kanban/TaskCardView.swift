@@ -21,13 +21,12 @@ struct TaskCardView: View {
                 .padding(.vertical, 4)
 
             HStack(spacing: 8) {
-                Button(action: onToggle) {
-                    Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 17))
-                        .foregroundStyle(task.isDone ? .green : .secondary)
-                }
-                .buttonStyle(.borderless)
-                .focusEffectDisabled()
+                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 17))
+                    .foregroundStyle(task.isDone ? .green : .secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onToggle)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title.isEmpty ? "New task" : task.title)

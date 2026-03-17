@@ -1,6 +1,8 @@
 # today-md
 
-A macOS task manager built with SwiftUI, `@Observable` models, and a local SQLite store. The app organizes work into lists and three planning lanes: Today, This Week, and Backlog.
+Native macOS task manager for planning work across `Today`, `This Week`, and `Backlog`.
+
+Built with SwiftUI, `@Observable` models, and a local SQLite store, `today-md` keeps tasks, subtasks, and Markdown notes in a lightweight local-first desktop app.
 
 ![today-md screenshot](docs/image.png)
 
@@ -99,4 +101,10 @@ Task notes are also mirrored automatically as Markdown files in `~/Library/Appli
 
 Search is powered by a local SQLite full-text index over task titles, markdown notes, and subtask text.
 
-If you want, I can do a second pass next for a LICENSE, contribution guide, and a cleaner repo description/tagline for GitHub.
+## Contributing
+
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, workflow, and pull request guidelines.
+
+## License
+
+Released under the MIT License. See [`LICENSE`](LICENSE).
