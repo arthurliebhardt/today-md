@@ -7,28 +7,11 @@ struct ChecklistSection: View {
     @State private var newItemTitle = ""
     @State private var isExpanded = true
 
-    private struct CheckItem: Identifiable {
-        let id: Int
-        let title: String
-        let isChecked: Bool
-    }
-
-    private var items: [CheckItem] {
-        guard let content = task.note?.content else { return [] }
-        return content.components(separatedBy: "\n").enumerated().compactMap { index, line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
-                return CheckItem(id: index, title: String(trimmed.dropFirst(6)), isChecked: true)
-            } else if trimmed.hasPrefix("- [ ] ") {
-                return CheckItem(id: index, title: String(trimmed.dropFirst(6)), isChecked: false)
-            }
-            return nil
-        }
-    }
+    private var items: [MarkdownChecklistItem] { task.checklistItems }
 
     private var doneCount: Int { items.filter(\.isChecked).count }
-    private var activeItems: [CheckItem] { items.filter { !$0.isChecked } }
-    private var doneItems: [CheckItem] { items.filter { $0.isChecked } }
+    private var activeItems: [MarkdownChecklistItem] { items.filter { !$0.isChecked } }
+    private var doneItems: [MarkdownChecklistItem] { items.filter { $0.isChecked } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -78,10 +61,10 @@ struct ChecklistSection: View {
         }
     }
 
-    private func checkRow(_ item: CheckItem) -> some View {
+    private func checkRow(_ item: MarkdownChecklistItem) -> some View {
         HStack(spacing: 8) {
             Button {
-                store.toggleChecklistItem(taskID: task.id, lineIndex: item.id)
+                store.toggleChecklistItem(taskID: task.id, lineIndex: item.lineIndex)
             } label: {
                 Image(systemName: item.isChecked ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
@@ -96,7 +79,7 @@ struct ChecklistSection: View {
             Spacer()
 
             Button {
-                store.removeChecklistItem(taskID: task.id, lineIndex: item.id)
+                store.removeChecklistItem(taskID: task.id, lineIndex: item.lineIndex)
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)

@@ -11,6 +11,24 @@ struct TaskCardMetadata {
     static let empty = TaskCardMetadata(hasNote: false, checkboxDone: 0, checkboxTotal: 0)
 }
 
+struct MarkdownChecklistItem: Identifiable, Hashable {
+    let lineIndex: Int
+    let title: String
+    let isChecked: Bool
+
+    var id: Int { lineIndex }
+
+    var normalizedTitle: String {
+        Self.normalize(title)
+    }
+
+    static func normalize(_ title: String) -> String {
+        title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
 @Observable
 final class TaskItem: Identifiable, Hashable {
     let id: UUID
@@ -40,27 +58,53 @@ final class TaskItem: Identifiable, Hashable {
         cardMetadata.checkboxDone
     }
 
-    var cardMetadata: TaskCardMetadata {
-        guard let note else { return .empty }
+    var checklistItems: [MarkdownChecklistItem] {
+        guard let note else { return [] }
 
-        var checkboxDone = 0
-        var checkboxTotal = 0
-
-        for line in note.content.split(separator: "\n", omittingEmptySubsequences: false) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("- [ ] ") {
-                checkboxTotal += 1
-            } else if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
-                checkboxTotal += 1
-                checkboxDone += 1
+        return note.content
+            .components(separatedBy: "\n")
+            .enumerated()
+            .compactMap { lineIndex, line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                    return MarkdownChecklistItem(
+                        lineIndex: lineIndex,
+                        title: String(trimmed.dropFirst(6)),
+                        isChecked: true
+                    )
+                } else if trimmed.hasPrefix("- [ ] ") {
+                    return MarkdownChecklistItem(
+                        lineIndex: lineIndex,
+                        title: String(trimmed.dropFirst(6)),
+                        isChecked: false
+                    )
+                }
+                return nil
             }
-        }
+    }
 
+    var mappedSubtasks: [SubTask] {
+        markdownSubtaskMappings().map(\.subtask)
+    }
+
+    var mappedCompletedSubtaskCount: Int {
+        mappedSubtasks.filter(\.isCompleted).count
+    }
+
+    var cardMetadata: TaskCardMetadata {
         return TaskCardMetadata(
-            hasNote: true,
-            checkboxDone: checkboxDone,
-            checkboxTotal: checkboxTotal
+            hasNote: note != nil,
+            checkboxDone: checklistItems.filter(\.isChecked).count,
+            checkboxTotal: checklistItems.count
         )
+    }
+
+    func mappedChecklistLineIndex(for subtaskID: UUID) -> Int? {
+        markdownSubtaskMappings().first(where: { $0.subtask.id == subtaskID })?.item.lineIndex
+    }
+
+    func mappedSubtaskID(forChecklistLineIndex lineIndex: Int) -> UUID? {
+        markdownSubtaskMappings().first(where: { $0.item.lineIndex == lineIndex })?.subtask.id
     }
 
     init(
@@ -89,6 +133,26 @@ final class TaskItem: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    private func markdownSubtaskMappings() -> [(subtask: SubTask, item: MarkdownChecklistItem)] {
+        var remainingItemsByTitle = Dictionary(grouping: checklistItems, by: \.normalizedTitle)
+            .mapValues { items in
+                items.sorted { $0.lineIndex < $1.lineIndex }
+            }
+
+        return subtasks
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .compactMap { subtask in
+                let titleKey = MarkdownChecklistItem.normalize(subtask.title)
+                guard var matches = remainingItemsByTitle[titleKey], !matches.isEmpty else {
+                    return nil
+                }
+
+                let item = matches.removeFirst()
+                remainingItemsByTitle[titleKey] = matches
+                return (subtask, item)
+            }
     }
 }
 

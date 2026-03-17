@@ -6,8 +6,8 @@ struct SubTaskListView: View {
 
     @State private var newSubtaskTitle = ""
 
-    private var sortedSubtasks: [SubTask] {
-        task.subtasks.sorted { $0.sortOrder < $1.sortOrder }
+    private var mappedSubtasks: [SubTask] {
+        task.mappedSubtasks
     }
 
     var body: some View {
@@ -16,14 +16,14 @@ struct SubTaskListView: View {
                 Text("Subtasks")
                     .font(.subheadline.bold())
                 Spacer()
-                if !task.subtasks.isEmpty {
-                    Text("\(task.completedSubtaskCount)/\(task.subtasks.count)")
+                if !mappedSubtasks.isEmpty {
+                    Text("\(task.mappedCompletedSubtaskCount)/\(mappedSubtasks.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            ForEach(sortedSubtasks) { subtask in
+            ForEach(mappedSubtasks) { subtask in
                 subtaskRow(subtask)
             }
 
