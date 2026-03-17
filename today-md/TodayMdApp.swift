@@ -9,6 +9,8 @@ private struct MainWindowConfigurator: NSViewRepresentable {
             guard let window = view.window else { return }
             NSApp.setActivationPolicy(.regular)
             window.minSize = NSSize(width: 1200, height: 720)
+            window.title = ""
+            window.titleVisibility = .visible
             window.setContentSize(NSSize(width: 1500, height: 920))
             window.center()
             window.makeKeyAndOrderFront(nil)
@@ -22,6 +24,7 @@ private struct MainWindowConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = nsView.window else { return }
             window.minSize = NSSize(width: 1200, height: 720)
+            window.titleVisibility = .visible
         }
     }
 }
@@ -55,9 +58,112 @@ final class AppUndoController: ObservableObject {
     }
 }
 
+struct ShortcutItem: Identifiable, Hashable {
+    let id = UUID()
+    let title: String
+    let shortcut: String
+    let detail: String
+}
+
+struct ShortcutSection: Identifiable, Hashable {
+    let id = UUID()
+    let title: String
+    let items: [ShortcutItem]
+}
+
+enum ShortcutCheatsheet {
+    static let sections: [ShortcutSection] = [
+        ShortcutSection(
+            title: "Selection",
+            items: [
+                ShortcutItem(
+                    title: "Select task",
+                    shortcut: "Click",
+                    detail: "Select a single task and make it the active anchor."
+                ),
+                ShortcutItem(
+                    title: "Extend selection",
+                    shortcut: "Shift-Click",
+                    detail: "Select the range from the current anchor to the clicked task."
+                ),
+                ShortcutItem(
+                    title: "Select all visible tasks",
+                    shortcut: "Cmd-A",
+                    detail: "Select every task in the focused lane on the board, or every visible task in All Tasks and search."
+                ),
+                ShortcutItem(
+                    title: "Delete selection",
+                    shortcut: "Delete",
+                    detail: "Delete the selected task or the whole selected set."
+                ),
+                ShortcutItem(
+                    title: "Mark selection done",
+                    shortcut: "Cmd-Shift-D",
+                    detail: "Mark the selected task or selected tasks as done."
+                )
+            ]
+        ),
+        ShortcutSection(
+            title: "Board",
+            items: [
+                ShortcutItem(
+                    title: "Create task in selected lane",
+                    shortcut: "Cmd-N",
+                    detail: "Create a new task in the lane that currently has focus."
+                ),
+                ShortcutItem(
+                    title: "Focus lane",
+                    shortcut: "Click lane",
+                    detail: "Click inside a lane to make it the target for lane-wide shortcuts."
+                )
+            ]
+        ),
+        ShortcutSection(
+            title: "App",
+            items: [
+                ShortcutItem(
+                    title: "Open shortcuts",
+                    shortcut: "Cmd-/",
+                    detail: "Open this keyboard shortcuts cheatsheet."
+                ),
+                ShortcutItem(
+                    title: "Import backup",
+                    shortcut: "Cmd-Shift-I",
+                    detail: "Import a JSON backup into the app."
+                ),
+                ShortcutItem(
+                    title: "Export backup",
+                    shortcut: "Cmd-Shift-E",
+                    detail: "Export the current data as a backup."
+                ),
+                ShortcutItem(
+                    title: "Undo",
+                    shortcut: "Cmd-Z",
+                    detail: "Undo the last change."
+                ),
+                ShortcutItem(
+                    title: "Redo",
+                    shortcut: "Cmd-Shift-Z",
+                    detail: "Redo the last undone change."
+                )
+            ]
+        )
+    ]
+}
+
+@MainActor
+final class AppPresentationState: ObservableObject {
+    @Published var showingKeyboardShortcuts = false
+
+    func presentKeyboardShortcuts() {
+        showingKeyboardShortcuts = true
+    }
+}
+
 @main
 struct TodayMdApp: App {
     @StateObject private var undoController = AppUndoController()
+    @StateObject private var presentationState = AppPresentationState()
     @State private var store = TodayMdStore()
 
     var body: some Scene {
@@ -65,6 +171,7 @@ struct TodayMdApp: App {
             ContentView()
                 .environment(store)
                 .environmentObject(undoController)
+                .environmentObject(presentationState)
                 .background(MainWindowConfigurator())
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
@@ -94,6 +201,13 @@ struct TodayMdApp: App {
                     undoController.redo()
                 }
                 .keyboardShortcut("Z", modifiers: [.command, .shift])
+            }
+
+            CommandGroup(after: .help) {
+                Button("Keyboard Shortcuts") {
+                    presentationState.presentKeyboardShortcuts()
+                }
+                .keyboardShortcut("/", modifiers: [.command])
             }
         }
     }
@@ -203,16 +317,61 @@ final class TodayMdStore {
         return task
     }
 
-    func moveTask(id: UUID, to block: TimeBlock) {
+    func moveTask(id: UUID, to block: TimeBlock, markDone: Bool? = nil) {
         guard let task = task(id: id) else { return }
         let previousBlock = task.block
-        guard previousBlock != block else { return }
+        let nextDoneState = markDone ?? task.isDone
+        guard previousBlock != block || task.isDone != nextDoneState else { return }
 
         performMutation(actionName: "Move Task") {
             task.block = block
+            task.isDone = nextDoneState
             task.sortOrder = nextSortOrder(for: task.list, in: block)
-            normalizeSortOrder(for: task.list, in: previousBlock)
+
+            if previousBlock != block {
+                normalizeSortOrder(for: task.list, in: previousBlock)
+            }
+
             normalizeSortOrder(for: task.list, in: block)
+        }
+    }
+
+    func moveTasks(ids: [UUID], to block: TimeBlock, markDone: Bool? = nil) {
+        let uniqueIDs = Set(ids)
+        guard !uniqueIDs.isEmpty else { return }
+
+        let tasksToMove = allTasks.filter { task in
+            guard uniqueIDs.contains(task.id) else { return false }
+            let nextDoneState = markDone ?? task.isDone
+            return task.block != block || task.isDone != nextDoneState
+        }
+        guard !tasksToMove.isEmpty else { return }
+
+        struct SortScope: Hashable {
+            let listID: UUID?
+            let block: TimeBlock
+        }
+
+        let affectedScopes = Set(
+            tasksToMove.flatMap { task -> [SortScope] in
+                let listID = task.list?.id
+                return [
+                    SortScope(listID: listID, block: task.block),
+                    SortScope(listID: listID, block: block)
+                ]
+            }
+        )
+
+        performMutation(actionName: tasksToMove.count == 1 ? "Move Task" : "Move Tasks") {
+            for task in tasksToMove {
+                task.block = block
+                task.isDone = markDone ?? task.isDone
+                task.sortOrder = nextSortOrder(for: task.list, in: block)
+            }
+
+            for scope in affectedScopes {
+                normalizeSortOrder(for: scope.listID.flatMap(list(id:)), in: scope.block)
+            }
         }
     }
 
@@ -261,11 +420,54 @@ final class TodayMdStore {
         }
     }
 
+    func setTaskCompletion(id: UUID, isDone: Bool) {
+        guard let task = task(id: id) else { return }
+        guard task.isDone != isDone else { return }
+
+        performMutation(actionName: isDone ? "Complete Task" : "Mark Task Incomplete") {
+            task.isDone = isDone
+            task.sortOrder = nextSortOrder(for: task.list, in: task.block)
+            normalizeSortOrder(for: task.list, in: task.block)
+        }
+    }
+
+    func setTasksCompletion(ids: [UUID], isDone: Bool) {
+        let uniqueIDs = Set(ids)
+        guard !uniqueIDs.isEmpty else { return }
+
+        let tasksToUpdate = allTasks.filter { uniqueIDs.contains($0.id) && $0.isDone != isDone }
+        guard !tasksToUpdate.isEmpty else { return }
+
+        struct SortScope: Hashable {
+            let listID: UUID?
+            let block: TimeBlock
+        }
+
+        let affectedScopes = Set(
+            tasksToUpdate.map { task in
+                SortScope(listID: task.list?.id, block: task.block)
+            }
+        )
+
+        performMutation(
+            actionName: isDone
+                ? (tasksToUpdate.count == 1 ? "Complete Task" : "Complete Tasks")
+                : (tasksToUpdate.count == 1 ? "Mark Task Incomplete" : "Mark Tasks Incomplete")
+        ) {
+            for task in tasksToUpdate {
+                task.isDone = isDone
+                task.sortOrder = nextSortOrder(for: task.list, in: task.block)
+            }
+
+            for scope in affectedScopes {
+                normalizeSortOrder(for: scope.listID.flatMap(list(id:)), in: scope.block)
+            }
+        }
+    }
+
     func toggleTask(id: UUID) {
         guard let task = task(id: id) else { return }
-        performMutation(actionName: task.isDone ? "Mark Task Incomplete" : "Complete Task") {
-            task.isDone.toggle()
-        }
+        setTaskCompletion(id: id, isDone: !task.isDone)
     }
 
     func reorderAllActiveTask(_ draggedID: UUID, before beforeID: UUID?) {
