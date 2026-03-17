@@ -3,6 +3,8 @@ import SwiftUI
 struct AllTasksView: View {
     let tasks: [TaskItem]
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    let onSelect: (TaskItem, Bool) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
@@ -25,12 +27,12 @@ struct AllTasksView: View {
                 ForEach(activeTasks) { task in
                     AllTasksCardView(
                         task: task,
-                        isSelected: selectedTaskID == task.id,
+                        isSelected: selectedTaskIDs.contains(task.id),
                         onToggle: { onToggle(task) },
                         onMove: { targetBlock in onMove(task.id, targetBlock) },
                         onDelete: { onDelete(task) }
                     )
-                    .onTapGesture { selectedTaskID = task.id }
+                    .gesture(taskTapGesture(for: task))
                     .draggable(TaskItemTransfer(id: task.id))
                     .overlay {
                         if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
@@ -56,12 +58,12 @@ struct AllTasksView: View {
                         ForEach(doneTasks) { task in
                             AllTasksCardView(
                                 task: task,
-                                isSelected: selectedTaskID == task.id,
+                                isSelected: selectedTaskIDs.contains(task.id),
                                 onToggle: { onToggle(task) },
                                 onMove: { targetBlock in onMove(task.id, targetBlock) },
                                 onDelete: { onDelete(task) }
                             )
-                            .onTapGesture { selectedTaskID = task.id }
+                            .gesture(taskTapGesture(for: task))
                         }
                     }
                     .font(.caption)
@@ -125,6 +127,19 @@ struct AllTasksView: View {
             } isTargeted: { targeted in
                 updateDropTarget(targeted: targeted, target: target)
             }
+    }
+
+    private func taskTapGesture(for task: TaskItem) -> some Gesture {
+        TapGesture()
+            .modifiers(.shift)
+            .onEnded {
+                onSelect(task, true)
+            }
+            .exclusively(
+                before: TapGesture().onEnded {
+                    onSelect(task, false)
+                }
+            )
     }
 }
 
