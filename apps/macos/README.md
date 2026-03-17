@@ -69,7 +69,7 @@ curl -sL https://raw.githubusercontent.com/arthurliebhardt/today-md/main/scripts
 
 **Manual install:**
 
-1. Unzip `today-md-v1.1.0-macos.zip`
+1. Unzip `today-md-v1.2.0-macos.zip`
 2. Move `today-md.app` to your Applications folder
 3. On first launch macOS will block the app because it's not notarized:
 
@@ -88,7 +88,7 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
 
 ```bash
-bash scripts/install.sh ~/Downloads/today-md-v1.1.0-macos.zip
+bash scripts/install.sh ~/Downloads/today-md-v1.2.0-macos.zip
 ```
 
 ## Data Portability
