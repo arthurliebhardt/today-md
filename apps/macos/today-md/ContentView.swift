@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,12 +16,63 @@ private struct MarkdownArchiveSnapshot: Equatable {
     let noteLastModified: Date
 }
 
+private struct KeyboardShortcutMonitor: NSViewRepresentable {
+    let handler: (NSEvent) -> Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(handler: handler)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.start()
+        return NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.handler = handler
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stop()
+    }
+
+    final class Coordinator {
+        var handler: (NSEvent) -> Bool
+        private var monitor: Any?
+
+        init(handler: @escaping (NSEvent) -> Bool) {
+            self.handler = handler
+        }
+
+        func start() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                return self.handler(event) ? nil : event
+            }
+        }
+
+        func stop() {
+            guard let monitor else { return }
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+
+        deinit {
+            stop()
+        }
+    }
+}
+
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var undoController: AppUndoController
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
+    @State private var selectedTaskIDs: Set<UUID> = []
+    @State private var selectionAnchorTaskID: UUID?
+    @State private var focusedBlock: TimeBlock?
     @State private var showingSettingsSheet = false
     @State private var showingImportPicker = false
     @State private var showingExportPicker = false
@@ -36,6 +88,10 @@ struct ContentView: View {
     private var selectedTask: TaskItem? {
         guard let selectedTaskID else { return nil }
         return store.task(id: selectedTaskID)
+    }
+
+    private var isBoardSelectionActive: Bool {
+        !store.hasActiveSearch && selectedList != nil
     }
 
     private func listTasks(for block: TimeBlock) -> [TaskItem] {
@@ -67,17 +123,115 @@ struct ContentView: View {
     }
 
     private func syncSelectedTask() {
-        guard let selectedTaskID else { return }
-        guard preferredVisibleTasks.contains(where: { $0.id == selectedTaskID }) else {
-            self.selectedTaskID = nil
-            return
+        let visibleTasks = preferredVisibleTasks
+        let visibleIDs = Set(visibleTasks.map(\.id))
+        var retainedIDs = selectedTaskIDs.intersection(visibleIDs)
+
+        if let selectedTaskID, visibleIDs.contains(selectedTaskID) {
+            retainedIDs.insert(selectedTaskID)
         }
+
+        if !isBoardSelectionActive {
+            if let selectedTaskID, retainedIDs.contains(selectedTaskID) {
+                retainedIDs = [selectedTaskID]
+            } else if let fallback = visibleTasks.first(where: { retainedIDs.contains($0.id) }) {
+                retainedIDs = [fallback.id]
+                self.selectedTaskID = fallback.id
+            } else {
+                retainedIDs = []
+                self.selectedTaskID = nil
+            }
+        } else if let selectedTaskID, !retainedIDs.contains(selectedTaskID) {
+            self.selectedTaskID = visibleTasks.first(where: { retainedIDs.contains($0.id) })?.id
+        }
+
+        if selectedTaskID == nil, retainedIDs.count == 1 {
+            self.selectedTaskID = retainedIDs.first
+        }
+
+        selectedTaskIDs = retainedIDs
+        if let selectionAnchorTaskID, !visibleIDs.contains(selectionAnchorTaskID) {
+            self.selectionAnchorTaskID = nil
+        }
+        syncFocusedBlock()
     }
 
     private func validateSelection() {
         guard case .list(let id) = selection else { return }
         if store.list(id: id) == nil {
             selection = .all
+        }
+    }
+
+    private func syncFocusedBlock() {
+        guard isBoardSelectionActive else {
+            focusedBlock = nil
+            return
+        }
+
+        if let selectedTask, selectedTask.list?.id == selectedList?.id {
+            focusedBlock = selectedTask.block
+        } else if focusedBlock == nil {
+            focusedBlock = .today
+        }
+    }
+
+    private var orderedSelectedTaskIDs: [UUID] {
+        preferredVisibleTasks.map(\.id).filter { selectedTaskIDs.contains($0) }
+    }
+
+    private func orderedTaskIDsForLane(_ block: TimeBlock) -> [UUID] {
+        let laneTasks = listTasks(for: block)
+        let activeTaskIDs = laneTasks.filter { !$0.isDone }.map(\.id)
+        let doneTaskIDs = laneTasks.filter(\.isDone).map(\.id)
+        return activeTaskIDs + doneTaskIDs
+    }
+
+    private var canCreateTaskInFocusedLane: Bool {
+        isBoardSelectionActive && effectiveFocusedBlock != nil && !isModalUIActive
+    }
+
+    private var canSelectAllInFocusedLane: Bool {
+        guard isBoardSelectionActive, let block = effectiveFocusedBlock else { return false }
+        return !listTasks(for: block).isEmpty && !isModalUIActive
+    }
+
+    private var isModalUIActive: Bool {
+        showingSettingsSheet || showingImportPicker || showingExportPicker || showingImportModeDialog
+    }
+
+    private var effectiveFocusedBlock: TimeBlock? {
+        if let focusedBlock {
+            return focusedBlock
+        }
+
+        if isBoardSelectionActive {
+            return selectedTask?.block ?? .today
+        }
+
+        return nil
+    }
+
+    private func handleKeyboardShortcut(_ event: NSEvent) -> Bool {
+        guard !isModalUIActive else { return false }
+        guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        guard flags == [.command], !(NSApp.keyWindow?.firstResponder is NSTextView) else {
+            return false
+        }
+
+        switch characters {
+        case "a":
+            guard canSelectAllInFocusedLane else { return false }
+            selectAllTasksInFocusedLane()
+            return true
+        case "n":
+            guard canCreateTaskInFocusedLane else { return false }
+            createTaskInFocusedLane()
+            return true
+        default:
+            return false
         }
     }
 
@@ -287,6 +441,35 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var contentColumn: some View {
+        if store.hasActiveSearch || selection == .all {
+            AllTasksView(
+                tasks: preferredVisibleTasks,
+                selectedTaskID: $selectedTaskID,
+                selectedTaskIDs: $selectedTaskIDs,
+                onSelect: selectTask,
+                onMove: moveTask,
+                onDelete: deleteTask,
+                onToggle: toggleTask,
+                onReorderActive: reorderActiveTask
+            )
+        } else {
+            BoardView(
+                tasks: listTasks,
+                selectedTaskID: $selectedTaskID,
+                selectedTaskIDs: $selectedTaskIDs,
+                focusedBlock: $focusedBlock,
+                onSelect: selectTask,
+                onAdd: addTask,
+                onMove: moveTask,
+                onReorderInBlock: reorderTaskInCurrentListBlock,
+                onDelete: deleteTask,
+                onToggle: toggleTask
+            )
+        }
+    }
+
     private func settingsActionCard(
         title: String,
         subtitle: String,
@@ -340,28 +523,7 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } content: {
-            Group {
-                if store.hasActiveSearch || selection == .all {
-                    AllTasksView(
-                        tasks: preferredVisibleTasks,
-                        selectedTaskID: $selectedTaskID,
-                        onMove: moveTask,
-                        onDelete: deleteTask,
-                        onToggle: toggleTask,
-                        onReorderActive: reorderActiveTask
-                    )
-                } else {
-                    BoardView(
-                        tasks: listTasks,
-                        selectedTaskID: $selectedTaskID,
-                        onAdd: addTask,
-                        onMove: moveTask,
-                        onReorderInBlock: reorderTaskInCurrentListBlock,
-                        onDelete: deleteTask,
-                        onToggle: toggleTask
-                    )
-                }
-            }
+            contentColumn
             .navigationTitle(boardTitle)
             .navigationSplitViewColumnWidth(min: 560, ideal: 760)
         } detail: {
@@ -439,6 +601,10 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.automatic)
         .frame(minWidth: 800, minHeight: 500)
+        .background(
+            KeyboardShortcutMonitor(handler: handleKeyboardShortcut)
+                .allowsHitTesting(false)
+        )
         .sheet(isPresented: $showingSettingsSheet) {
             settingsSheetView
         }
@@ -493,9 +659,7 @@ struct ContentView: View {
             syncSelectedTask()
         }
         .onDeleteCommand {
-            if let selectedTaskID {
-                deleteTask(id: selectedTaskID)
-            }
+            deleteSelectedTasks()
         }
     }
 
@@ -519,11 +683,79 @@ struct ContentView: View {
             return
         }
 
-        selectedTaskID = task.id
+        setSingleSelection(task.id, focusedBlock: block)
+    }
+
+    private func createTaskInFocusedLane() {
+        guard let block = effectiveFocusedBlock else { return }
+        guard case .list(let listID) = selection,
+              let task = store.addTask(title: "New Task", block: block, listID: listID)
+        else {
+            return
+        }
+
+        setSingleSelection(task.id, focusedBlock: block)
+    }
+
+    private func selectAllTasksInFocusedLane() {
+        guard let block = effectiveFocusedBlock else { return }
+        let laneTasks = listTasks(for: block)
+        guard !laneTasks.isEmpty else { return }
+
+        selectedTaskIDs = Set(laneTasks.map(\.id))
+
+        if let selectedTaskID, selectedTaskIDs.contains(selectedTaskID) {
+            self.selectedTaskID = selectedTaskID
+        } else {
+            self.selectedTaskID = laneTasks.first?.id
+        }
+
+        focusedBlock = block
+    }
+
+    private func setSingleSelection(_ taskID: UUID, focusedBlock: TimeBlock? = nil) {
+        selectedTaskID = taskID
+        selectedTaskIDs = [taskID]
+        selectionAnchorTaskID = taskID
+
+        if let focusedBlock {
+            self.focusedBlock = focusedBlock
+        }
+    }
+
+    private func selectTask(_ task: TaskItem, extendingRange: Bool) {
+        if let selectedList, task.list?.id == selectedList.id {
+            selectTask(task.id, in: orderedTaskIDsForLane(task.block), focusedBlock: task.block, extendingRange: extendingRange)
+        } else {
+            selectTask(task.id, in: preferredVisibleTasks.map(\.id), extendingRange: extendingRange)
+        }
+    }
+
+    private func selectTask(_ taskID: UUID, in orderedIDs: [UUID], focusedBlock: TimeBlock? = nil, extendingRange: Bool) {
+        if let focusedBlock {
+            self.focusedBlock = focusedBlock
+        }
+
+        guard extendingRange,
+              let anchorID = selectionAnchorTaskID ?? selectedTaskID,
+              let anchorIndex = orderedIDs.firstIndex(of: anchorID),
+              let selectedIndex = orderedIDs.firstIndex(of: taskID)
+        else {
+            setSingleSelection(taskID, focusedBlock: focusedBlock)
+            return
+        }
+
+        let lowerBound = min(anchorIndex, selectedIndex)
+        let upperBound = max(anchorIndex, selectedIndex)
+        selectedTaskIDs = Set(orderedIDs[lowerBound...upperBound])
+        selectedTaskID = taskID
     }
 
     private func moveTask(id: UUID, to block: TimeBlock) {
         store.moveTask(id: id, to: block)
+        if selectedTaskIDs.contains(id) {
+            focusedBlock = block
+        }
     }
 
     private func deleteTask(_ task: TaskItem) {
@@ -531,10 +763,39 @@ struct ContentView: View {
     }
 
     private func deleteTask(id: UUID) {
+        selectedTaskIDs.remove(id)
         if selectedTaskID == id {
             selectedTaskID = nil
         }
+        if selectionAnchorTaskID == id {
+            selectionAnchorTaskID = nil
+        }
         store.deleteTask(id: id)
+    }
+
+    private func deleteSelectedTasks() {
+        let taskIDs = orderedSelectedTaskIDs
+
+        guard !taskIDs.isEmpty else {
+            if let selectedTaskID {
+                deleteTask(id: selectedTaskID)
+            }
+            return
+        }
+
+        selectedTaskIDs.removeAll()
+        if let selectedTaskID, taskIDs.contains(selectedTaskID) {
+            self.selectedTaskID = nil
+        }
+        if let selectionAnchorTaskID, taskIDs.contains(selectionAnchorTaskID) {
+            self.selectionAnchorTaskID = nil
+        }
+
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.deleteTask(id: taskID)
+        } else {
+            store.deleteTasks(ids: taskIDs)
+        }
     }
 
     private func toggleTask(_ task: TaskItem) {

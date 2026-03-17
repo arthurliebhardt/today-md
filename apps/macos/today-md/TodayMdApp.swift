@@ -230,6 +230,37 @@ final class TodayMdStore {
         }
     }
 
+    func deleteTasks(ids: [UUID]) {
+        let uniqueIDs = Set(ids)
+        guard !uniqueIDs.isEmpty else { return }
+
+        let tasksToDelete = allTasks.filter { uniqueIDs.contains($0.id) }
+        guard !tasksToDelete.isEmpty else { return }
+
+        struct SortScope: Hashable {
+            let listID: UUID?
+            let block: TimeBlock
+        }
+
+        let affectedScopes = Set(
+            tasksToDelete.map { task in
+                SortScope(listID: task.list?.id, block: task.block)
+            }
+        )
+
+        performMutation(actionName: tasksToDelete.count == 1 ? "Delete Task" : "Delete Tasks") {
+            for list in lists {
+                list.items.removeAll { uniqueIDs.contains($0.id) }
+            }
+
+            unassignedTasks.removeAll { uniqueIDs.contains($0.id) }
+
+            for scope in affectedScopes {
+                normalizeSortOrder(for: scope.listID.flatMap(list(id:)), in: scope.block)
+            }
+        }
+    }
+
     func toggleTask(id: UUID) {
         guard let task = task(id: id) else { return }
         performMutation(actionName: task.isDone ? "Mark Task Incomplete" : "Complete Task") {

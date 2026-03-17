@@ -3,6 +3,9 @@ import SwiftUI
 struct BoardView: View {
     let tasks: (TimeBlock) -> [TaskItem]
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    @Binding var focusedBlock: TimeBlock?
+    let onSelect: (TaskItem, Bool) -> Void
     let onAdd: (String, TimeBlock) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onReorderInBlock: (UUID, TimeBlock, UUID?) -> Void
@@ -55,6 +58,9 @@ struct BoardView: View {
                                 block: block,
                                 tasks: tasks(block),
                                 selectedTaskID: $selectedTaskID,
+                                selectedTaskIDs: $selectedTaskIDs,
+                                isFocused: focusedBlock == block,
+                                onSelect: onSelect,
                                 onAdd: { title in onAdd(title, block) },
                                 onMove: onMove,
                                 onReorderActive: { draggedID, beforeID in
@@ -62,6 +68,7 @@ struct BoardView: View {
                                 },
                                 onDelete: onDelete,
                                 onToggle: onToggle,
+                                onFocus: { focusedBlock = block },
                                 onCollapse: {
                                     if block == .backlog { backlogCollapsed = true }
                                     else { thisWeekCollapsed = true }
@@ -73,13 +80,17 @@ struct BoardView: View {
                             block: block,
                             tasks: tasks(block),
                             selectedTaskID: $selectedTaskID,
+                            selectedTaskIDs: $selectedTaskIDs,
+                            isFocused: focusedBlock == block,
+                            onSelect: onSelect,
                             onAdd: { title in onAdd(title, block) },
                             onMove: onMove,
                             onReorderActive: { draggedID, beforeID in
                                 onReorderInBlock(draggedID, block, beforeID)
                             },
                             onDelete: onDelete,
-                            onToggle: onToggle
+                            onToggle: onToggle,
+                            onFocus: { focusedBlock = block }
                         )
                     }
                 }
@@ -127,11 +138,15 @@ struct LaneView: View {
     let block: TimeBlock
     let tasks: [TaskItem]
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    let isFocused: Bool
+    let onSelect: (TaskItem, Bool) -> Void
     let onAdd: (String) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
+    let onFocus: () -> Void
     var onCollapse: (() -> Void)? = nil
 
     @State private var isTargeted = false
@@ -177,6 +192,10 @@ struct LaneView: View {
     }
 
     private var laneBorderColor: Color {
+        if isFocused {
+            return accentColor.opacity(isTodayLane ? 0.7 : 0.45)
+        }
+
         if isTodayLane {
             return accentColor.opacity(0.35)
         }
@@ -192,12 +211,12 @@ struct LaneView: View {
                     ForEach(activeTasks) { task in
                         TaskCardView(
                             task: task,
-                            isSelected: selectedTaskID == task.id,
+                            isSelected: selectedTaskIDs.contains(task.id),
                             onToggle: { onToggle(task) },
                             onMove: { targetBlock in onMove(task.id, targetBlock) },
                             onDelete: { onDelete(task) }
                         )
-                        .onTapGesture { handleTaskTap(task.id) }
+                        .gesture(taskTapGesture(for: task))
                         .draggable(TaskItemTransfer(id: task.id))
                         .overlay {
                             if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
@@ -223,11 +242,13 @@ struct LaneView: View {
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    onFocus()
                     dismissEmptyDraftIfNeeded()
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture {
+                onFocus()
                 dismissEmptyDraftIfNeeded()
             }
         }
@@ -238,7 +259,7 @@ struct LaneView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(laneBorderColor, lineWidth: isTodayLane ? 1.5 : 1)
+                .strokeBorder(laneBorderColor, lineWidth: isFocused ? 2 : (isTodayLane ? 1.5 : 1))
         )
         .dropDestination(for: TaskItemTransfer.self) { items, _ in
             for item in items { onMove(item.id, block) }
@@ -288,6 +309,7 @@ struct LaneView: View {
         .padding(.bottom, 8)
         .contentShape(Rectangle())
         .onTapGesture {
+            onFocus()
             dismissEmptyDraftIfNeeded()
         }
         .background(alignment: .bottom) {
@@ -339,12 +361,12 @@ struct LaneView: View {
             ForEach(doneTasks) { task in
                 TaskCardView(
                     task: task,
-                    isSelected: selectedTaskID == task.id,
+                    isSelected: selectedTaskIDs.contains(task.id),
                     onToggle: { onToggle(task) },
                     onMove: { targetBlock in onMove(task.id, targetBlock) },
                     onDelete: { onDelete(task) }
                 )
-                .onTapGesture { handleTaskTap(task.id) }
+                .gesture(taskTapGesture(for: task))
             }
         }
         .font(.caption)
@@ -436,8 +458,20 @@ struct LaneView: View {
         cancelAdd()
     }
 
-    private func handleTaskTap(_ taskID: UUID) {
-        selectedTaskID = taskID
-        dismissEmptyDraftIfNeeded()
+    private func taskTapGesture(for task: TaskItem) -> some Gesture {
+        TapGesture()
+            .modifiers(.shift)
+            .onEnded {
+                onFocus()
+                onSelect(task, true)
+                dismissEmptyDraftIfNeeded()
+            }
+            .exclusively(
+                before: TapGesture().onEnded {
+                    onFocus()
+                    onSelect(task, false)
+                    dismissEmptyDraftIfNeeded()
+                }
+            )
     }
 }
