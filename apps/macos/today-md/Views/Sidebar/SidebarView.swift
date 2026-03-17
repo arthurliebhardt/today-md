@@ -35,6 +35,8 @@ struct SidebarView: View {
                             .frame(width: 24)
 
                         Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .layoutPriority(1)
 
                         Spacer()
 
@@ -45,6 +47,7 @@ struct SidebarView: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .buttonStyle(.plain)
                 .listRowBackground(
                     selection == .all ? Color.blue.opacity(0.12) : Color.clear
@@ -57,6 +60,8 @@ struct SidebarView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             shortcutHintFooter
         }
@@ -87,17 +92,22 @@ struct SidebarView: View {
                     Text("to show keyboard shortcuts")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
 
                     Spacer(minLength: 0)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .contentShape(Rectangle())
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .buttonStyle(.plain)
             .help("Open the keyboard shortcuts cheatsheet")
             .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func listRow(_ list: TaskList) -> some View {
@@ -116,6 +126,8 @@ struct SidebarView: View {
 
                 Text(list.name)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
 
                 Spacer()
 
@@ -126,6 +138,7 @@ struct SidebarView: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .buttonStyle(.plain)
         .listRowBackground(
             selection == .list(list.id) ? list.listColor.color.opacity(0.1) : Color.clear
