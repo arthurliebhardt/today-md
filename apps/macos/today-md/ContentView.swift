@@ -271,29 +271,6 @@ struct ContentView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Search")
-                        .font(.headline)
-
-                    Text("Task title, note content, and checklist items are indexed in the local SQLite database using full-text search.")
-                        .foregroundStyle(.secondary)
-
-                    TextField("Search tasks", text: Binding(
-                        get: { store.searchText },
-                        set: { store.searchText = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                }
-                .padding(18)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
-                )
-
                 HStack {
                     Text("Future settings can build on top of the current local-first store without changing the app architecture again.")
                         .font(.caption)
