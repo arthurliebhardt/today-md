@@ -98,3 +98,5 @@ Backups are exported as JSON files, and each export also writes a sibling folder
 Task notes are also mirrored automatically as Markdown files in `~/Library/Application Support/today-md/Markdown Archive/` so they can be reused outside the app.
 
 Search is powered by a local SQLite full-text index over task titles, markdown notes, and subtask text.
+
+If you want, I can do a second pass next for a LICENSE, contribution guide, and a cleaner repo description/tagline for GitHub.

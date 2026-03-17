@@ -70,7 +70,8 @@ struct ChecklistSection: View {
                     .font(.system(size: 18))
                     .foregroundStyle(item.isChecked ? .green : .secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
+            .focusEffectDisabled()
 
             Text(item.title)
                 .strikethrough(item.isChecked)

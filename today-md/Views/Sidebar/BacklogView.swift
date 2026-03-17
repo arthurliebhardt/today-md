@@ -154,7 +154,8 @@ struct AllTasksCardView: View {
                         .font(.system(size: 20))
                         .foregroundStyle(task.isDone ? .green : .secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .focusEffectDisabled()
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(task.title.isEmpty ? "Untitled" : task.title)

@@ -119,6 +119,9 @@ final class TodayMdStore {
             database = try TodayMdDatabase(url: Self.defaultDatabaseURL())
             let archive = try database.loadArchive()
             applyArchive(archive, refreshSearch: false)
+            if removeLegacySubtasksIfNeeded() {
+                persist()
+            }
 
             if allTasks.isEmpty {
                 seedShowcaseDataIfNeeded()
@@ -471,23 +474,14 @@ final class TodayMdStore {
             - [x] Check insurance card
             - [ ] Call dentist office
             - [ ] Add appointment to calendar
-            """,
-            subtasks: [
-                ("Find last checkup date", true),
-                ("Ask about cleaning availability", false)
-            ]
+            """
         )
 
         makeTask(
             list: list,
             title: "Buy groceries for dinner party",
             block: .today,
-            sortOrder: 1,
-            subtasks: [
-                ("Fresh herbs", false),
-                ("Dessert ingredients", false),
-                ("Sparkling water", true)
-            ]
+            sortOrder: 1
         )
 
         makeTask(
@@ -501,11 +495,7 @@ final class TodayMdStore {
             - [x] Pick travel dates
             - [ ] Compare train options
             - [ ] Reserve hotel near the center
-            """,
-            subtasks: [
-                ("Shortlist neighborhoods", true),
-                ("Save restaurants to maps", false)
-            ]
+            """
         )
 
         makeTask(
@@ -528,11 +518,7 @@ final class TodayMdStore {
             - [x] Verify empty states
             - [ ] Check keyboard shortcuts
             - [ ] Confirm analytics events
-            """,
-            subtasks: [
-                ("Leave review comments", false),
-                ("Sync with design", true)
-            ]
+            """
         )
 
         makeTask(
@@ -569,20 +555,48 @@ final class TodayMdStore {
         title: String,
         block: TimeBlock,
         sortOrder: Int,
-        note: String? = nil,
-        subtasks: [(String, Bool)] = []
+        note: String? = nil
     ) {
         let task = TaskItem(
             title: title,
             block: block,
             sortOrder: sortOrder,
-            subtasks: subtasks.enumerated().map { index, subtask in
-                SubTask(title: subtask.0, isCompleted: subtask.1, sortOrder: index)
-            },
             note: note.map { TaskNote(content: $0) }
         )
         task.list = list
         list.items.append(task)
+    }
+
+    private func removeLegacySubtasksIfNeeded() -> Bool {
+        var didChange = false
+
+        for task in allTasks where !task.subtasks.isEmpty {
+            let mappedLineIndices = task.subtasks
+                .compactMap { task.mappedChecklistLineIndex(for: $0.id) }
+                .sorted(by: >)
+
+            if let note = task.note, !mappedLineIndices.isEmpty {
+                var lines = note.content.components(separatedBy: "\n")
+
+                for lineIndex in mappedLineIndices where lineIndex < lines.count {
+                    lines.remove(at: lineIndex)
+                }
+
+                if lines.isEmpty {
+                    task.note = nil
+                } else {
+                    note.content = lines.joined(separator: "\n")
+                    note.lastModified = Date()
+                }
+
+                didChange = true
+            }
+
+            task.subtasks.removeAll()
+            didChange = true
+        }
+
+        return didChange
     }
 
     private func performMutation(actionName: String, registersUndo: Bool = true, _ change: () -> Void) {

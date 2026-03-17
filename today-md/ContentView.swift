@@ -67,12 +67,11 @@ struct ContentView: View {
     }
 
     private func syncSelectedTask() {
-        if let selectedTaskID,
-           preferredVisibleTasks.contains(where: { $0.id == selectedTaskID }) {
+        guard let selectedTaskID else { return }
+        guard preferredVisibleTasks.contains(where: { $0.id == selectedTaskID }) else {
+            self.selectedTaskID = nil
             return
         }
-
-        selectedTaskID = preferredVisibleTasks.first?.id
     }
 
     private func validateSelection() {
@@ -276,7 +275,7 @@ struct ContentView: View {
                     Text("Search")
                         .font(.headline)
 
-                    Text("Task title, note content, and subtasks are indexed in the local SQLite database using full-text search.")
+                    Text("Task title, note content, and checklist items are indexed in the local SQLite database using full-text search.")
                         .foregroundStyle(.secondary)
 
                     TextField("Search tasks", text: Binding(
@@ -411,7 +410,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
 
                     TextField(
-                        "Search tasks, notes, and subtasks",
+                        "Search tasks, notes, and checklist items",
                         text: Binding(
                             get: { store.searchText },
                             set: { store.searchText = $0 }
