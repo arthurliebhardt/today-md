@@ -67,10 +67,11 @@ struct SidebarView: View {
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(placement: .navigation) {
                 Button(action: { isAddingList = true }) {
-                    Label("Add List", systemImage: "plus")
+                    Image(systemName: "plus")
                 }
+                .help("Add List")
             }
         }
         .sheet(isPresented: $isAddingList) { addListSheet }
