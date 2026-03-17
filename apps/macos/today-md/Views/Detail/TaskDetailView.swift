@@ -16,8 +16,6 @@ struct TaskDetailView: View {
                 Divider()
                 ChecklistSection(task: task)
                 Divider()
-                SubTaskListView(task: task)
-                Divider()
                 MarkdownEditorView(task: task)
             }
             .padding(.horizontal, 20)
@@ -48,7 +46,8 @@ struct TaskDetailView: View {
                         .font(.title2)
                         .foregroundStyle(task.isDone ? .green : .secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .focusEffectDisabled()
 
                 TextField("Task title", text: $draftTitle)
                     .font(.title2.bold())

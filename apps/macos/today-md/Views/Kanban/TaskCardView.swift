@@ -26,7 +26,8 @@ struct TaskCardView: View {
                         .font(.system(size: 17))
                         .foregroundStyle(task.isDone ? .green : .secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .focusEffectDisabled()
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title.isEmpty ? "New task" : task.title)
