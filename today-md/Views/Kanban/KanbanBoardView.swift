@@ -138,6 +138,7 @@ struct LaneView: View {
     @State private var isAdding = false
     @State private var newTitle = ""
     @State private var currentDropTarget: ReorderTarget?
+    @FocusState private var isNewTaskFieldFocused: Bool
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     private var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
@@ -196,7 +197,7 @@ struct LaneView: View {
                             onMove: { targetBlock in onMove(task.id, targetBlock) },
                             onDelete: { onDelete(task) }
                         )
-                        .onTapGesture { selectedTaskID = task.id }
+                        .onTapGesture { handleTaskTap(task.id) }
                         .draggable(TaskItemTransfer(id: task.id))
                         .overlay {
                             if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
@@ -220,6 +221,14 @@ struct LaneView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissEmptyDraftIfNeeded()
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                dismissEmptyDraftIfNeeded()
             }
         }
         .frame(minWidth: 210, maxWidth: .infinity)
@@ -277,6 +286,10 @@ struct LaneView: View {
         .padding(.horizontal, 12)
         .padding(.top, 12)
         .padding(.bottom, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            dismissEmptyDraftIfNeeded()
+        }
         .background(alignment: .bottom) {
             Capsule()
                 .fill(accentColor.opacity(isTodayLane ? 0.8 : block == .thisWeek ? 0.35 : 0.18))
@@ -291,15 +304,21 @@ struct LaneView: View {
                 TextField("Task title…", text: $newTitle)
                     .textFieldStyle(.plain)
                     .font(.body)
+                    .focused($isNewTaskFieldFocused)
                     .onSubmit { submitNew() }
                     .onExitCommand { cancelAdd() }
+                    .onChange(of: isNewTaskFieldFocused) { _, isFocused in
+                        if !isFocused {
+                            handleBlur()
+                        }
+                    }
                     .padding(12)
                     .background {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color(nsColor: .windowBackgroundColor))
                     }
             } else {
-                Button(action: { isAdding = true }) {
+                Button(action: startAdd) {
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
                         .frame(height: 48)
@@ -308,6 +327,7 @@ struct LaneView: View {
                                 .font(.body)
                                 .foregroundStyle(.tertiary)
                         }
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)
             }
@@ -324,7 +344,7 @@ struct LaneView: View {
                     onMove: { targetBlock in onMove(task.id, targetBlock) },
                     onDelete: { onDelete(task) }
                 )
-                .onTapGesture { selectedTaskID = task.id }
+                .onTapGesture { handleTaskTap(task.id) }
             }
         }
         .font(.caption)
@@ -391,10 +411,33 @@ struct LaneView: View {
         onAdd(title)
         newTitle = ""
         isAdding = false
+        isNewTaskFieldFocused = false
     }
 
     private func cancelAdd() {
         newTitle = ""
         isAdding = false
+        isNewTaskFieldFocused = false
+    }
+
+    private func startAdd() {
+        isAdding = true
+        DispatchQueue.main.async {
+            isNewTaskFieldFocused = true
+        }
+    }
+
+    private func handleBlur() {
+        dismissEmptyDraftIfNeeded()
+    }
+
+    private func dismissEmptyDraftIfNeeded() {
+        guard newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        cancelAdd()
+    }
+
+    private func handleTaskTap(_ taskID: UUID) {
+        selectedTaskID = taskID
+        dismissEmptyDraftIfNeeded()
     }
 }

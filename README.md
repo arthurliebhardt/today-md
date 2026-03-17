@@ -37,6 +37,12 @@ swift build
 swift run today-md
 ```
 
+For a real macOS app launch with the proper app icon, build and open the `.app` bundle instead:
+
+```bash
+bash scripts/dev-run.sh
+```
+
 Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 
 The app stores its local data in SQLite at `~/Library/Application Support/today-md/today-md.sqlite` and creates sample lists and tasks the first time it launches.

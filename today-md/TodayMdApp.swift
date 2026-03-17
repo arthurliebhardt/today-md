@@ -7,9 +7,12 @@ private struct MainWindowConfigurator: NSViewRepresentable {
 
         DispatchQueue.main.async {
             guard let window = view.window else { return }
+            NSApp.setActivationPolicy(.regular)
             window.minSize = NSSize(width: 1200, height: 720)
             window.setContentSize(NSSize(width: 1500, height: 920))
             window.center()
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
 
         return view
@@ -324,37 +327,49 @@ final class TodayMdStore {
     }
 
     func toggleChecklistItem(taskID: UUID, lineIndex: Int) {
-        guard let task = task(id: taskID), let current = task.note?.content else { return }
-        var lines = current.components(separatedBy: "\n")
-        guard lineIndex < lines.count else { return }
-        let line = lines[lineIndex]
-
-        if line.contains("- [ ] ") {
-            lines[lineIndex] = line.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
-        } else {
-            lines[lineIndex] = line
-                .replacingOccurrences(of: "- [x] ", with: "- [ ] ")
-                .replacingOccurrences(of: "- [X] ", with: "- [ ] ")
+        guard let task = task(id: taskID),
+              let item = task.checklistItems.first(where: { $0.lineIndex == lineIndex })
+        else {
+            return
         }
 
-        updateTaskNote(id: taskID, content: lines.joined(separator: "\n"), registersUndo: true)
+        let mappedSubtaskID = task.mappedSubtaskID(forChecklistLineIndex: lineIndex)
+        let nextCheckedState = !item.isChecked
+
+        performMutation(actionName: nextCheckedState ? "Complete Checklist Item" : "Mark Checklist Item Incomplete") {
+            setChecklistItem(in: task, lineIndex: lineIndex, isChecked: nextCheckedState)
+
+            if let mappedSubtaskID,
+               let subtask = task.subtasks.first(where: { $0.id == mappedSubtaskID }) {
+                subtask.isCompleted = nextCheckedState
+            }
+        }
     }
 
     func removeChecklistItem(taskID: UUID, lineIndex: Int) {
-        guard let task = task(id: taskID), let current = task.note?.content else { return }
-        var lines = current.components(separatedBy: "\n")
-        guard lineIndex < lines.count else { return }
-        lines.remove(at: lineIndex)
-        updateTaskNote(id: taskID, content: lines.joined(separator: "\n"), registersUndo: true)
+        guard let task = task(id: taskID) else { return }
+        let mappedSubtaskID = task.mappedSubtaskID(forChecklistLineIndex: lineIndex)
+
+        performMutation(actionName: "Delete Checklist Item") {
+            removeChecklistLine(in: task, lineIndex: lineIndex)
+
+            if let mappedSubtaskID {
+                task.subtasks.removeAll { $0.id == mappedSubtaskID }
+                normalizeSubtaskSortOrder(in: task)
+            }
+        }
     }
 
     func addChecklistItem(taskID: UUID, title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let current = task(id: taskID)?.note?.content ?? ""
-        let entry = "- [ ] \(trimmed)"
-        let nextContent = current.isEmpty ? entry : "\(current)\n\(entry)"
-        updateTaskNote(id: taskID, content: nextContent, registersUndo: true)
+        guard !trimmed.isEmpty, let task = task(id: taskID) else { return }
+
+        performMutation(actionName: "Add Checklist Item") {
+            appendChecklistLine(to: task, title: trimmed)
+            task.subtasks.append(
+                SubTask(title: trimmed, sortOrder: task.subtasks.count)
+            )
+        }
     }
 
     func addSubtask(taskID: UUID, title: String) {
@@ -365,23 +380,41 @@ final class TodayMdStore {
             task.subtasks.append(
                 SubTask(title: trimmed, sortOrder: task.subtasks.count)
             )
+            appendChecklistLine(to: task, title: trimmed)
         }
     }
 
     func toggleSubtask(taskID: UUID, subtaskID: UUID) {
-        guard let subtask = task(id: taskID)?.subtasks.first(where: { $0.id == subtaskID }) else { return }
-        performMutation(actionName: subtask.isCompleted ? "Mark Subtask Incomplete" : "Complete Subtask") {
-            subtask.isCompleted.toggle()
+        guard let task = task(id: taskID),
+              let subtask = task.subtasks.first(where: { $0.id == subtaskID })
+        else {
+            return
+        }
+
+        let mappedLineIndex = task.mappedChecklistLineIndex(for: subtaskID)
+        let nextCompletedState = !subtask.isCompleted
+
+        performMutation(actionName: nextCompletedState ? "Complete Subtask" : "Mark Subtask Incomplete") {
+            subtask.isCompleted = nextCompletedState
+
+            if let mappedLineIndex {
+                setChecklistItem(in: task, lineIndex: mappedLineIndex, isChecked: nextCompletedState)
+            }
         }
     }
 
     func deleteSubtask(taskID: UUID, subtaskID: UUID) {
         guard let task = task(id: taskID) else { return }
+        let mappedLineIndex = task.mappedChecklistLineIndex(for: subtaskID)
+
         performMutation(actionName: "Delete Subtask") {
             task.subtasks.removeAll { $0.id == subtaskID }
-            for (index, subtask) in task.subtasks.enumerated() {
-                subtask.sortOrder = index
+
+            if let mappedLineIndex {
+                removeChecklistLine(in: task, lineIndex: mappedLineIndex)
             }
+
+            normalizeSubtaskSortOrder(in: task)
         }
     }
 
@@ -595,6 +628,49 @@ final class TodayMdStore {
         }
     }
 
+    private func appendChecklistLine(to task: TaskItem, title: String) {
+        let entry = "- [ ] \(title)"
+
+        if let note = task.note {
+            note.content = note.content.isEmpty ? entry : "\(note.content)\n\(entry)"
+            note.lastModified = Date()
+        } else {
+            task.note = TaskNote(content: entry)
+        }
+    }
+
+    private func setChecklistItem(in task: TaskItem, lineIndex: Int, isChecked: Bool) {
+        guard let note = task.note else { return }
+        var lines = note.content.components(separatedBy: "\n")
+        guard lineIndex < lines.count else { return }
+
+        let title = task.checklistItems.first(where: { $0.lineIndex == lineIndex })?.title
+            ?? lines[lineIndex]
+                .trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: "- [ ] ", with: "")
+                .replacingOccurrences(of: "- [x] ", with: "")
+                .replacingOccurrences(of: "- [X] ", with: "")
+
+        lines[lineIndex] = isChecked ? "- [x] \(title)" : "- [ ] \(title)"
+        note.content = lines.joined(separator: "\n")
+        note.lastModified = Date()
+    }
+
+    private func removeChecklistLine(in task: TaskItem, lineIndex: Int) {
+        guard let note = task.note else { return }
+        var lines = note.content.components(separatedBy: "\n")
+        guard lineIndex < lines.count else { return }
+
+        lines.remove(at: lineIndex)
+
+        if lines.isEmpty {
+            task.note = nil
+        } else {
+            note.content = lines.joined(separator: "\n")
+            note.lastModified = Date()
+        }
+    }
+
     private func refreshSearch() {
         guard hasActiveSearch else {
             persistedSearchIDs = []
@@ -612,6 +688,12 @@ final class TodayMdStore {
     private func normalizeListSortOrder() {
         for (index, list) in lists.sorted(by: { $0.sortOrder < $1.sortOrder }).enumerated() {
             list.sortOrder = index
+        }
+    }
+
+    private func normalizeSubtaskSortOrder(in task: TaskItem) {
+        for (index, subtask) in task.subtasks.enumerated() {
+            subtask.sortOrder = index
         }
     }
 
