@@ -29,6 +29,7 @@
 		AA000022 /* TodayMdArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022; };
 		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023; };
 		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
+		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,6 +58,7 @@
 		AB000022 /* TodayMdArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdArchive.swift; sourceTree = "<group>"; };
 		AB000023 /* TodayMdDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdDatabase.swift; sourceTree = "<group>"; };
 		AB000024 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		AB000025 /* SearchPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPresentation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,6 +161,7 @@
 			isa = PBXGroup;
 			children = (
 				AB000014 /* MarkdownRenderer.swift */,
+				AB000025 /* SearchPresentation.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
 				AB000023 /* TodayMdDatabase.swift */,
 				AB000024 /* libsqlite3.tbd */,
@@ -255,6 +258,7 @@
 				AA000021 /* TodayMdTransferService.swift in Sources */,
 				AA000022 /* TodayMdArchive.swift in Sources */,
 				AA000023 /* TodayMdDatabase.swift in Sources */,
+				AA000025 /* SearchPresentation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -385,7 +389,7 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -396,7 +400,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -412,7 +416,7 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -423,7 +427,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
