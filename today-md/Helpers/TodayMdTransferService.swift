@@ -15,8 +15,8 @@ enum TodayMdTransferService {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
         panel.title = "Export Tasks"
-        panel.message = "Choose a folder for the JSON backup and markdown exports."
-        panel.prompt = "Export Here"
+        panel.message = "Choose where to create the export folder."
+        panel.prompt = "Export"
 
         present(panel) { folderURL in
             guard let folderURL else { return }
@@ -31,8 +31,19 @@ enum TodayMdTransferService {
 
     static func exportData(from store: TodayMdStore, to folderURL: URL) throws {
         try withSecurityScopedAccess(to: folderURL) {
-            let exportBaseName = defaultExportBasename()
-            let exportURL = folderURL.appendingPathComponent("\(exportBaseName).json")
+            let timestamp = Date()
+            let exportFolderURL = folderURL.appendingPathComponent(
+                defaultExportFolderName(for: timestamp),
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(
+                at: exportFolderURL,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+
+            let exportBaseName = defaultExportBasename(for: timestamp)
+            let exportURL = exportFolderURL.appendingPathComponent("\(exportBaseName).json")
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
@@ -40,7 +51,7 @@ enum TodayMdTransferService {
             let data = try encoder.encode(store.makeArchive())
             try data.write(to: exportURL, options: .atomic)
 
-            let markdownFolderURL = folderURL.appendingPathComponent("\(exportBaseName)-markdown", isDirectory: true)
+            let markdownFolderURL = exportFolderURL.appendingPathComponent("\(exportBaseName)-markdown", isDirectory: true)
             try TodayMdMarkdownArchiveService.exportNotes(for: store.allTasks, to: markdownFolderURL)
         }
     }
@@ -142,10 +153,18 @@ enum TodayMdTransferService {
         alert.runModal()
     }
 
-    private static func defaultExportBasename() -> String {
+    private static func defaultExportFolderName(for date: Date) -> String {
+        "today-md-eport-\(exportDateString(from: date))"
+    }
+
+    private static func defaultExportBasename(for date: Date) -> String {
+        "today-md-backup-\(exportDateString(from: date))"
+    }
+
+    private static func exportDateString(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        return "today-md-backup-\(formatter.string(from: Date()))"
+        return formatter.string(from: date)
     }
 }
 

@@ -16,54 +16,6 @@ private struct MarkdownArchiveSnapshot: Equatable {
     let noteLastModified: Date
 }
 
-private struct KeyboardShortcutMonitor: NSViewRepresentable {
-    let handler: (NSEvent) -> Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(handler: handler)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        context.coordinator.start()
-        return NSView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.handler = handler
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.stop()
-    }
-
-    final class Coordinator {
-        var handler: (NSEvent) -> Bool
-        private var monitor: Any?
-
-        init(handler: @escaping (NSEvent) -> Bool) {
-            self.handler = handler
-        }
-
-        func start() {
-            guard monitor == nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self else { return event }
-                return self.handler(event) ? nil : event
-            }
-        }
-
-        func stop() {
-            guard let monitor else { return }
-            NSEvent.removeMonitor(monitor)
-            self.monitor = nil
-        }
-
-        deinit {
-            stop()
-        }
-    }
-}
-
 @MainActor
 private struct WindowTitleSyncView: NSViewRepresentable {
     let title: String
@@ -202,11 +154,9 @@ struct ContentView: View {
     @State private var selectedTaskIDs: Set<UUID> = []
     @State private var selectionAnchorTaskID: UUID?
     @State private var focusedBlock: TimeBlock?
+    @State private var expandedDoneBlocks: Set<TimeBlock> = []
+    @State private var allTasksDoneSectionExpanded = false
     @State private var showingSettingsSheet = false
-    @State private var showingImportPicker = false
-    @State private var showingExportPicker = false
-    @State private var pendingImportURL: URL?
-    @State private var showingImportModeDialog = false
     @State private var transferAlert: TransferAlert?
 
     private var selectedList: TaskList? {
@@ -219,7 +169,11 @@ struct ContentView: View {
         return store.task(id: selectedTaskID)
     }
 
-    private var isBoardSelectionActive: Bool {
+    private var isBoardLayoutActive: Bool {
+        !store.hasActiveSearch
+    }
+
+    private var isListBoardSelectionActive: Bool {
         !store.hasActiveSearch && selectedList != nil
     }
 
@@ -229,7 +183,17 @@ struct ContentView: View {
             list.items
                 .filter { $0.block == block }
                 .sorted { $0.sortOrder < $1.sortOrder }
-        )
+            )
+    }
+
+    private func boardTasks(for block: TimeBlock) -> [TaskItem] {
+        if selectedList != nil {
+            return listTasks(for: block)
+        }
+
+        return store.allTasks
+            .filter { $0.block == block }
+            .sorted(by: taskSort)
     }
 
     private var preferredVisibleTasks: [TaskItem] {
@@ -248,6 +212,13 @@ struct ContentView: View {
 
         let activeTasks = tasks.filter { !$0.isDone }
         let doneTasks = tasks.filter(\.isDone)
+        return activeTasks + doneTasks
+    }
+
+    private var visibleFlatTasks: [TaskItem] {
+        let activeTasks = preferredVisibleTasks.filter { !$0.isDone }
+        guard allTasksDoneSectionExpanded else { return activeTasks }
+        let doneTasks = preferredVisibleTasks.filter(\.isDone)
         return activeTasks + doneTasks
     }
 
@@ -281,12 +252,12 @@ struct ContentView: View {
     }
 
     private func syncFocusedBlock() {
-        guard isBoardSelectionActive else {
+        guard isBoardLayoutActive else {
             focusedBlock = nil
             return
         }
 
-        if let selectedTask, selectedTask.list?.id == selectedList?.id {
+        if let selectedTask, isTaskVisibleOnCurrentBoard(selectedTask) {
             focusedBlock = selectedTask.block
         } else if focusedBlock == nil {
             focusedBlock = .today
@@ -298,14 +269,15 @@ struct ContentView: View {
     }
 
     private func orderedTaskIDsForLane(_ block: TimeBlock) -> [UUID] {
-        let laneTasks = listTasks(for: block)
+        let laneTasks = boardTasks(for: block)
         let activeTaskIDs = laneTasks.filter { !$0.isDone }.map(\.id)
+        guard isDoneSectionExpanded(for: block) else { return activeTaskIDs }
         let doneTaskIDs = laneTasks.filter(\.isDone).map(\.id)
         return activeTaskIDs + doneTaskIDs
     }
 
     private var canCreateTaskInFocusedLane: Bool {
-        isBoardSelectionActive && effectiveFocusedBlock != nil && !isModalUIActive
+        isListBoardSelectionActive && effectiveFocusedBlock != nil && !isModalUIActive
     }
 
     private var canSelectAllVisibleTasks: Bool {
@@ -340,7 +312,7 @@ struct ContentView: View {
     }
 
     private var isModalUIActive: Bool {
-        showingSettingsSheet || showingImportPicker || showingExportPicker || showingImportModeDialog || presentationState.showingKeyboardShortcuts
+        showingSettingsSheet || presentationState.showingKeyboardShortcuts
     }
 
     private var effectiveFocusedBlock: TimeBlock? {
@@ -348,7 +320,7 @@ struct ContentView: View {
             return focusedBlock
         }
 
-        if isBoardSelectionActive {
+        if isBoardLayoutActive {
             return selectedTask?.block ?? .today
         }
 
@@ -385,14 +357,14 @@ struct ContentView: View {
     private func startImport() {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showingImportPicker = true
+            TodayMdTransferService.importData(into: store)
         }
     }
 
     private func startExport() {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showingExportPicker = true
+            TodayMdTransferService.exportData(from: store)
         }
     }
 
@@ -404,40 +376,6 @@ struct ContentView: View {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             presentationState.presentKeyboardShortcuts()
-        }
-    }
-
-    private func handleImportSelection(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            pendingImportURL = url
-            showingImportModeDialog = true
-        case .failure(let error):
-            presentTransferError(title: "Import Failed", error: error)
-        }
-    }
-
-    private func handleExportSelection(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let folderURL):
-            do {
-                try TodayMdTransferService.exportData(from: store, to: folderURL)
-            } catch {
-                presentTransferError(title: "Export Failed", error: error)
-            }
-        case .failure(let error):
-            presentTransferError(title: "Export Failed", error: error)
-        }
-    }
-
-    private func confirmImport(mode: ImportMode) {
-        guard let url = pendingImportURL else { return }
-        pendingImportURL = nil
-
-        do {
-            try TodayMdTransferService.importData(into: store, from: url, mode: mode)
-        } catch {
-            presentTransferError(title: "Import Failed", error: error)
         }
     }
 
@@ -589,7 +527,7 @@ struct ContentView: View {
 
                     settingsActionCard(
                         title: "Open Shortcut Cheatsheet",
-                        subtitle: "See the current selection, board, and app shortcuts in one place.",
+                        subtitle: "See the current selection, editor, board, and app shortcuts in one place.",
                         systemImage: "command",
                         tint: .purple,
                         action: openShortcutCheatsheetFromSettings
@@ -657,7 +595,7 @@ struct ContentView: View {
                         Text("Keyboard Shortcuts")
                             .font(.system(size: 28, weight: .bold))
 
-                        Text("Selection, board, and app shortcuts that are currently available in today-md.")
+                        Text("Selection, editor, board, and app shortcuts that are currently available in today-md.")
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -737,11 +675,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var contentColumn: some View {
-        if store.hasActiveSearch || selection == .all {
+        if store.hasActiveSearch {
             AllTasksView(
                 tasks: preferredVisibleTasks,
                 selectedTaskID: $selectedTaskID,
                 selectedTaskIDs: $selectedTaskIDs,
+                doneSectionExpanded: $allTasksDoneSectionExpanded,
                 onSelect: selectTask,
                 onMove: moveTask,
                 onMarkDone: markDraggedSelectionDone,
@@ -751,7 +690,8 @@ struct ContentView: View {
             )
         } else {
             BoardView(
-                tasks: listTasks,
+                tasks: boardTasks,
+                doneSectionExpanded: doneSectionExpandedBinding,
                 selectedTaskID: $selectedTaskID,
                 selectedTaskIDs: $selectedTaskIDs,
                 focusedBlock: $focusedBlock,
@@ -759,9 +699,11 @@ struct ContentView: View {
                 onAdd: addTask,
                 onMove: moveTask,
                 onMoveToDone: moveTaskToDone,
-                onReorderInBlock: reorderTaskInCurrentListBlock,
+                onReorderInBlock: reorderTaskInVisibleBoard,
                 onDelete: deleteTask,
-                onToggle: toggleTask
+                onToggle: toggleTask,
+                allowsAdding: selectedList != nil,
+                showsListBadge: selection == .all
             )
         }
     }
@@ -948,37 +890,6 @@ struct ContentView: View {
         .sheet(isPresented: $presentationState.showingKeyboardShortcuts) {
             shortcutsSheetView
         }
-        .fileImporter(
-            isPresented: $showingImportPicker,
-            allowedContentTypes: [.json]
-        ) { result in
-            handleImportSelection(result)
-        }
-        .fileImporter(
-            isPresented: $showingExportPicker,
-            allowedContentTypes: [.folder]
-        ) { result in
-            handleExportSelection(result)
-        }
-        .confirmationDialog(
-            "Import Tasks",
-            isPresented: $showingImportModeDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Merge") {
-                confirmImport(mode: .merge)
-            }
-
-            Button("Replace Existing") {
-                confirmImport(mode: .replaceExisting)
-            }
-
-            Button("Cancel", role: .cancel) {
-                pendingImportURL = nil
-            }
-        } message: {
-            Text("Choose whether to merge the imported data into your existing lists or replace everything currently in the app.")
-        }
         .alert(item: $transferAlert) { alert in
             Alert(
                 title: Text(alert.title),
@@ -1071,7 +982,7 @@ struct ContentView: View {
     }
 
     private func selectAllTasksInCurrentContext() {
-        if isBoardSelectionActive {
+        if isBoardLayoutActive {
             selectAllTasksInFocusedLane()
         } else {
             selectAllVisibleTasks()
@@ -1096,7 +1007,7 @@ struct ContentView: View {
     }
 
     private func selectAllVisibleTasks() {
-        let visibleTaskIDs = preferredVisibleTasks.map(\.id)
+        let visibleTaskIDs = visibleFlatTasks.map(\.id)
         guard !visibleTaskIDs.isEmpty else { return }
 
         selectedTaskIDs = Set(visibleTaskIDs)
@@ -1121,10 +1032,10 @@ struct ContentView: View {
     }
 
     private func selectTask(_ task: TaskItem, extendingRange: Bool) {
-        if let selectedList, task.list?.id == selectedList.id {
+        if isBoardLayoutActive && isTaskVisibleOnCurrentBoard(task) {
             selectTask(task.id, in: orderedTaskIDsForLane(task.block), focusedBlock: task.block, extendingRange: extendingRange)
         } else {
-            selectTask(task.id, in: preferredVisibleTasks.map(\.id), extendingRange: extendingRange)
+            selectTask(task.id, in: visibleFlatTasks.map(\.id), extendingRange: extendingRange)
         }
     }
 
@@ -1321,9 +1232,43 @@ struct ContentView: View {
         store.reorderAllActiveTask(draggedID, before: beforeID)
     }
 
+    private func reorderTaskInVisibleBoard(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
+        if case .list = selection {
+            reorderTaskInCurrentListBlock(draggedID, block, beforeID)
+        } else {
+            reorderActiveTask(draggedID, beforeID)
+        }
+    }
+
     private func reorderTaskInCurrentListBlock(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
         guard case .list(let listID) = selection else { return }
         store.reorderTaskInListBlock(listID: listID, draggedID: draggedID, block: block, before: beforeID)
+    }
+
+    private func isTaskVisibleOnCurrentBoard(_ task: TaskItem) -> Bool {
+        switch selection {
+        case .all:
+            return true
+        case .list(let listID):
+            return task.list?.id == listID
+        }
+    }
+
+    private func isDoneSectionExpanded(for block: TimeBlock) -> Bool {
+        expandedDoneBlocks.contains(block)
+    }
+
+    private func doneSectionExpandedBinding(for block: TimeBlock) -> Binding<Bool> {
+        Binding(
+            get: { isDoneSectionExpanded(for: block) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedDoneBlocks.insert(block)
+                } else {
+                    expandedDoneBlocks.remove(block)
+                }
+            }
+        )
     }
 }
 

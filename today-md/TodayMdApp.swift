@@ -1,6 +1,54 @@
 import AppKit
 import SwiftUI
 
+struct KeyboardShortcutMonitor: NSViewRepresentable {
+    let handler: (NSEvent) -> Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(handler: handler)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.start()
+        return NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.handler = handler
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stop()
+    }
+
+    final class Coordinator {
+        var handler: (NSEvent) -> Bool
+        private var monitor: Any?
+
+        init(handler: @escaping (NSEvent) -> Bool) {
+            self.handler = handler
+        }
+
+        func start() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                return self.handler(event) ? nil : event
+            }
+        }
+
+        func stop() {
+            guard let monitor else { return }
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+
+        deinit {
+            stop()
+        }
+    }
+}
+
 private struct MainWindowConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -119,22 +167,47 @@ enum ShortcutCheatsheet {
             ]
         ),
         ShortcutSection(
+            title: "Editor",
+            items: [
+                ShortcutItem(
+                    title: "Heading levels",
+                    shortcut: "Cmd-1 / 2 / 3",
+                    detail: "Turn the current line or selected lines into H1, H2, or H3 headings."
+                ),
+                ShortcutItem(
+                    title: "Bold",
+                    shortcut: "Cmd-B",
+                    detail: "Wrap the current selection in Markdown bold markers."
+                ),
+                ShortcutItem(
+                    title: "Italic",
+                    shortcut: "Cmd-I",
+                    detail: "Wrap the current selection in Markdown italic markers."
+                ),
+                ShortcutItem(
+                    title: "Inline code",
+                    shortcut: "Cmd-`",
+                    detail: "Wrap the current selection in backticks."
+                ),
+                ShortcutItem(
+                    title: "Bullet list",
+                    shortcut: "Cmd-Shift-L",
+                    detail: "Prefix the current line or selected lines with a bullet marker."
+                ),
+                ShortcutItem(
+                    title: "Checklist todo",
+                    shortcut: "Cmd-Shift-T",
+                    detail: "Insert Markdown checklist items for the current line or selection."
+                )
+            ]
+        ),
+        ShortcutSection(
             title: "App",
             items: [
                 ShortcutItem(
                     title: "Open shortcuts",
                     shortcut: "Cmd-/",
                     detail: "Open this keyboard shortcuts cheatsheet."
-                ),
-                ShortcutItem(
-                    title: "Import backup",
-                    shortcut: "Cmd-Shift-I",
-                    detail: "Import a JSON backup into the app."
-                ),
-                ShortcutItem(
-                    title: "Export backup",
-                    shortcut: "Cmd-Shift-E",
-                    detail: "Export the current data as a backup."
                 ),
                 ShortcutItem(
                     title: "Undo",
@@ -183,12 +256,10 @@ struct TodayMdApp: App {
                 Button("Import...") {
                     TodayMdTransferService.importData(into: store)
                 }
-                .keyboardShortcut("I", modifiers: [.command, .shift])
 
                 Button("Export...") {
                     TodayMdTransferService.exportData(from: store)
                 }
-                .keyboardShortcut("E", modifiers: [.command, .shift])
             }
 
             CommandGroup(replacing: .undoRedo) {
