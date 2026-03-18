@@ -10,9 +10,11 @@ struct TaskDetailView: View {
     @State private var draftTitle = ""
 
     var body: some View {
+        let searchQuery = SearchPresentationQuery(store.searchText)
+
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                headerSection
+                headerSection(searchQuery: searchQuery)
                 Divider()
                 ChecklistSection(task: task)
                 Divider()
@@ -27,18 +29,9 @@ struct TaskDetailView: View {
         .onChange(of: task.id, initial: true) { _, _ in
             draftTitle = task.title
         }
-        .toolbar {
-            ToolbarItem(placement: .destructiveAction) {
-                Button(role: .destructive) {
-                    onDelete(task)
-                } label: {
-                    Image(systemName: "trash")
-                }
-            }
-        }
     }
 
-    private var headerSection: some View {
+    private func headerSection(searchQuery: SearchPresentationQuery) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Button(action: { onToggle(task) }) {
@@ -55,7 +48,25 @@ struct TaskDetailView: View {
                     .onChange(of: draftTitle) { _, newValue in
                         store.updateTaskTitle(id: task.id, title: newValue)
                     }
+
+                Button(role: .destructive) {
+                    onDelete(task)
+                } label: {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.red)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.red.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
             }
+
+            if searchQuery.containsMatch(in: task.title) {
+                Text(searchQuery.highlightedText(for: task.title.isEmpty ? "Untitled" : task.title))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             HStack(spacing: 12) {
                 if let list = task.list {
                     Label(list.name, systemImage: list.icon)

@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct TaskCardView: View {
+    @Environment(TodayMdStore.self) private var store
+
     let task: TaskItem
     var isSelected: Bool = false
+    var showsListBadge: Bool = false
     let onToggle: () -> Void
     let onMove: (TimeBlock) -> Void
     let onDelete: () -> Void
@@ -11,8 +14,18 @@ struct TaskCardView: View {
         task.list?.listColor.color ?? .secondary
     }
 
+    private var listLabel: String {
+        task.list?.name ?? "Unassigned"
+    }
+
+    private var listIcon: String {
+        task.list?.icon ?? "tray"
+    }
+
     var body: some View {
         let metadata = task.cardMetadata
+        let searchQuery = SearchPresentationQuery(store.searchText)
+        let preview = searchQuery.preview(for: task)
 
         HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 2)
@@ -21,21 +34,46 @@ struct TaskCardView: View {
                 .padding(.vertical, 4)
 
             HStack(spacing: 8) {
-                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 17))
-                    .foregroundStyle(task.isDone ? .green : .secondary)
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onToggle)
+                Button(action: onToggle) {
+                    Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(task.isDone ? .green : listColor)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle()
+                                .fill((task.isDone ? Color.green : listColor).opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(task.title.isEmpty ? "New task" : task.title)
+                    Text(searchQuery.highlightedText(for: task.title.isEmpty ? "New task" : task.title))
                         .font(.body)
                         .lineLimit(2)
                         .strikethrough(task.isDone)
                         .foregroundStyle(task.isDone ? .secondary : .primary)
 
+                    if let preview {
+                        Text(searchQuery.highlightedText(for: preview))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .foregroundStyle(.secondary)
+                    }
+
                     HStack(spacing: 6) {
+                        if showsListBadge {
+                            HStack(spacing: 4) {
+                                Image(systemName: listIcon)
+                                    .font(.caption2)
+                                Text(listLabel)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(listColor.opacity(0.12)))
+                            .foregroundStyle(listColor)
+                        }
                         if metadata.checkboxTotal > 0 {
                             HStack(spacing: 2) {
                                 Image(systemName: "checklist")
@@ -58,13 +96,13 @@ struct TaskCardView: View {
             .padding(10)
         }
         .background {
-            RoundedRectangle(cornerRadius: 8)
+            Rectangle()
                 .fill(Color(nsColor: .windowBackgroundColor))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(Rectangle())
         .overlay {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
+                Rectangle()
                     .strokeBorder(listColor.opacity(0.5), lineWidth: 1.5)
             }
         }

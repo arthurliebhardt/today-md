@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,17 +16,147 @@ private struct MarkdownArchiveSnapshot: Equatable {
     let noteLastModified: Date
 }
 
+@MainActor
+private struct WindowTitleSyncView: NSViewRepresentable {
+    let title: String
+
+    final class TrackingView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        weak var window: NSWindow?
+        var title = ""
+
+        func applyTitle() {
+            guard let window else { return }
+            window.titleVisibility = .visible
+            if window.title != title {
+                window.title = title
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onWindowChange = { [coordinator = context.coordinator] window in
+            coordinator.window = window
+            coordinator.applyTitle()
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        context.coordinator.title = title
+        context.coordinator.window = nsView.window
+        context.coordinator.applyTitle()
+        nsView.onWindowChange = { [coordinator = context.coordinator] window in
+            coordinator.window = window
+            coordinator.applyTitle()
+        }
+    }
+}
+
+struct ShortcutSequenceView: View {
+    enum Tone {
+        case accent
+        case secondary
+    }
+
+    let shortcut: String
+    var tone: Tone = .accent
+    var font: Font = .system(.subheadline, design: .monospaced, weight: .semibold)
+
+    private var tokens: [String] {
+        shortcut
+            .components(separatedBy: CharacterSet(charactersIn: "-+"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var foregroundColor: Color {
+        switch tone {
+        case .accent:
+            return .blue
+        case .secondary:
+            return .secondary
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch tone {
+        case .accent:
+            return Color.blue.opacity(0.10)
+        case .secondary:
+            return Color.secondary.opacity(0.12)
+        }
+    }
+
+    private var borderColor: Color {
+        switch tone {
+        case .accent:
+            return Color.blue.opacity(0.18)
+        case .secondary:
+            return Color.secondary.opacity(0.18)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
+                shortcutToken(token)
+            }
+        }
+        .fixedSize()
+    }
+
+    @ViewBuilder
+    private func shortcutToken(_ token: String) -> some View {
+        Group {
+            if token.caseInsensitiveCompare("cmd") == .orderedSame || token.caseInsensitiveCompare("command") == .orderedSame {
+                Image(systemName: "command")
+            } else {
+                Text(token)
+            }
+        }
+        .font(font)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(backgroundColor)
+        )
+        .overlay(
+            Capsule()
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .foregroundStyle(foregroundColor)
+    }
+}
+
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var undoController: AppUndoController
+    @EnvironmentObject private var presentationState: AppPresentationState
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
+    @State private var selectedTaskIDs: Set<UUID> = []
+    @State private var selectionAnchorTaskID: UUID?
+    @State private var focusedBlock: TimeBlock?
+    @State private var expandedDoneBlocks: Set<TimeBlock> = []
+    @State private var allTasksDoneSectionExpanded = false
     @State private var showingSettingsSheet = false
-    @State private var showingImportPicker = false
-    @State private var showingExportPicker = false
-    @State private var pendingImportURL: URL?
-    @State private var showingImportModeDialog = false
     @State private var transferAlert: TransferAlert?
 
     private var selectedList: TaskList? {
@@ -38,13 +169,31 @@ struct ContentView: View {
         return store.task(id: selectedTaskID)
     }
 
+    private var isBoardLayoutActive: Bool {
+        !store.hasActiveSearch
+    }
+
+    private var isListBoardSelectionActive: Bool {
+        !store.hasActiveSearch && selectedList != nil
+    }
+
     private func listTasks(for block: TimeBlock) -> [TaskItem] {
         guard let list = selectedList else { return [] }
         return store.filteredTasks(
             list.items
                 .filter { $0.block == block }
                 .sorted { $0.sortOrder < $1.sortOrder }
-        )
+            )
+    }
+
+    private func boardTasks(for block: TimeBlock) -> [TaskItem] {
+        if selectedList != nil {
+            return listTasks(for: block)
+        }
+
+        return store.allTasks
+            .filter { $0.block == block }
+            .sorted(by: taskSort)
     }
 
     private var preferredVisibleTasks: [TaskItem] {
@@ -66,12 +215,33 @@ struct ContentView: View {
         return activeTasks + doneTasks
     }
 
+    private var visibleFlatTasks: [TaskItem] {
+        let activeTasks = preferredVisibleTasks.filter { !$0.isDone }
+        guard allTasksDoneSectionExpanded else { return activeTasks }
+        let doneTasks = preferredVisibleTasks.filter(\.isDone)
+        return activeTasks + doneTasks
+    }
+
     private func syncSelectedTask() {
-        guard let selectedTaskID else { return }
-        guard preferredVisibleTasks.contains(where: { $0.id == selectedTaskID }) else {
-            self.selectedTaskID = nil
-            return
+        let visibleTasks = preferredVisibleTasks
+        let visibleIDs = Set(visibleTasks.map(\.id))
+        var retainedIDs = selectedTaskIDs.intersection(visibleIDs)
+
+        if let selectedTaskID, visibleIDs.contains(selectedTaskID) {
+            retainedIDs.insert(selectedTaskID)
         }
+
+        if let selectedTaskID, !retainedIDs.contains(selectedTaskID) {
+            self.selectedTaskID = visibleTasks.first(where: { retainedIDs.contains($0.id) })?.id
+        } else if selectedTaskID == nil {
+            self.selectedTaskID = visibleTasks.first(where: { retainedIDs.contains($0.id) })?.id
+        }
+
+        selectedTaskIDs = retainedIDs
+        if let selectionAnchorTaskID, !visibleIDs.contains(selectionAnchorTaskID) {
+            self.selectionAnchorTaskID = nil
+        }
+        syncFocusedBlock()
     }
 
     private func validateSelection() {
@@ -81,51 +251,131 @@ struct ContentView: View {
         }
     }
 
+    private func syncFocusedBlock() {
+        guard isBoardLayoutActive else {
+            focusedBlock = nil
+            return
+        }
+
+        if let selectedTask, isTaskVisibleOnCurrentBoard(selectedTask) {
+            focusedBlock = selectedTask.block
+        } else if focusedBlock == nil {
+            focusedBlock = .today
+        }
+    }
+
+    private var orderedSelectedTaskIDs: [UUID] {
+        preferredVisibleTasks.map(\.id).filter { selectedTaskIDs.contains($0) }
+    }
+
+    private func orderedTaskIDsForLane(_ block: TimeBlock) -> [UUID] {
+        let laneTasks = boardTasks(for: block)
+        let activeTaskIDs = laneTasks.filter { !$0.isDone }.map(\.id)
+        guard isDoneSectionExpanded(for: block) else { return activeTaskIDs }
+        let doneTaskIDs = laneTasks.filter(\.isDone).map(\.id)
+        return activeTaskIDs + doneTaskIDs
+    }
+
+    private var canCreateTaskInFocusedLane: Bool {
+        isListBoardSelectionActive && effectiveFocusedBlock != nil && !isModalUIActive
+    }
+
+    private var canSelectAllVisibleTasks: Bool {
+        !preferredVisibleTasks.isEmpty && !isModalUIActive
+    }
+
+    private var currentSelectionTaskIDs: [UUID] {
+        let orderedIDs = orderedSelectedTaskIDs
+        if !orderedIDs.isEmpty {
+            return orderedIDs
+        }
+
+        if let selectedTaskID {
+            return [selectedTaskID]
+        }
+
+        return []
+    }
+
+    private var canMarkSelectedTasksDone: Bool {
+        !isModalUIActive && currentSelectionTaskIDs.contains { taskID in
+            store.task(id: taskID)?.isDone == false
+        }
+    }
+
+    private var orderedSelectedTasks: [TaskItem] {
+        currentSelectionTaskIDs.compactMap(store.task(id:))
+    }
+
+    private var hasMultipleSelectedTasks: Bool {
+        orderedSelectedTasks.count > 1
+    }
+
+    private var isModalUIActive: Bool {
+        showingSettingsSheet || presentationState.showingKeyboardShortcuts
+    }
+
+    private var effectiveFocusedBlock: TimeBlock? {
+        if let focusedBlock {
+            return focusedBlock
+        }
+
+        if isBoardLayoutActive {
+            return selectedTask?.block ?? .today
+        }
+
+        return nil
+    }
+
+    private func handleKeyboardShortcut(_ event: NSEvent) -> Bool {
+        guard !isModalUIActive else { return false }
+        guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        guard !(NSApp.keyWindow?.firstResponder is NSTextView) else {
+            return false
+        }
+
+        switch (flags, characters) {
+        case ([.command], "a"):
+            guard canSelectAllVisibleTasks else { return false }
+            selectAllTasksInCurrentContext()
+            return true
+        case ([.command], "n"):
+            guard canCreateTaskInFocusedLane else { return false }
+            createTaskInFocusedLane()
+            return true
+        case ([.command, .shift], "d"):
+            guard canMarkSelectedTasksDone else { return false }
+            markSelectedTasksDone()
+            return true
+        default:
+            return false
+        }
+    }
+
     private func startImport() {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showingImportPicker = true
+            TodayMdTransferService.importData(into: store)
         }
     }
 
     private func startExport() {
         showingSettingsSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showingExportPicker = true
+            TodayMdTransferService.exportData(from: store)
         }
     }
 
-    private func handleImportSelection(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            pendingImportURL = url
-            showingImportModeDialog = true
-        case .failure(let error):
-            presentTransferError(title: "Import Failed", error: error)
-        }
+    private func openShortcutCheatsheet() {
+        presentationState.presentKeyboardShortcuts()
     }
 
-    private func handleExportSelection(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let folderURL):
-            do {
-                try TodayMdTransferService.exportData(from: store, to: folderURL)
-            } catch {
-                presentTransferError(title: "Export Failed", error: error)
-            }
-        case .failure(let error):
-            presentTransferError(title: "Export Failed", error: error)
-        }
-    }
-
-    private func confirmImport(mode: ImportMode) {
-        guard let url = pendingImportURL else { return }
-        pendingImportURL = nil
-
-        do {
-            try TodayMdTransferService.importData(into: store, from: url, mode: mode)
-        } catch {
-            presentTransferError(title: "Import Failed", error: error)
+    private func openShortcutCheatsheetFromSettings() {
+        showingSettingsSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            presentationState.presentKeyboardShortcuts()
         }
     }
 
@@ -209,7 +459,7 @@ struct ContentView: View {
                         Text("Settings")
                             .font(.system(size: 28, weight: .bold))
 
-                        Text("Manage backups, local search, and note archives without coupling the app to Xcode-only persistence.")
+                        Text("Manage backups, keyboard shortcuts, and note archives without coupling the app to Xcode-only persistence.")
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
@@ -271,18 +521,17 @@ struct ContentView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Search")
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Keyboard Shortcuts")
                         .font(.headline)
 
-                    Text("Task title, note content, and checklist items are indexed in the local SQLite database using full-text search.")
-                        .foregroundStyle(.secondary)
-
-                    TextField("Search tasks", text: Binding(
-                        get: { store.searchText },
-                        set: { store.searchText = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
+                    settingsActionCard(
+                        title: "Open Shortcut Cheatsheet",
+                        subtitle: "See the current selection, editor, board, and app shortcuts in one place.",
+                        systemImage: "command",
+                        tint: .purple,
+                        action: openShortcutCheatsheetFromSettings
+                    )
                 }
                 .padding(18)
                 .background(
@@ -308,6 +557,213 @@ struct ContentView: View {
             .padding(28)
             .frame(width: 540)
         }
+    }
+
+    private var shortcutsSheetView: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.orange.opacity(0.08),
+                    Color.blue.opacity(0.06),
+                    Color(nsColor: .windowBackgroundColor)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .top, spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.blue.opacity(0.92), Color.teal.opacity(0.72)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+
+                        Image(systemName: "command.square.fill")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 58, height: 58)
+                    .shadow(color: Color.blue.opacity(0.18), radius: 10, y: 4)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Keyboard Shortcuts")
+                            .font(.system(size: 28, weight: .bold))
+
+                        Text("Selection, editor, board, and app shortcuts that are currently available in today-md.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+                }
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(ShortcutCheatsheet.sections) { section in
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(section.title)
+                                    .font(.headline)
+
+                                VStack(spacing: 10) {
+                                    ForEach(section.items) { item in
+                                        shortcutRow(item)
+                                    }
+                                }
+                            }
+                            .padding(18)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+                            )
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
+
+                HStack(spacing: 6) {
+                    Text("Open from the menu with")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ShortcutSequenceView(
+                        shortcut: "Cmd-/",
+                        tone: .secondary,
+                        font: .system(size: 11, weight: .semibold, design: .rounded)
+                    )
+                    Spacer()
+                    Button("Close") {
+                        presentationState.showingKeyboardShortcuts = false
+                    }
+                    .keyboardShortcut(.cancelAction)
+                }
+            }
+            .padding(28)
+            .frame(width: 620, height: 640)
+        }
+    }
+
+    private func shortcutRow(_ item: ShortcutItem) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.headline)
+                Text(item.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 16)
+
+            ShortcutSequenceView(shortcut: item.shortcut)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+        )
+    }
+
+    @ViewBuilder
+    private var contentColumn: some View {
+        if store.hasActiveSearch {
+            AllTasksView(
+                tasks: preferredVisibleTasks,
+                selectedTaskID: $selectedTaskID,
+                selectedTaskIDs: $selectedTaskIDs,
+                doneSectionExpanded: $allTasksDoneSectionExpanded,
+                onSelect: selectTask,
+                onMove: moveTask,
+                onMarkDone: markDraggedSelectionDone,
+                onDelete: deleteTask,
+                onToggle: toggleTask,
+                onReorderActive: reorderActiveTask
+            )
+        } else {
+            BoardView(
+                tasks: boardTasks,
+                doneSectionExpanded: doneSectionExpandedBinding,
+                selectedTaskID: $selectedTaskID,
+                selectedTaskIDs: $selectedTaskIDs,
+                focusedBlock: $focusedBlock,
+                onSelect: selectTask,
+                onAdd: addTask,
+                onMove: moveTask,
+                onMoveToDone: moveTaskToDone,
+                onReorderInBlock: reorderTaskInVisibleBoard,
+                onDelete: deleteTask,
+                onToggle: toggleTask,
+                allowsAdding: selectedList != nil,
+                showsListBadge: selection == .all
+            )
+        }
+    }
+
+    private var selectionActionBar: some View {
+        HStack(spacing: 12) {
+            Text(selectionSummaryText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button {
+                markSelectedTasksDone()
+            } label: {
+                Label("Done", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(canMarkSelectedTasksDone ? Color.green : Color.secondary.opacity(0.5))
+            .background(
+                Capsule()
+                    .fill(Color.green.opacity(canMarkSelectedTasksDone ? 0.14 : 0.06))
+            )
+            .disabled(!canMarkSelectedTasksDone)
+
+            Button(role: .destructive) {
+                deleteSelectedTasks()
+            } label: {
+                Label("Delete", systemImage: "trash.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.red)
+            .background(
+                Capsule()
+                    .fill(Color.red.opacity(0.12))
+            )
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.88))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private var selectionSummaryText: String {
+        let count = currentSelectionTaskIDs.count
+        if count == 1 {
+            return "1 selected"
+        }
+        return "\(count) selected"
     }
 
     private func settingsActionCard(
@@ -363,32 +819,12 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(selection: $selection)
         } content: {
-            Group {
-                if store.hasActiveSearch || selection == .all {
-                    AllTasksView(
-                        tasks: preferredVisibleTasks,
-                        selectedTaskID: $selectedTaskID,
-                        onMove: moveTask,
-                        onDelete: deleteTask,
-                        onToggle: toggleTask,
-                        onReorderActive: reorderActiveTask
-                    )
-                } else {
-                    BoardView(
-                        tasks: listTasks,
-                        selectedTaskID: $selectedTaskID,
-                        onAdd: addTask,
-                        onMove: moveTask,
-                        onReorderInBlock: reorderTaskInCurrentListBlock,
-                        onDelete: deleteTask,
-                        onToggle: toggleTask
-                    )
-                }
-            }
-            .navigationTitle(boardTitle)
+            contentColumn
             .navigationSplitViewColumnWidth(min: 560, ideal: 760)
         } detail: {
-            if let task = selectedTask {
+            if hasMultipleSelectedTasks {
+                multiSelectionDetailView
+            } else if let task = selectedTask {
                 TaskDetailView(
                     task: task,
                     onToggle: toggleTask,
@@ -405,46 +841,10 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 460, ideal: 560)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-
-                    TextField(
-                        "Search tasks, notes, and checklist items",
-                        text: Binding(
-                            get: { store.searchText },
-                            set: { store.searchText = $0 }
-                        )
-                    )
-                    .textFieldStyle(.plain)
-
-                    if store.hasActiveSearch {
-                        Button {
-                            store.searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(minWidth: 280, idealWidth: 360, maxWidth: 420)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
+                toolbarSearchField
             }
 
             ToolbarItemGroup {
-                Button {
-                    showingSettingsSheet = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Open settings")
-
                 Button {
                     undoController.undo()
                 } label: {
@@ -458,43 +858,37 @@ struct ContentView: View {
                     Label("Redo", systemImage: "arrow.uturn.forward")
                 }
                 .help("Redo the last undone change")
+
+                Button {
+                    openShortcutCheatsheet()
+                } label: {
+                    Label("Keyboard Shortcuts", systemImage: "command")
+                }
+                .help("Open the keyboard shortcuts cheatsheet")
+
+                Button {
+                    showingSettingsSheet = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open settings and app actions")
             }
         }
         .navigationSplitViewStyle(.automatic)
         .frame(minWidth: 800, minHeight: 500)
+        .background(
+            KeyboardShortcutMonitor(handler: handleKeyboardShortcut)
+                .allowsHitTesting(false)
+        )
+        .background(
+            WindowTitleSyncView(title: boardTitle)
+                .allowsHitTesting(false)
+        )
         .sheet(isPresented: $showingSettingsSheet) {
             settingsSheetView
         }
-        .fileImporter(
-            isPresented: $showingImportPicker,
-            allowedContentTypes: [.json]
-        ) { result in
-            handleImportSelection(result)
-        }
-        .fileImporter(
-            isPresented: $showingExportPicker,
-            allowedContentTypes: [.folder]
-        ) { result in
-            handleExportSelection(result)
-        }
-        .confirmationDialog(
-            "Import Tasks",
-            isPresented: $showingImportModeDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Merge") {
-                confirmImport(mode: .merge)
-            }
-
-            Button("Replace Existing") {
-                confirmImport(mode: .replaceExisting)
-            }
-
-            Button("Cancel", role: .cancel) {
-                pendingImportURL = nil
-            }
-        } message: {
-            Text("Choose whether to merge the imported data into your existing lists or replace everything currently in the app.")
+        .sheet(isPresented: $presentationState.showingKeyboardShortcuts) {
+            shortcutsSheetView
         }
         .alert(item: $transferAlert) { alert in
             Alert(
@@ -516,10 +910,41 @@ struct ContentView: View {
             syncSelectedTask()
         }
         .onDeleteCommand {
-            if let selectedTaskID {
-                deleteTask(id: selectedTaskID)
+            deleteSelectedTasks()
+        }
+    }
+
+    private var toolbarSearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField(
+                "Search tasks, notes, and checklist items",
+                text: Binding(
+                    get: { store.searchText },
+                    set: { store.searchText = $0 }
+                )
+            )
+            .textFieldStyle(.plain)
+
+            if store.hasActiveSearch {
+                Button {
+                    store.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(minWidth: 280, idealWidth: 360, maxWidth: 420)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
     }
 
     private var boardTitle: String {
@@ -542,11 +967,123 @@ struct ContentView: View {
             return
         }
 
-        selectedTaskID = task.id
+        setSingleSelection(task.id, focusedBlock: block)
+    }
+
+    private func createTaskInFocusedLane() {
+        guard let block = effectiveFocusedBlock else { return }
+        guard case .list(let listID) = selection,
+              let task = store.addTask(title: "New Task", block: block, listID: listID)
+        else {
+            return
+        }
+
+        setSingleSelection(task.id, focusedBlock: block)
+    }
+
+    private func selectAllTasksInCurrentContext() {
+        if isBoardLayoutActive {
+            selectAllTasksInFocusedLane()
+        } else {
+            selectAllVisibleTasks()
+        }
+    }
+
+    private func selectAllTasksInFocusedLane() {
+        guard let block = effectiveFocusedBlock else { return }
+        let laneTaskIDs = orderedTaskIDsForLane(block)
+        guard !laneTaskIDs.isEmpty else { return }
+
+        selectedTaskIDs = Set(laneTaskIDs)
+
+        if let selectedTaskID, selectedTaskIDs.contains(selectedTaskID) {
+            self.selectedTaskID = selectedTaskID
+        } else {
+            self.selectedTaskID = laneTaskIDs.first
+        }
+
+        selectionAnchorTaskID = self.selectedTaskID
+        focusedBlock = block
+    }
+
+    private func selectAllVisibleTasks() {
+        let visibleTaskIDs = visibleFlatTasks.map(\.id)
+        guard !visibleTaskIDs.isEmpty else { return }
+
+        selectedTaskIDs = Set(visibleTaskIDs)
+
+        if let selectedTaskID, selectedTaskIDs.contains(selectedTaskID) {
+            self.selectedTaskID = selectedTaskID
+        } else {
+            self.selectedTaskID = visibleTaskIDs.first
+        }
+
+        selectionAnchorTaskID = self.selectedTaskID
+    }
+
+    private func setSingleSelection(_ taskID: UUID, focusedBlock: TimeBlock? = nil) {
+        selectedTaskID = taskID
+        selectedTaskIDs = [taskID]
+        selectionAnchorTaskID = taskID
+
+        if let focusedBlock {
+            self.focusedBlock = focusedBlock
+        }
+    }
+
+    private func selectTask(_ task: TaskItem, extendingRange: Bool) {
+        if isBoardLayoutActive && isTaskVisibleOnCurrentBoard(task) {
+            selectTask(task.id, in: orderedTaskIDsForLane(task.block), focusedBlock: task.block, extendingRange: extendingRange)
+        } else {
+            selectTask(task.id, in: visibleFlatTasks.map(\.id), extendingRange: extendingRange)
+        }
+    }
+
+    private func selectTask(_ taskID: UUID, in orderedIDs: [UUID], focusedBlock: TimeBlock? = nil, extendingRange: Bool) {
+        if let focusedBlock {
+            self.focusedBlock = focusedBlock
+        }
+
+        guard extendingRange,
+              let anchorID = selectionAnchorTaskID ?? selectedTaskID,
+              let anchorIndex = orderedIDs.firstIndex(of: anchorID),
+              let selectedIndex = orderedIDs.firstIndex(of: taskID)
+        else {
+            setSingleSelection(taskID, focusedBlock: focusedBlock)
+            return
+        }
+
+        let lowerBound = min(anchorIndex, selectedIndex)
+        let upperBound = max(anchorIndex, selectedIndex)
+        selectedTaskIDs = Set(orderedIDs[lowerBound...upperBound])
+        selectedTaskID = taskID
     }
 
     private func moveTask(id: UUID, to block: TimeBlock) {
-        store.moveTask(id: id, to: block)
+        let taskIDs = draggedSelectionTaskIDs(for: id)
+
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.moveTask(id: taskID, to: block, markDone: false)
+        } else {
+            store.moveTasks(ids: taskIDs, to: block, markDone: false)
+        }
+
+        if taskIDs.contains(where: { selectedTaskIDs.contains($0) }) {
+            focusedBlock = block
+        }
+    }
+
+    private func moveTaskToDone(id: UUID, in block: TimeBlock) {
+        let taskIDs = draggedSelectionTaskIDs(for: id)
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.moveTask(id: taskID, to: block, markDone: true)
+        } else {
+            store.moveTasks(ids: taskIDs, to: block, markDone: true)
+        }
+
+        if taskIDs.contains(where: { selectedTaskIDs.contains($0) }) {
+            focusedBlock = block
+        }
     }
 
     private func deleteTask(_ task: TaskItem) {
@@ -554,10 +1091,39 @@ struct ContentView: View {
     }
 
     private func deleteTask(id: UUID) {
+        selectedTaskIDs.remove(id)
         if selectedTaskID == id {
             selectedTaskID = nil
         }
+        if selectionAnchorTaskID == id {
+            selectionAnchorTaskID = nil
+        }
         store.deleteTask(id: id)
+    }
+
+    private func deleteSelectedTasks() {
+        let taskIDs = orderedSelectedTaskIDs
+
+        guard !taskIDs.isEmpty else {
+            if let selectedTaskID {
+                deleteTask(id: selectedTaskID)
+            }
+            return
+        }
+
+        selectedTaskIDs.removeAll()
+        if let selectedTaskID, taskIDs.contains(selectedTaskID) {
+            self.selectedTaskID = nil
+        }
+        if let selectionAnchorTaskID, taskIDs.contains(selectionAnchorTaskID) {
+            self.selectionAnchorTaskID = nil
+        }
+
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.deleteTask(id: taskID)
+        } else {
+            store.deleteTasks(ids: taskIDs)
+        }
     }
 
     private func toggleTask(_ task: TaskItem) {
@@ -568,13 +1134,141 @@ struct ContentView: View {
         store.toggleTask(id: id)
     }
 
+    private func markDraggedSelectionDone(id: UUID) {
+        let taskIDs = draggedSelectionTaskIDs(for: id).filter { taskID in
+            store.task(id: taskID)?.isDone == false
+        }
+
+        guard !taskIDs.isEmpty else { return }
+
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.setTaskCompletion(id: taskID, isDone: true)
+        } else {
+            store.setTasksCompletion(ids: taskIDs, isDone: true)
+        }
+    }
+
+    private func markSelectedTasksDone() {
+        let taskIDs = currentSelectionTaskIDs.filter { taskID in
+            store.task(id: taskID)?.isDone == false
+        }
+
+        guard !taskIDs.isEmpty else { return }
+
+        if taskIDs.count == 1, let taskID = taskIDs.first {
+            store.setTaskCompletion(id: taskID, isDone: true)
+        } else {
+            store.setTasksCompletion(ids: taskIDs, isDone: true)
+        }
+    }
+
+    private func draggedSelectionTaskIDs(for draggedTaskID: UUID) -> [UUID] {
+        let selectedTaskIDs = currentSelectionTaskIDs
+        guard selectedTaskIDs.count > 1, selectedTaskIDs.contains(draggedTaskID) else {
+            return [draggedTaskID]
+        }
+
+        return selectedTaskIDs
+    }
+
+    private var multiSelectionDetailView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                selectionActionBar
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Selected Tasks")
+                        .font(.headline)
+
+                    ForEach(orderedSelectedTasks) { task in
+                        multiSelectionTaskRow(task)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+    }
+
+    private func multiSelectionTaskRow(_ task: TaskItem) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(task.isDone ? .green : .secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(task.title.isEmpty ? "Untitled" : task.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .strikethrough(task.isDone)
+
+                HStack(spacing: 10) {
+                    if let list = task.list {
+                        Label(list.name, systemImage: list.icon)
+                            .font(.caption)
+                            .foregroundStyle(list.listColor.color)
+                    }
+
+                    Label(task.block.label, systemImage: task.block.icon)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.82))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+        )
+    }
+
     private func reorderActiveTask(_ draggedID: UUID, _ beforeID: UUID?) {
         store.reorderAllActiveTask(draggedID, before: beforeID)
+    }
+
+    private func reorderTaskInVisibleBoard(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
+        if case .list = selection {
+            reorderTaskInCurrentListBlock(draggedID, block, beforeID)
+        } else {
+            reorderActiveTask(draggedID, beforeID)
+        }
     }
 
     private func reorderTaskInCurrentListBlock(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
         guard case .list(let listID) = selection else { return }
         store.reorderTaskInListBlock(listID: listID, draggedID: draggedID, block: block, before: beforeID)
+    }
+
+    private func isTaskVisibleOnCurrentBoard(_ task: TaskItem) -> Bool {
+        switch selection {
+        case .all:
+            return true
+        case .list(let listID):
+            return task.list?.id == listID
+        }
+    }
+
+    private func isDoneSectionExpanded(for block: TimeBlock) -> Bool {
+        expandedDoneBlocks.contains(block)
+    }
+
+    private func doneSectionExpandedBinding(for block: TimeBlock) -> Binding<Bool> {
+        Binding(
+            get: { isDoneSectionExpanded(for: block) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedDoneBlocks.insert(block)
+                } else {
+                    expandedDoneBlocks.remove(block)
+                }
+            }
+        )
     }
 }
 

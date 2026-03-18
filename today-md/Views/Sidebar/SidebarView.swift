@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(TodayMdStore.self) private var store
+    @EnvironmentObject private var presentationState: AppPresentationState
     @Binding var selection: SidebarSelection
 
     @State private var isAddingList = false
@@ -34,6 +35,8 @@ struct SidebarView: View {
                             .frame(width: 24)
 
                         Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .layoutPriority(1)
 
                         Spacer()
 
@@ -44,6 +47,7 @@ struct SidebarView: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .buttonStyle(.plain)
                 .listRowBackground(
                     selection == .all ? Color.blue.opacity(0.12) : Color.clear
@@ -56,16 +60,55 @@ struct SidebarView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            shortcutHintFooter
+        }
         .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(placement: .navigation) {
                 Button(action: { isAddingList = true }) {
-                    Label("Add List", systemImage: "plus")
+                    Image(systemName: "plus")
                 }
+                .help("Add List")
             }
         }
         .sheet(isPresented: $isAddingList) { addListSheet }
         .sheet(item: $editingList) { list in renameListSheet(list) }
+    }
+
+    private var shortcutHintFooter: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            Button(action: { presentationState.presentKeyboardShortcuts() }) {
+                HStack(spacing: 8) {
+                    ShortcutSequenceView(
+                        shortcut: "Cmd + /",
+                        tone: .secondary,
+                        font: .system(size: 11, weight: .semibold, design: .rounded)
+                    )
+
+                    Text("to show keyboard shortcuts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .help("Open the keyboard shortcuts cheatsheet")
+            .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func listRow(_ list: TaskList) -> some View {
@@ -84,6 +127,8 @@ struct SidebarView: View {
 
                 Text(list.name)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
 
                 Spacer()
 
@@ -94,6 +139,7 @@ struct SidebarView: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .buttonStyle(.plain)
         .listRowBackground(
             selection == .list(list.id) ? list.listColor.color.opacity(0.1) : Color.clear

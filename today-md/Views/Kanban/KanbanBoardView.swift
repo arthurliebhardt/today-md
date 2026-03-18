@@ -2,12 +2,19 @@ import SwiftUI
 
 struct BoardView: View {
     let tasks: (TimeBlock) -> [TaskItem]
+    let doneSectionExpanded: (TimeBlock) -> Binding<Bool>
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    @Binding var focusedBlock: TimeBlock?
+    let onSelect: (TaskItem, Bool) -> Void
     let onAdd: (String, TimeBlock) -> Void
     let onMove: (UUID, TimeBlock) -> Void
+    let onMoveToDone: (UUID, TimeBlock) -> Void
     let onReorderInBlock: (UUID, TimeBlock, UUID?) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
+    var allowsAdding: Bool = true
+    var showsListBadge: Bool = false
 
     @State private var backlogCollapsed = false
     @State private var thisWeekCollapsed = false
@@ -55,13 +62,21 @@ struct BoardView: View {
                                 block: block,
                                 tasks: tasks(block),
                                 selectedTaskID: $selectedTaskID,
+                                selectedTaskIDs: $selectedTaskIDs,
+                                isFocused: focusedBlock == block,
+                                onSelect: onSelect,
                                 onAdd: { title in onAdd(title, block) },
                                 onMove: onMove,
+                                onMoveToDone: onMoveToDone,
                                 onReorderActive: { draggedID, beforeID in
                                     onReorderInBlock(draggedID, block, beforeID)
                                 },
                                 onDelete: onDelete,
                                 onToggle: onToggle,
+                                onFocus: { focusedBlock = block },
+                                allowsAdding: allowsAdding,
+                                doneSectionExpanded: doneSectionExpanded(block),
+                                showsListBadge: showsListBadge,
                                 onCollapse: {
                                     if block == .backlog { backlogCollapsed = true }
                                     else { thisWeekCollapsed = true }
@@ -73,13 +88,21 @@ struct BoardView: View {
                             block: block,
                             tasks: tasks(block),
                             selectedTaskID: $selectedTaskID,
+                            selectedTaskIDs: $selectedTaskIDs,
+                            isFocused: focusedBlock == block,
+                            onSelect: onSelect,
                             onAdd: { title in onAdd(title, block) },
                             onMove: onMove,
+                            onMoveToDone: onMoveToDone,
                             onReorderActive: { draggedID, beforeID in
                                 onReorderInBlock(draggedID, block, beforeID)
                             },
                             onDelete: onDelete,
-                            onToggle: onToggle
+                            onToggle: onToggle,
+                            onFocus: { focusedBlock = block },
+                            allowsAdding: allowsAdding,
+                            doneSectionExpanded: doneSectionExpanded(block),
+                            showsListBadge: showsListBadge
                         )
                     }
                 }
@@ -127,17 +150,26 @@ struct LaneView: View {
     let block: TimeBlock
     let tasks: [TaskItem]
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    let isFocused: Bool
+    let onSelect: (TaskItem, Bool) -> Void
     let onAdd: (String) -> Void
     let onMove: (UUID, TimeBlock) -> Void
+    let onMoveToDone: (UUID, TimeBlock) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
+    let onFocus: () -> Void
+    let allowsAdding: Bool
+    @Binding var doneSectionExpanded: Bool
+    let showsListBadge: Bool
     var onCollapse: (() -> Void)? = nil
 
     @State private var isTargeted = false
     @State private var isAdding = false
     @State private var newTitle = ""
     @State private var currentDropTarget: ReorderTarget?
+    @State private var isDoneSectionTargeted = false
     @FocusState private var isNewTaskFieldFocused: Bool
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
@@ -177,6 +209,10 @@ struct LaneView: View {
     }
 
     private var laneBorderColor: Color {
+        if isFocused {
+            return accentColor.opacity(isTodayLane ? 0.7 : 0.45)
+        }
+
         if isTodayLane {
             return accentColor.opacity(0.35)
         }
@@ -192,16 +228,17 @@ struct LaneView: View {
                     ForEach(activeTasks) { task in
                         TaskCardView(
                             task: task,
-                            isSelected: selectedTaskID == task.id,
+                            isSelected: selectedTaskIDs.contains(task.id),
+                            showsListBadge: showsListBadge,
                             onToggle: { onToggle(task) },
                             onMove: { targetBlock in onMove(task.id, targetBlock) },
                             onDelete: { onDelete(task) }
                         )
-                        .onTapGesture { handleTaskTap(task.id) }
+                        .gesture(taskTapGesture(for: task))
                         .draggable(TaskItemTransfer(id: task.id))
                         .overlay {
                             if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
-                                RoundedRectangle(cornerRadius: 8)
+                                Rectangle()
                                     .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
                             }
                         }
@@ -214,20 +251,22 @@ struct LaneView: View {
                         }
                     }
                     reorderDropZone(target: .end, height: 48)
-                    addCard
-                    if !doneTasks.isEmpty {
-                        doneSection
+                    if allowsAdding {
+                        addCard
                     }
+                    doneSection
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    onFocus()
                     dismissEmptyDraftIfNeeded()
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture {
+                onFocus()
                 dismissEmptyDraftIfNeeded()
             }
         }
@@ -238,7 +277,7 @@ struct LaneView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(laneBorderColor, lineWidth: isTodayLane ? 1.5 : 1)
+                .strokeBorder(laneBorderColor, lineWidth: isFocused ? 2 : (isTodayLane ? 1.5 : 1))
         )
         .dropDestination(for: TaskItemTransfer.self) { items, _ in
             for item in items { onMove(item.id, block) }
@@ -288,6 +327,7 @@ struct LaneView: View {
         .padding(.bottom, 8)
         .contentShape(Rectangle())
         .onTapGesture {
+            onFocus()
             dismissEmptyDraftIfNeeded()
         }
         .background(alignment: .bottom) {
@@ -335,20 +375,108 @@ struct LaneView: View {
     }
 
     private var doneSection: some View {
-        DisclosureGroup("Done (\(doneTasks.count))") {
-            ForEach(doneTasks) { task in
-                TaskCardView(
-                    task: task,
-                    isSelected: selectedTaskID == task.id,
-                    onToggle: { onToggle(task) },
-                    onMove: { targetBlock in onMove(task.id, targetBlock) },
-                    onDelete: { onDelete(task) }
-                )
-                .onTapGesture { handleTaskTap(task.id) }
+        Group {
+            if doneSectionExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button(action: toggleDoneSection) {
+                        doneSectionHeader
+                    }
+                    .buttonStyle(.plain)
+
+                    if doneTasks.isEmpty {
+                        Text("Drop tasks here to mark them done.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .allowsHitTesting(false)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
+                            )
+                    } else {
+                        ForEach(doneTasks) { task in
+                            TaskCardView(
+                                task: task,
+                                isSelected: selectedTaskIDs.contains(task.id),
+                                showsListBadge: showsListBadge,
+                                onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
+                                onDelete: { onDelete(task) }
+                            )
+                            .gesture(taskTapGesture(for: task))
+                            .draggable(TaskItemTransfer(id: task.id))
+                        }
+                    }
+                }
+                .padding(12)
+                .background {
+                    Button(action: toggleDoneSection) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Button(action: toggleDoneSection) {
+                    doneSectionHeader
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    isDoneSectionTargeted
+                        ? Color.green.opacity(0.14)
+                        : Color.green.opacity(0.06)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isDoneSectionTargeted
+                        ? Color.green.opacity(0.45)
+                        : Color.green.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                )
+        )
+        .dropDestination(for: TaskItemTransfer.self) { items, _ in
+            guard !items.isEmpty else { return false }
+            for item in items {
+                onMoveToDone(item.id, block)
+            }
+            return true
+        } isTargeted: { targeted in
+            isDoneSectionTargeted = targeted
+        }
+    }
+
+    private var doneSectionHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Done")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(doneTasks.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.green.opacity(0.14)))
+            Image(systemName: doneSectionExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func toggleDoneSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            doneSectionExpanded.toggle()
+        }
     }
 
     private func handleReorderDrop(_ items: [TaskItemTransfer], target: ReorderTarget) -> Bool {
@@ -436,8 +564,20 @@ struct LaneView: View {
         cancelAdd()
     }
 
-    private func handleTaskTap(_ taskID: UUID) {
-        selectedTaskID = taskID
-        dismissEmptyDraftIfNeeded()
+    private func taskTapGesture(for task: TaskItem) -> some Gesture {
+        TapGesture()
+            .modifiers(.shift)
+            .onEnded {
+                onFocus()
+                onSelect(task, true)
+                dismissEmptyDraftIfNeeded()
+            }
+            .exclusively(
+                before: TapGesture().onEnded {
+                    onFocus()
+                    onSelect(task, false)
+                    dismissEmptyDraftIfNeeded()
+                }
+            )
     }
 }

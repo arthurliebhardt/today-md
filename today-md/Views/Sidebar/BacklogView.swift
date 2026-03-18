@@ -3,12 +3,17 @@ import SwiftUI
 struct AllTasksView: View {
     let tasks: [TaskItem]
     @Binding var selectedTaskID: UUID?
+    @Binding var selectedTaskIDs: Set<UUID>
+    @Binding var doneSectionExpanded: Bool
+    let onSelect: (TaskItem, Bool) -> Void
     let onMove: (UUID, TimeBlock) -> Void
+    let onMarkDone: (UUID) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
     let onReorderActive: (UUID, UUID?) -> Void
 
     @State private var currentDropTarget: ReorderTarget?
+    @State private var isDoneSectionTargeted = false
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     private var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
@@ -25,16 +30,16 @@ struct AllTasksView: View {
                 ForEach(activeTasks) { task in
                     AllTasksCardView(
                         task: task,
-                        isSelected: selectedTaskID == task.id,
+                        isSelected: selectedTaskIDs.contains(task.id),
                         onToggle: { onToggle(task) },
                         onMove: { targetBlock in onMove(task.id, targetBlock) },
                         onDelete: { onDelete(task) }
                     )
-                    .onTapGesture { selectedTaskID = task.id }
+                    .gesture(taskTapGesture(for: task))
                     .draggable(TaskItemTransfer(id: task.id))
                     .overlay {
                         if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
-                            RoundedRectangle(cornerRadius: 8)
+                            Rectangle()
                                 .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
                         }
                     }
@@ -51,23 +56,7 @@ struct AllTasksView: View {
                     reorderDropZone(target: .end, height: 52)
                 }
 
-                if !doneTasks.isEmpty {
-                    DisclosureGroup("Done (\(doneTasks.count))") {
-                        ForEach(doneTasks) { task in
-                            AllTasksCardView(
-                                task: task,
-                                isSelected: selectedTaskID == task.id,
-                                onToggle: { onToggle(task) },
-                                onMove: { targetBlock in onMove(task.id, targetBlock) },
-                                onDelete: { onDelete(task) }
-                            )
-                            .onTapGesture { selectedTaskID = task.id }
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
-                }
+                doneSection
             }
             .padding()
         }
@@ -126,9 +115,129 @@ struct AllTasksView: View {
                 updateDropTarget(targeted: targeted, target: target)
             }
     }
+
+    private func taskTapGesture(for task: TaskItem) -> some Gesture {
+        TapGesture()
+            .modifiers(.shift)
+            .onEnded {
+                onSelect(task, true)
+            }
+            .exclusively(
+                before: TapGesture().onEnded {
+                    onSelect(task, false)
+                }
+            )
+    }
+
+    private var doneSection: some View {
+        Group {
+            if doneSectionExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button(action: toggleDoneSection) {
+                        doneSectionHeader
+                    }
+                    .buttonStyle(.plain)
+
+                    if doneTasks.isEmpty {
+                        Text("Drop tasks here to mark them done.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 56)
+                            .allowsHitTesting(false)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
+                            )
+                    } else {
+                        ForEach(doneTasks) { task in
+                            AllTasksCardView(
+                                task: task,
+                                isSelected: selectedTaskIDs.contains(task.id),
+                                onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
+                                onDelete: { onDelete(task) }
+                            )
+                            .gesture(taskTapGesture(for: task))
+                            .draggable(TaskItemTransfer(id: task.id))
+                        }
+                    }
+                }
+                .padding(12)
+                .background {
+                    Button(action: toggleDoneSection) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Button(action: toggleDoneSection) {
+                    doneSectionHeader
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    isDoneSectionTargeted
+                        ? Color.green.opacity(0.14)
+                        : Color.green.opacity(0.06)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isDoneSectionTargeted
+                        ? Color.green.opacity(0.45)
+                        : Color.green.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                )
+        )
+        .padding(.top, 8)
+        .dropDestination(for: TaskItemTransfer.self) { items, _ in
+            guard !items.isEmpty else { return false }
+            for item in items {
+                onMarkDone(item.id)
+            }
+            return true
+        } isTargeted: { targeted in
+            isDoneSectionTargeted = targeted
+        }
+    }
+
+    private var doneSectionHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Done")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(doneTasks.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.green.opacity(0.14)))
+            Image(systemName: doneSectionExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func toggleDoneSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            doneSectionExpanded.toggle()
+        }
+    }
 }
 
 struct AllTasksCardView: View {
+    @Environment(TodayMdStore.self) private var store
+
     let task: TaskItem
     var isSelected: Bool = false
     let onToggle: () -> Void
@@ -141,6 +250,8 @@ struct AllTasksCardView: View {
 
     var body: some View {
         let metadata = task.cardMetadata
+        let searchQuery = SearchPresentationQuery(store.searchText)
+        let preview = searchQuery.preview(for: task)
 
         HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 2)
@@ -149,19 +260,31 @@ struct AllTasksCardView: View {
                 .padding(.vertical, 4)
 
             HStack(spacing: 8) {
-                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(task.isDone ? .green : .secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onToggle)
+                Button(action: onToggle) {
+                    Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(task.isDone ? .green : listColor)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill((task.isDone ? Color.green : listColor).opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(task.title.isEmpty ? "Untitled" : task.title)
+                    Text(searchQuery.highlightedText(for: task.title.isEmpty ? "Untitled" : task.title))
                         .font(.body)
                         .lineLimit(2)
                         .strikethrough(task.isDone)
                         .foregroundStyle(task.isDone ? .secondary : .primary)
+
+                    if let preview {
+                        Text(searchQuery.highlightedText(for: preview))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .foregroundStyle(.secondary)
+                    }
 
                     HStack(spacing: 8) {
                         if metadata.checkboxTotal > 0 {
@@ -183,32 +306,36 @@ struct AllTasksCardView: View {
 
                 Spacer(minLength: 0)
 
-                blockBadge(task.block)
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
+                        blockBadge(task.block)
 
-                if let list = task.list {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(list.listColor.color)
-                            .frame(width: 7, height: 7)
-                        Text(list.name)
-                            .font(.caption)
+                        if let list = task.list {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(list.listColor.color)
+                                    .frame(width: 7, height: 7)
+                                Text(list.name)
+                                    .font(.caption)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(list.listColor.color.opacity(0.12)))
+                            .foregroundStyle(list.listColor.color)
+                        }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(list.listColor.color.opacity(0.12)))
-                    .foregroundStyle(list.listColor.color)
                 }
             }
             .padding(12)
         }
         .background {
-            RoundedRectangle(cornerRadius: 8)
+            Rectangle()
                 .fill(Color(nsColor: .windowBackgroundColor))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(Rectangle())
         .overlay {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
+                Rectangle()
                     .strokeBorder(listColor.opacity(0.5), lineWidth: 1.5)
             }
         }
