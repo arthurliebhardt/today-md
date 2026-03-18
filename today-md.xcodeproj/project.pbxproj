@@ -30,6 +30,7 @@
 		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023; };
 		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
 		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025; };
+		AA000026 /* TodayMdSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,6 +60,7 @@
 		AB000023 /* TodayMdDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdDatabase.swift; sourceTree = "<group>"; };
 		AB000024 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		AB000025 /* SearchPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPresentation.swift; sourceTree = "<group>"; };
+		AB000026 /* TodayMdSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdSyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -163,6 +165,7 @@
 				AB000014 /* MarkdownRenderer.swift */,
 				AB000025 /* SearchPresentation.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
+				AB000026 /* TodayMdSyncService.swift */,
 				AB000023 /* TodayMdDatabase.swift */,
 				AB000024 /* libsqlite3.tbd */,
 			);
@@ -258,6 +261,7 @@
 				AA000021 /* TodayMdTransferService.swift in Sources */,
 				AA000022 /* TodayMdArchive.swift in Sources */,
 				AA000023 /* TodayMdDatabase.swift in Sources */,
+				AA000026 /* TodayMdSyncService.swift in Sources */,
 				AA000025 /* SearchPresentation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

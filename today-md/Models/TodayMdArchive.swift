@@ -3,24 +3,43 @@ import Foundation
 struct TodayMdArchive: Codable {
     let version: Int
     let exportedAt: Date
+    let syncRevisionID: String?
+    let syncUpdatedAt: Date?
+    let syncUpdatedByDeviceID: String?
     let lists: [ListArchive]
     let unassignedTasks: [TaskArchive]
 
     init(
         version: Int = 1,
         exportedAt: Date = Date(),
+        syncRevisionID: String? = nil,
+        syncUpdatedAt: Date? = nil,
+        syncUpdatedByDeviceID: String? = nil,
         lists: [ListArchive],
         unassignedTasks: [TaskArchive]
     ) {
         self.version = version
         self.exportedAt = exportedAt
+        self.syncRevisionID = syncRevisionID
+        self.syncUpdatedAt = syncUpdatedAt
+        self.syncUpdatedByDeviceID = syncUpdatedByDeviceID
         self.lists = lists
         self.unassignedTasks = unassignedTasks
     }
 
-    init(lists: [TaskList], unassignedTasks: [TaskItem], exportedAt: Date = Date()) {
+    init(
+        lists: [TaskList],
+        unassignedTasks: [TaskItem],
+        exportedAt: Date = Date(),
+        syncRevisionID: String? = nil,
+        syncUpdatedAt: Date? = nil,
+        syncUpdatedByDeviceID: String? = nil
+    ) {
         self.version = 1
         self.exportedAt = exportedAt
+        self.syncRevisionID = syncRevisionID
+        self.syncUpdatedAt = syncUpdatedAt
+        self.syncUpdatedByDeviceID = syncUpdatedByDeviceID
         self.lists = lists
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { list in

@@ -157,7 +157,7 @@ enum ShortcutCheatsheet {
                 ShortcutItem(
                     title: "Create task in selected lane",
                     shortcut: "Cmd-N",
-                    detail: "Create a new task in the lane that currently has focus."
+                    detail: "Create a new task in the focused lane. In All Tasks, it is created without a list."
                 ),
                 ShortcutItem(
                     title: "Focus lane",
@@ -235,22 +235,37 @@ final class AppPresentationState: ObservableObject {
 
 @main
 struct TodayMdApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
-    @State private var store = TodayMdStore()
+    @StateObject private var syncService: TodayMdSyncService
+    @State private var store: TodayMdStore
+
+    init() {
+        let syncService = TodayMdSyncService()
+        _syncService = StateObject(wrappedValue: syncService)
+        _store = State(initialValue: TodayMdStore(shouldSeedShowcaseData: !syncService.syncEnabled))
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .environmentObject(syncService)
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
                 .background(MainWindowConfigurator())
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
+                    syncService.attach(store: store)
+                    syncService.handleAppLaunchIfNeeded()
                 }
         }
         .defaultSize(width: 1500, height: 920)
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            syncService.handleAppDidBecomeActive()
+        }
         .commands {
             CommandGroup(after: .saveItem) {
                 Button("Import...") {
@@ -299,9 +314,12 @@ final class TodayMdStore {
     @ObservationIgnored
     private var undoManager: UndoManager?
 
-    init() {
+    @ObservationIgnored
+    private var syncHandler: (() -> Void)?
+
+    init(databaseURL: URL? = nil, shouldSeedShowcaseData: Bool = true) {
         do {
-            database = try TodayMdDatabase(url: Self.defaultDatabaseURL())
+            database = try TodayMdDatabase(url: databaseURL ?? Self.defaultDatabaseURL())
             let archive = try database.loadArchive()
             applyArchive(archive, refreshSearch: false)
             if removeLegacySubtasksIfNeeded() {
@@ -309,7 +327,11 @@ final class TodayMdStore {
             }
 
             if allTasks.isEmpty {
-                seedShowcaseDataIfNeeded()
+                if shouldSeedShowcaseData {
+                    seedShowcaseDataIfNeeded()
+                } else {
+                    refreshSearch()
+                }
             } else {
                 refreshSearch()
             }
@@ -327,8 +349,16 @@ final class TodayMdStore {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    var isEmpty: Bool {
+        allTasks.isEmpty
+    }
+
     func configureUndoManager(_ manager: UndoManager) {
         undoManager = manager
+    }
+
+    func configureSyncHandler(_ handler: @escaping () -> Void) {
+        syncHandler = handler
     }
 
     func list(id: UUID) -> TaskList? {
@@ -386,6 +416,56 @@ final class TodayMdStore {
         }
 
         return task
+    }
+
+    func addUnassignedTask(title: String, block: TimeBlock) -> TaskItem {
+        let task = TaskItem(title: title, block: block, sortOrder: nextSortOrder(for: nil, in: block))
+
+        performMutation(actionName: "Add Task") {
+            unassignedTasks.append(task)
+        }
+
+        return task
+    }
+
+    func assignTask(id: UUID, toListID listID: UUID?) {
+        guard let task = task(id: id) else { return }
+
+        let sourceList = task.list
+        let sourceListID = sourceList?.id
+        guard sourceListID != listID else { return }
+
+        let destinationList = listID.flatMap(list(id:))
+        guard listID == nil || destinationList != nil else { return }
+
+        let actionName: String
+        if listID == nil {
+            actionName = "Remove Task from List"
+        } else if sourceList == nil {
+            actionName = "Assign Task to List"
+        } else {
+            actionName = "Move Task to List"
+        }
+
+        performMutation(actionName: actionName) {
+            if let sourceList {
+                sourceList.items.removeAll { $0.id == id }
+            } else {
+                unassignedTasks.removeAll { $0.id == id }
+            }
+
+            task.list = destinationList
+            task.sortOrder = nextSortOrder(for: destinationList, in: task.block)
+
+            if let destinationList {
+                destinationList.items.append(task)
+            } else {
+                unassignedTasks.append(task)
+            }
+
+            normalizeSortOrder(for: sourceList, in: task.block)
+            normalizeSortOrder(for: destinationList, in: task.block)
+        }
     }
 
     func moveTask(id: UUID, to block: TimeBlock, markDone: Bool? = nil) {
@@ -750,7 +830,26 @@ final class TodayMdStore {
     }
 
     func makeArchive() -> TodayMdArchive {
-        TodayMdArchive(lists: lists, unassignedTasks: unassignedTasks)
+        makeArchive(syncRevisionID: nil, syncUpdatedAt: nil, syncUpdatedByDeviceID: nil)
+    }
+
+    func makeArchive(
+        syncRevisionID: String?,
+        syncUpdatedAt: Date?,
+        syncUpdatedByDeviceID: String?
+    ) -> TodayMdArchive {
+        TodayMdArchive(
+            lists: lists,
+            unassignedTasks: unassignedTasks,
+            syncRevisionID: syncRevisionID,
+            syncUpdatedAt: syncUpdatedAt,
+            syncUpdatedByDeviceID: syncUpdatedByDeviceID
+        )
+    }
+
+    func applyRemoteArchive(_ archive: TodayMdArchive) {
+        applyArchive(archive, refreshSearch: true)
+        persist(notifySync: false)
     }
 
     private func seedShowcaseDataIfNeeded() {
@@ -938,9 +1037,12 @@ final class TodayMdStore {
         }
     }
 
-    private func persist() {
+    private func persist(notifySync: Bool = true) {
         do {
             try database.replaceAll(with: makeArchive())
+            if notifySync {
+                syncHandler?()
+            }
         } catch {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
         }

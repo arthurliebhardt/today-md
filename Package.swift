@@ -27,6 +27,11 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]
+        ),
+        .testTarget(
+            name: "TodayMdAppTests",
+            dependencies: ["TodayMdApp"],
+            path: "Tests/TodayMdAppTests"
         )
     ]
 )
