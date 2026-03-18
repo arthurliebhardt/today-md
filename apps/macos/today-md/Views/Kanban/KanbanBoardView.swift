@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BoardView: View {
     let tasks: (TimeBlock) -> [TaskItem]
+    let doneSectionExpanded: (TimeBlock) -> Binding<Bool>
     @Binding var selectedTaskID: UUID?
     @Binding var selectedTaskIDs: Set<UUID>
     @Binding var focusedBlock: TimeBlock?
@@ -12,6 +13,8 @@ struct BoardView: View {
     let onReorderInBlock: (UUID, TimeBlock, UUID?) -> Void
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
+    var allowsAdding: Bool = true
+    var showsListBadge: Bool = false
 
     @State private var backlogCollapsed = false
     @State private var thisWeekCollapsed = false
@@ -71,6 +74,9 @@ struct BoardView: View {
                                 onDelete: onDelete,
                                 onToggle: onToggle,
                                 onFocus: { focusedBlock = block },
+                                allowsAdding: allowsAdding,
+                                doneSectionExpanded: doneSectionExpanded(block),
+                                showsListBadge: showsListBadge,
                                 onCollapse: {
                                     if block == .backlog { backlogCollapsed = true }
                                     else { thisWeekCollapsed = true }
@@ -93,7 +99,10 @@ struct BoardView: View {
                             },
                             onDelete: onDelete,
                             onToggle: onToggle,
-                            onFocus: { focusedBlock = block }
+                            onFocus: { focusedBlock = block },
+                            allowsAdding: allowsAdding,
+                            doneSectionExpanded: doneSectionExpanded(block),
+                            showsListBadge: showsListBadge
                         )
                     }
                 }
@@ -151,6 +160,9 @@ struct LaneView: View {
     let onDelete: (TaskItem) -> Void
     let onToggle: (TaskItem) -> Void
     let onFocus: () -> Void
+    let allowsAdding: Bool
+    @Binding var doneSectionExpanded: Bool
+    let showsListBadge: Bool
     var onCollapse: (() -> Void)? = nil
 
     @State private var isTargeted = false
@@ -158,7 +170,6 @@ struct LaneView: View {
     @State private var newTitle = ""
     @State private var currentDropTarget: ReorderTarget?
     @State private var isDoneSectionTargeted = false
-    @State private var isDoneSectionExpanded = false
     @FocusState private var isNewTaskFieldFocused: Bool
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
@@ -218,6 +229,7 @@ struct LaneView: View {
                         TaskCardView(
                             task: task,
                             isSelected: selectedTaskIDs.contains(task.id),
+                            showsListBadge: showsListBadge,
                             onToggle: { onToggle(task) },
                             onMove: { targetBlock in onMove(task.id, targetBlock) },
                             onDelete: { onDelete(task) }
@@ -239,7 +251,9 @@ struct LaneView: View {
                         }
                     }
                     reorderDropZone(target: .end, height: 48)
-                    addCard
+                    if allowsAdding {
+                        addCard
+                    }
                     doneSection
                 }
                 .padding(.horizontal, 8)
@@ -361,57 +375,57 @@ struct LaneView: View {
     }
 
     private var doneSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isDoneSectionExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("Done")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(doneTasks.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.green.opacity(0.14)))
-                    Image(systemName: isDoneSectionExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
+        Group {
+            if doneSectionExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button(action: toggleDoneSection) {
+                        doneSectionHeader
+                    }
+                    .buttonStyle(.plain)
 
-            if isDoneSectionExpanded {
-                if doneTasks.isEmpty {
-                    Text("Drop tasks here to mark them done.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
-                        )
-                } else {
-                    ForEach(doneTasks) { task in
-                        TaskCardView(
-                            task: task,
-                            isSelected: selectedTaskIDs.contains(task.id),
-                            onToggle: { onToggle(task) },
-                            onMove: { targetBlock in onMove(task.id, targetBlock) },
-                            onDelete: { onDelete(task) }
-                        )
-                        .gesture(taskTapGesture(for: task))
-                        .draggable(TaskItemTransfer(id: task.id))
+                    if doneTasks.isEmpty {
+                        Text("Drop tasks here to mark them done.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .allowsHitTesting(false)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
+                            )
+                    } else {
+                        ForEach(doneTasks) { task in
+                            TaskCardView(
+                                task: task,
+                                isSelected: selectedTaskIDs.contains(task.id),
+                                showsListBadge: showsListBadge,
+                                onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
+                                onDelete: { onDelete(task) }
+                            )
+                            .gesture(taskTapGesture(for: task))
+                            .draggable(TaskItemTransfer(id: task.id))
+                        }
                     }
                 }
+                .padding(12)
+                .background {
+                    Button(action: toggleDoneSection) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Button(action: toggleDoneSection) {
+                    doneSectionHeader
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
@@ -437,6 +451,31 @@ struct LaneView: View {
             return true
         } isTargeted: { targeted in
             isDoneSectionTargeted = targeted
+        }
+    }
+
+    private var doneSectionHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Done")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(doneTasks.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.green.opacity(0.14)))
+            Image(systemName: doneSectionExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func toggleDoneSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            doneSectionExpanded.toggle()
         }
     }
 

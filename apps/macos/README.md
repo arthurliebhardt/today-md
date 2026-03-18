@@ -95,7 +95,7 @@ bash scripts/install.sh ~/Downloads/today-md-v1.4.1-macos.zip
 
 ## Data Portability
 
-Backups are exported as JSON files, and each export also writes a sibling folder with the task notes as separate Markdown files. Imported data can either be merged into the existing SQLite store or replace it completely.
+Each export creates a dated `today-md-eport-{date}` folder containing the JSON backup and a markdown notes folder. Imported data can either be merged into the existing SQLite store or replace it completely.
 
 Task notes are also mirrored automatically as Markdown files in `~/Library/Application Support/today-md/Markdown Archive/` so they can be reused outside the app.
 

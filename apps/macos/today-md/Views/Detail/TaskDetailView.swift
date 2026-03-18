@@ -10,9 +10,11 @@ struct TaskDetailView: View {
     @State private var draftTitle = ""
 
     var body: some View {
+        let searchQuery = SearchPresentationQuery(store.searchText)
+
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                headerSection
+                headerSection(searchQuery: searchQuery)
                 Divider()
                 ChecklistSection(task: task)
                 Divider()
@@ -29,7 +31,7 @@ struct TaskDetailView: View {
         }
     }
 
-    private var headerSection: some View {
+    private func headerSection(searchQuery: SearchPresentationQuery) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Button(action: { onToggle(task) }) {
@@ -58,6 +60,13 @@ struct TaskDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            if searchQuery.containsMatch(in: task.title) {
+                Text(searchQuery.highlightedText(for: task.title.isEmpty ? "Untitled" : task.title))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             HStack(spacing: 12) {
                 if let list = task.list {
                     Label(list.name, systemImage: list.icon)

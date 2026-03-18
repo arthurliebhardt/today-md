@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MarkdownEditorView: View {
@@ -5,10 +6,14 @@ struct MarkdownEditorView: View {
     let task: TaskItem
 
     @State private var showPreview = false
+    @State private var hoveredToolbarButtonID: String?
     @State private var markdownText = ""
     @State private var saveTask: DispatchWorkItem?
     @State private var suppressAutoContinue = false
     @State private var cachedTextView: NSTextView?
+
+    private var searchQuery: SearchPresentationQuery { SearchPresentationQuery(store.searchText) }
+    private var matchingNoteExcerpts: [String] { searchQuery.matchingExcerpts(in: markdownText) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -27,6 +32,10 @@ struct MarkdownEditorView: View {
 
             if !showPreview {
                 mdToolbar
+            }
+
+            if !matchingNoteExcerpts.isEmpty {
+                searchMatchesView
             }
 
             if showPreview {
@@ -50,68 +59,144 @@ struct MarkdownEditorView: View {
                 markdownText = current
             }
         }
+        .onDisappear {
+            hoveredToolbarButtonID = nil
+        }
     }
 
     private var mdToolbar: some View {
-        HStack(spacing: 1) {
-            mdBtn("H1", icon: nil, tip: "Heading 1 (⌘1)") { insertPrefix("# ") }
-            mdBtn("H2", icon: nil, tip: "Heading 2 (⌘2)") { insertPrefix("## ") }
-            mdBtn("H3", icon: nil, tip: "Heading 3 (⌘3)") { insertPrefix("### ") }
+        HStack(alignment: .top, spacing: 1) {
+            mdBtn(title: "Heading 1", label: "H1", shortcut: "⌘1") { insertPrefix("# ") }
+            mdBtn(title: "Heading 2", label: "H2", shortcut: "⌘2") { insertPrefix("## ") }
+            mdBtn(title: "Heading 3", label: "H3", shortcut: "⌘3") { insertPrefix("### ") }
 
             mdDivider
 
-            mdBtn(nil, icon: "bold", tip: "Bold (⌘B)") { wrapSelection("**") }
-            mdBtn(nil, icon: "italic", tip: "Italic (⌘I)") { wrapSelection("_") }
-            mdBtn(nil, icon: "strikethrough", tip: "Strikethrough") { wrapSelection("~~") }
-            mdBtn(nil, icon: "chevron.left.forwardslash.chevron.right", tip: "Code (⌘`)") { wrapSelection("`") }
+            mdBtn(title: "Bold", icon: "bold", shortcut: "⌘B") { wrapSelection("**") }
+            mdBtn(title: "Italic", icon: "italic", shortcut: "⌘I") { wrapSelection("_") }
+            mdBtn(title: "Strikethrough", icon: "strikethrough") { wrapSelection("~~") }
+            mdBtn(title: "Inline Code", icon: "chevron.left.forwardslash.chevron.right", shortcut: "⌘`") { wrapSelection("`") }
 
             mdDivider
 
-            mdBtn(nil, icon: "list.bullet", tip: "Bullet List (⌘⇧L)") { insertPrefix("- ") }
-            mdBtn(nil, icon: "list.number", tip: "Numbered List") { insertPrefix("1. ") }
-            mdBtn(nil, icon: "checkmark.square", tip: "Task (⌘⇧T)") { insertPrefix("- [ ] ") }
+            mdBtn(title: "Bullet List", icon: "list.bullet", shortcut: "⌘⇧L") { insertPrefix("- ") }
+            mdBtn(title: "Numbered List", icon: "list.number") { insertPrefix("1. ") }
+            mdBtn(title: "Checklist Item", icon: "checkmark.square", shortcut: "⌘⇧T") { insertPrefix("- [ ] ") }
 
             mdDivider
 
-            mdBtn(nil, icon: "text.quote", tip: "Quote") { insertPrefix("> ") }
-            mdBtn(nil, icon: "minus", tip: "Divider") { appendAtCursor("\n---\n") }
-            mdBtn(nil, icon: "curlybraces", tip: "Code Block") { appendAtCursor("\n```\n\n```\n") }
+            mdBtn(title: "Quote", icon: "text.quote") { insertPrefix("> ") }
+            mdBtn(title: "Divider", icon: "minus") { appendAtCursor("\n---\n") }
+            mdBtn(title: "Code Block", icon: "curlybraces") { appendAtCursor("\n```\n\n```\n") }
 
             Spacer()
         }
     }
 
     private var mdDivider: some View {
-        Divider().frame(height: 20).padding(.horizontal, 6)
+        Divider()
+            .frame(height: 20)
+            .padding(.horizontal, 6)
+            .padding(.top, 5)
     }
 
-    private func mdBtn(_ label: String?, icon: String?, tip: String, action: @escaping () -> Void) -> some View {
-        Button {
-            if let tv = activeTextView {
-                tv.window?.makeFirstResponder(tv)
+    private var searchMatchesView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Search matches")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(Array(matchingNoteExcerpts.enumerated()), id: \.offset) { _, excerpt in
+                Text(searchQuery.highlightedText(for: excerpt))
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                    )
             }
-            action()
-            DispatchQueue.main.async {
-                if let tv = cachedTextView {
+        }
+    }
+
+    private func mdBtn(
+        title: String,
+        label: String? = nil,
+        icon: String? = nil,
+        shortcut: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let buttonID = [title, label, icon].compactMap { $0 }.joined(separator: "-")
+        let isHovered = hoveredToolbarButtonID == buttonID
+
+        return VStack(spacing: 4) {
+            Button {
+                if let tv = activeTextView {
                     tv.window?.makeFirstResponder(tv)
                 }
+                action()
+                DispatchQueue.main.async {
+                    if let tv = cachedTextView {
+                        tv.window?.makeFirstResponder(tv)
+                    }
+                }
+            } label: {
+                Group {
+                    if let icon {
+                        Image(systemName: icon)
+                    } else if let label {
+                        Text(label).fontWeight(.bold)
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+                .foregroundStyle(isHovered ? Color.accentColor : Color(nsColor: .labelColor).opacity(0.84))
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(
+                            isHovered
+                            ? Color.accentColor.opacity(0.12)
+                            : Color(nsColor: .textBackgroundColor)
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(
+                            isHovered
+                            ? Color.accentColor.opacity(0.35)
+                            : Color(nsColor: .separatorColor).opacity(0.28),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: Color.black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 6 : 2, y: 1)
+                .animation(.easeOut(duration: 0.12), value: isHovered)
             }
-        } label: {
-            Group {
-                if let icon {
-                    Image(systemName: icon)
-                } else if let label {
-                    Text(label).fontWeight(.bold)
+            .buttonStyle(.plain)
+            .help(toolbarHelpText(title: title, shortcut: shortcut))
+            .accessibilityLabel(title)
+            .accessibilityHint(shortcut.map { "Shortcut \($0)" } ?? "")
+            .onHover { hovering in
+                if hovering {
+                    hoveredToolbarButtonID = buttonID
+                } else if hoveredToolbarButtonID == buttonID {
+                    hoveredToolbarButtonID = nil
                 }
             }
-            .font(.system(size: 13))
-            .frame(width: 28, height: 28)
-            .contentShape(Rectangle())
-            .foregroundStyle(.secondary)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color(nsColor: .controlBackgroundColor).opacity(0.5)))
+
+            Text(shortcut ?? " ")
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .opacity(shortcut == nil ? 0 : 1)
         }
-        .buttonStyle(.borderless)
-        .help(tip)
+        .frame(width: 36)
+    }
+
+    private func toolbarHelpText(title: String, shortcut: String?) -> String {
+        guard let shortcut else { return title }
+        return "\(title)\nShortcut: \(shortcut)"
     }
 
     private func captureActiveEditorTextView() {
@@ -244,6 +329,7 @@ struct MarkdownEditorView: View {
                 debouncedSave()
                 autoContinueList(old: oldValue, new: newValue)
             }
+            .background(KeyboardShortcutMonitor(handler: handleMarkdownShortcut))
     }
 
     private var previewView: some View {
@@ -347,6 +433,42 @@ struct MarkdownEditorView: View {
             }
         }
         return nil
+    }
+
+    private func handleMarkdownShortcut(_ event: NSEvent) -> Bool {
+        guard !showPreview, activeTextView != nil else { return false }
+        guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        switch (flags, characters) {
+        case ([.command], "1"):
+            insertPrefix("# ")
+            return true
+        case ([.command], "2"):
+            insertPrefix("## ")
+            return true
+        case ([.command], "3"):
+            insertPrefix("### ")
+            return true
+        case ([.command], "b"):
+            wrapSelection("**")
+            return true
+        case ([.command], "i"):
+            wrapSelection("_")
+            return true
+        case ([.command], "`"):
+            wrapSelection("`")
+            return true
+        case ([.command, .shift], "l"):
+            insertPrefix("- ")
+            return true
+        case ([.command, .shift], "t"):
+            insertPrefix("- [ ] ")
+            return true
+        default:
+            return false
+        }
     }
 
     private func debouncedSave() {

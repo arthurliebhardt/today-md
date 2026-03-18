@@ -12,6 +12,7 @@ struct ChecklistSection: View {
     private var doneCount: Int { items.filter(\.isChecked).count }
     private var activeItems: [MarkdownChecklistItem] { items.filter { !$0.isChecked } }
     private var doneItems: [MarkdownChecklistItem] { items.filter { $0.isChecked } }
+    private var searchQuery: SearchPresentationQuery { SearchPresentationQuery(store.searchText) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -73,7 +74,7 @@ struct ChecklistSection: View {
             .buttonStyle(.borderless)
             .focusEffectDisabled()
 
-            Text(item.title)
+            Text(searchQuery.highlightedText(for: item.title))
                 .strikethrough(item.isChecked)
                 .foregroundStyle(item.isChecked ? .secondary : .primary)
 

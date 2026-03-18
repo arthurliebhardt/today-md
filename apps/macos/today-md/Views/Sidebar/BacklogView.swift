@@ -4,6 +4,7 @@ struct AllTasksView: View {
     let tasks: [TaskItem]
     @Binding var selectedTaskID: UUID?
     @Binding var selectedTaskIDs: Set<UUID>
+    @Binding var doneSectionExpanded: Bool
     let onSelect: (TaskItem, Bool) -> Void
     let onMove: (UUID, TimeBlock) -> Void
     let onMarkDone: (UUID) -> Void
@@ -13,7 +14,6 @@ struct AllTasksView: View {
 
     @State private var currentDropTarget: ReorderTarget?
     @State private var isDoneSectionTargeted = false
-    @State private var isDoneSectionExpanded = false
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     private var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
@@ -130,57 +130,56 @@ struct AllTasksView: View {
     }
 
     private var doneSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isDoneSectionExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("Done")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(doneTasks.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.green.opacity(0.14)))
-                    Image(systemName: isDoneSectionExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
+        Group {
+            if doneSectionExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button(action: toggleDoneSection) {
+                        doneSectionHeader
+                    }
+                    .buttonStyle(.plain)
 
-            if isDoneSectionExpanded {
-                if doneTasks.isEmpty {
-                    Text("Drop tasks here to mark them done.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
-                        )
-                } else {
-                    ForEach(doneTasks) { task in
-                        AllTasksCardView(
-                            task: task,
-                            isSelected: selectedTaskIDs.contains(task.id),
-                            onToggle: { onToggle(task) },
-                            onMove: { targetBlock in onMove(task.id, targetBlock) },
-                            onDelete: { onDelete(task) }
-                        )
-                        .gesture(taskTapGesture(for: task))
-                        .draggable(TaskItemTransfer(id: task.id))
+                    if doneTasks.isEmpty {
+                        Text("Drop tasks here to mark them done.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 56)
+                            .allowsHitTesting(false)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
+                            )
+                    } else {
+                        ForEach(doneTasks) { task in
+                            AllTasksCardView(
+                                task: task,
+                                isSelected: selectedTaskIDs.contains(task.id),
+                                onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
+                                onDelete: { onDelete(task) }
+                            )
+                            .gesture(taskTapGesture(for: task))
+                            .draggable(TaskItemTransfer(id: task.id))
+                        }
                     }
                 }
+                .padding(12)
+                .background {
+                    Button(action: toggleDoneSection) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Button(action: toggleDoneSection) {
+                    doneSectionHeader
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
@@ -209,9 +208,36 @@ struct AllTasksView: View {
             isDoneSectionTargeted = targeted
         }
     }
+
+    private var doneSectionHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Done")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(doneTasks.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.green.opacity(0.14)))
+            Image(systemName: doneSectionExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func toggleDoneSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            doneSectionExpanded.toggle()
+        }
+    }
 }
 
 struct AllTasksCardView: View {
+    @Environment(TodayMdStore.self) private var store
+
     let task: TaskItem
     var isSelected: Bool = false
     let onToggle: () -> Void
@@ -224,6 +250,8 @@ struct AllTasksCardView: View {
 
     var body: some View {
         let metadata = task.cardMetadata
+        let searchQuery = SearchPresentationQuery(store.searchText)
+        let preview = searchQuery.preview(for: task)
 
         HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 2)
@@ -245,11 +273,18 @@ struct AllTasksCardView: View {
                 .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(task.title.isEmpty ? "Untitled" : task.title)
+                    Text(searchQuery.highlightedText(for: task.title.isEmpty ? "Untitled" : task.title))
                         .font(.body)
                         .lineLimit(2)
                         .strikethrough(task.isDone)
                         .foregroundStyle(task.isDone ? .secondary : .primary)
+
+                    if let preview {
+                        Text(searchQuery.highlightedText(for: preview))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .foregroundStyle(.secondary)
+                    }
 
                     HStack(spacing: 8) {
                         if metadata.checkboxTotal > 0 {
