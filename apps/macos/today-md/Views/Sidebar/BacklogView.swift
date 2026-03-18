@@ -309,20 +309,7 @@ struct AllTasksCardView: View {
                 VStack(alignment: .trailing, spacing: 8) {
                     HStack(spacing: 8) {
                         blockBadge(task.block)
-
-                        if let list = task.list {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(list.listColor.color)
-                                    .frame(width: 7, height: 7)
-                                Text(list.name)
-                                    .font(.caption)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(list.listColor.color.opacity(0.12)))
-                            .foregroundStyle(list.listColor.color)
-                        }
+                        TaskListBadgePicker(task: task)
                     }
                 }
             }

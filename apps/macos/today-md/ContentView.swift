@@ -146,6 +146,7 @@ struct ShortcutSequenceView: View {
 
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
+    @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
 
@@ -277,7 +278,7 @@ struct ContentView: View {
     }
 
     private var canCreateTaskInFocusedLane: Bool {
-        isListBoardSelectionActive && effectiveFocusedBlock != nil && !isModalUIActive
+        isBoardLayoutActive && effectiveFocusedBlock != nil && !isModalUIActive
     }
 
     private var canSelectAllVisibleTasks: Bool {
@@ -379,6 +380,21 @@ struct ContentView: View {
         }
     }
 
+    private func startSyncFolderSelection() {
+        showingSettingsSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            syncService.promptForFolderSelection()
+        }
+    }
+
+    private func syncNowFromSettings() {
+        syncService.syncNow()
+    }
+
+    private func disableSyncFromSettings() {
+        syncService.disableSync()
+    }
+
     private func presentTransferError(title: String, error: Error) {
         transferAlert = TransferAlert(
             title: title,
@@ -421,6 +437,71 @@ struct ContentView: View {
         } catch {
             presentTransferError(title: "Open Markdown Archive Failed", error: error)
         }
+    }
+
+    private func openSyncFolder() {
+        syncService.openSyncFolder()
+    }
+
+    private var syncConflictIsPresented: Binding<Bool> {
+        Binding(
+            get: { syncService.conflict != nil },
+            set: { _ in }
+        )
+    }
+
+    private var syncStatusColor: Color {
+        switch syncService.status {
+        case .disabled:
+            return .secondary
+        case .idle:
+            return .green
+        case .syncing:
+            return .blue
+        case .conflict:
+            return .orange
+        case .error:
+            return .red
+        }
+    }
+
+    private var syncFolderActionTitle: String {
+        syncService.syncEnabled ? "Choose Sync Folder" : "Enable Sync"
+    }
+
+    private var syncFolderActionSubtitle: String {
+        if syncService.syncEnabled {
+            return "Switch the iCloud Drive or OneDrive folder that stores the shared sync snapshot."
+        }
+
+        return "Choose a synced cloud folder and keep this Mac in sync through a single shared JSON snapshot."
+    }
+
+    private var syncLastSyncText: String {
+        guard let lastSyncAt = syncService.lastSyncAt else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: lastSyncAt, relativeTo: Date())
+    }
+
+    private func syncConflictMessage(_ conflict: SyncConflict) -> String {
+        var fragments: [String] = [
+            "The cloud folder contains changes that do not match this Mac's unsynced edits."
+        ]
+
+        if let remoteUpdatedAt = conflict.remoteUpdatedAt {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            fragments.append("Cloud update: \(formatter.string(from: remoteUpdatedAt)).")
+        }
+
+        if let remoteUpdatedByDeviceID = conflict.remoteUpdatedByDeviceID {
+            fragments.append("Cloud device: \(remoteUpdatedByDeviceID).")
+        }
+
+        fragments.append("Choose which version should win. The discarded version will be saved in Conflict Backups.")
+        return fragments.joined(separator: " ")
     }
 
     private var settingsSheetView: some View {
@@ -518,6 +599,86 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Sync")
+                        .font(.headline)
+
+                    VStack(spacing: 12) {
+                        settingsActionCard(
+                            title: syncFolderActionTitle,
+                            subtitle: syncFolderActionSubtitle,
+                            systemImage: "icloud",
+                            tint: .teal,
+                            action: startSyncFolderSelection
+                        )
+
+                        settingsActionCard(
+                            title: "Sync Now",
+                            subtitle: "Re-read the cloud snapshot, pull if needed, or push this Mac's pending changes.",
+                            systemImage: "arrow.triangle.2.circlepath",
+                            tint: .blue,
+                            isEnabled: syncService.syncEnabled,
+                            action: syncNowFromSettings
+                        )
+
+                        settingsActionCard(
+                            title: "Open Sync Folder",
+                            subtitle: "Reveal the chosen sync folder so you can inspect the JSON snapshot and markdown archive.",
+                            systemImage: "folder",
+                            tint: .green,
+                            isEnabled: syncService.hasFolderSelection,
+                            action: openSyncFolder
+                        )
+
+                        settingsActionCard(
+                            title: "Disable Sync",
+                            subtitle: "Keep local data on this Mac, but stop reading from and writing to the shared sync folder.",
+                            systemImage: "xmark.icloud",
+                            tint: .red,
+                            isEnabled: syncService.syncEnabled,
+                            action: disableSyncFromSettings
+                        )
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                    )
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(syncStatusColor)
+                                .frame(width: 10, height: 10)
+
+                            Text("Status: \(syncService.statusLabel)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text("Last successful sync: \(syncLastSyncText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let folderPath = syncService.folderPath {
+                            Text("Sync folder: \(folderPath)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+
+                        if let lastError = syncService.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
 
@@ -702,7 +863,7 @@ struct ContentView: View {
                 onReorderInBlock: reorderTaskInVisibleBoard,
                 onDelete: deleteTask,
                 onToggle: toggleTask,
-                allowsAdding: selectedList != nil,
+                allowsAdding: selection == .all || selectedList != nil,
                 showsListBadge: selection == .all
             )
         }
@@ -771,24 +932,25 @@ struct ContentView: View {
         subtitle: String,
         systemImage: String,
         tint: Color,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(tint.opacity(0.14))
+                        .fill(tint.opacity(isEnabled ? 0.14 : 0.08))
 
                     Image(systemName: systemImage)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(isEnabled ? tint : .secondary)
                 }
                 .frame(width: 44, height: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(isEnabled ? .primary : .secondary)
 
                     Text(subtitle)
                         .font(.subheadline)
@@ -813,6 +975,8 @@ struct ContentView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.72)
     }
 
     var body: some View {
@@ -896,6 +1060,17 @@ struct ContentView: View {
                 message: Text(alert.message)
             )
         }
+        .alert("Sync Conflict", isPresented: syncConflictIsPresented, presenting: syncService.conflict) { _ in
+            Button("Use Cloud Version") {
+                syncService.resolveConflict(.useRemote)
+            }
+
+            Button("Keep This Mac's Version") {
+                syncService.resolveConflict(.keepLocal)
+            }
+        } message: { conflict in
+            Text(syncConflictMessage(conflict))
+        }
         .onAppear {
             syncSelectedTask()
         }
@@ -961,24 +1136,22 @@ struct ContentView: View {
     }
 
     private func addTask(title: String, block: TimeBlock) {
-        guard case .list(let listID) = selection,
-              let task = store.addTask(title: title, block: block, listID: listID)
-        else {
-            return
+        let task: TaskItem?
+
+        switch selection {
+        case .all:
+            task = store.addUnassignedTask(title: title, block: block)
+        case .list(let listID):
+            task = store.addTask(title: title, block: block, listID: listID)
         }
 
+        guard let task else { return }
         setSingleSelection(task.id, focusedBlock: block)
     }
 
     private func createTaskInFocusedLane() {
         guard let block = effectiveFocusedBlock else { return }
-        guard case .list(let listID) = selection,
-              let task = store.addTask(title: "New Task", block: block, listID: listID)
-        else {
-            return
-        }
-
-        setSingleSelection(task.id, focusedBlock: block)
+        addTask(title: "New Task", block: block)
     }
 
     private func selectAllTasksInCurrentContext() {
