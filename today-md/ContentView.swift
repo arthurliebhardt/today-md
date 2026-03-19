@@ -386,12 +386,19 @@ struct ContentView: View {
 
     private func handleKeyboardShortcut(_ event: NSEvent) -> Bool {
         guard !isModalUIActive else { return false }
-        guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         guard !(NSApp.keyWindow?.firstResponder is NSTextView) else {
             return false
         }
+
+        if flags.isEmpty, event.keyCode == 51 || event.keyCode == 117 {
+            guard !currentSelectionTaskIDs.isEmpty else { return false }
+            deleteSelectedTasks()
+            return true
+        }
+
+        guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
 
         switch (flags, characters) {
         case ([.command], "a"):
@@ -1571,6 +1578,12 @@ struct ContentView: View {
     }
 
     private func deleteTask(_ task: TaskItem) {
+        let selectedIDs = currentSelectionTaskIDs
+        if selectedIDs.count > 1, selectedIDs.contains(task.id) {
+            deleteSelectedTasks()
+            return
+        }
+
         deleteTask(id: task.id)
     }
 

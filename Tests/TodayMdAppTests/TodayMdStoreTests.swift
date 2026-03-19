@@ -222,6 +222,19 @@ final class TodayMdStoreTests: XCTestCase {
         )
     }
 
+    func testMarkdownInlineDisplayMapsChecklistAutoContinuationForLegacyCRLFText() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: "☐ Ship update\r\n☐ asdsa",
+                newDisplay: "☐ Ship update\r\n☐ asdsa\n"
+            ),
+            MarkdownAutoContinuation.Edit(
+                text: "☐ Ship update\n☐ asdsa\n☐ ",
+                cursorLocation: ("☐ Ship update\n☐ asdsa\n☐ " as NSString).length
+            )
+        )
+    }
+
     func testMarkdownInlineDisplayMapsBulletAutoContinuationBackToRenderedText() {
         XCTAssertEqual(
             MarkdownInlineDisplay.editForAutoContinuation(
@@ -284,6 +297,60 @@ final class TodayMdStoreTests: XCTestCase {
                 ☐ 
                 """,
                 cursorLocation: 33
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayContinuesChecklistFromCaretWithinOlderLoadedNote() {
+        let display = """
+        Huffman, Keith <keith.huffman@sap.com>
+
+        # asdasd
+        ☐ asda
+
+        ☐ asdasd
+        """
+
+        let offset = ("Huffman, Keith <keith.huffman@sap.com>\n\n# asdasd\n☐ asda" as NSString).length
+
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForInsertedNewline(in: display, atEditorOffset: offset),
+            MarkdownAutoContinuation.Edit(
+                text: """
+                Huffman, Keith <keith.huffman@sap.com>
+
+                # asdasd
+                ☐ asda
+                ☐ 
+
+                ☐ asdasd
+                """,
+                cursorLocation: ("Huffman, Keith <keith.huffman@sap.com>\n\n# asdasd\n☐ asda\n☐ " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayContinuesChecklistFromCaretForLegacyEmptyChecklistBlock() {
+        let display = """
+        ☐ 
+        ☐ asd
+        ☐ asd
+        ☐ 
+        """
+
+        let offset = ("☐ \n☐ asd" as NSString).length
+
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForInsertedNewline(in: display, atEditorOffset: offset),
+            MarkdownAutoContinuation.Edit(
+                text: """
+                ☐ 
+                ☐ asd
+                ☐ 
+                ☐ asd
+                ☐ 
+                """,
+                cursorLocation: ("☐ \n☐ asd\n☐ " as NSString).length
             )
         )
     }

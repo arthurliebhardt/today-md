@@ -21,11 +21,11 @@ enum MarkdownInlineDisplay {
     }
 
     static func display(from markdown: String) -> String {
-        transformLines(in: markdown, using: displayLine(from:))
+        transformLines(in: normalizedLineEndings(in: markdown), using: displayLine(from:))
     }
 
     static func markdown(from editorText: String) -> String {
-        transformLines(in: editorText, using: markdownLine(from:))
+        transformLines(in: normalizedLineEndings(in: editorText), using: markdownLine(from:))
     }
 
     static func canonicalMarkdown(from text: String) -> String {
@@ -38,14 +38,15 @@ enum MarkdownInlineDisplay {
     }
 
     static func normalizeEditorState(text: String, selection: NSRange) -> NormalizedEditorState {
-        let safeSelection = clamped(range: selection, in: text)
-        let markdown = markdown(from: text)
+        let normalizedSource = normalizedLineEndings(in: text)
+        let safeSelection = clamped(range: selection, in: normalizedSource)
+        let markdown = markdown(from: normalizedSource)
         let normalizedText = display(from: markdown)
 
-        let markdownSelectionStart = markdownOffset(forEditorOffset: safeSelection.location, inEditorText: text)
+        let markdownSelectionStart = markdownOffset(forEditorOffset: safeSelection.location, inEditorText: normalizedSource)
         let markdownSelectionEnd = markdownOffset(
             forEditorOffset: safeSelection.location + safeSelection.length,
-            inEditorText: text
+            inEditorText: normalizedSource
         )
 
         let normalizedSelectionStart = displayOffset(
@@ -68,23 +69,73 @@ enum MarkdownInlineDisplay {
     }
 
     static func editForAutoContinuation(oldDisplay: String, newDisplay: String) -> MarkdownAutoContinuation.Edit? {
-        let oldMarkdown = markdown(from: oldDisplay)
-        let newMarkdown = markdown(from: newDisplay)
+        let oldDisplay = normalizedLineEndings(in: oldDisplay)
+        let newDisplay = normalizedLineEndings(in: newDisplay)
 
-        guard let edit = MarkdownAutoContinuation.edit(old: oldMarkdown, new: newMarkdown) else {
+        guard newDisplay.count == oldDisplay.count + 1,
+              let newlineIndex = findInsertedNewline(old: oldDisplay, new: newDisplay) else {
             return nil
         }
 
-        let displayText = display(from: edit.text)
-        let displayCursorLocation = displayOffset(
-            forMarkdownOffset: edit.cursorLocation,
-            inMarkdownText: edit.text
-        )
+        let lineStart = newDisplay[..<newlineIndex].lastIndex(of: "\n").map { newDisplay.index(after: $0) } ?? newDisplay.startIndex
+        let currentLine = String(newDisplay[lineStart..<newlineIndex])
+        let priorLine = previousLine(before: lineStart, in: newDisplay)
+        guard let decision = displayContinuationDecision(for: currentLine, priorLine: priorLine) else {
+            return nil
+        }
 
-        return MarkdownAutoContinuation.Edit(
-            text: displayText,
-            cursorLocation: displayCursorLocation
-        )
+        switch decision {
+        case .continueWith(let prefix):
+            let beforePart = String(newDisplay[...newlineIndex])
+            let afterNewline = newDisplay.index(after: newlineIndex)
+            let afterPart = String(newDisplay[afterNewline...])
+
+            return MarkdownAutoContinuation.Edit(
+                text: beforePart + prefix + afterPart,
+                cursorLocation: (beforePart as NSString).length + (prefix as NSString).length
+            )
+        case .exitList:
+            let beforePart = String(newDisplay[..<lineStart])
+            let afterPart = String(newDisplay[newlineIndex...])
+
+            return MarkdownAutoContinuation.Edit(
+                text: beforePart + afterPart,
+                cursorLocation: (beforePart as NSString).length + 1
+            )
+        }
+    }
+
+    static func editForInsertedNewline(in display: String, atEditorOffset offset: Int) -> MarkdownAutoContinuation.Edit? {
+        let safeOffset = clamp(offset, in: display)
+        let cursorIndex = String.Index(utf16Offset: safeOffset, in: display)
+        let lineStart = display[..<cursorIndex].lastIndex(of: "\n").map { display.index(after: $0) } ?? display.startIndex
+        let lineEnd = display[cursorIndex...].firstIndex(of: "\n") ?? display.endIndex
+        let currentLine = String(display[lineStart..<lineEnd])
+        let priorLine = previousLine(before: lineStart, in: display)
+
+        guard let decision = displayContinuationDecision(for: currentLine, priorLine: priorLine) else {
+            return nil
+        }
+
+        switch decision {
+        case .continueWith(let prefix):
+            let beforeCursor = String(display[..<cursorIndex])
+            let afterCursor = String(display[cursorIndex...])
+            let inserted = "\n" + prefix
+
+            return MarkdownAutoContinuation.Edit(
+                text: beforeCursor + inserted + afterCursor,
+                cursorLocation: (beforeCursor as NSString).length + (inserted as NSString).length
+            )
+        case .exitList:
+            let beforeLine = String(display[..<lineStart])
+            let afterLine = String(display[lineEnd...])
+
+            return MarkdownAutoContinuation.Edit(
+                text: beforeLine + afterLine,
+                cursorLocation: (beforeLine as NSString).length
+            )
+        }
     }
 
     static func markdownOffset(forEditorOffset offset: Int, inEditorText text: String) -> Int {
@@ -324,6 +375,110 @@ enum MarkdownInlineDisplay {
 
     private static func clamp(_ offset: Int, in text: String) -> Int {
         min(max(offset, 0), (text as NSString).length)
+    }
+
+    private static func normalizedLineEndings(in text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+    }
+
+    private enum DisplayContinuationDecision: Equatable {
+        case continueWith(String)
+        case exitList
+    }
+
+    private static func displayContinuationDecision(for line: String, priorLine: String?) -> DisplayContinuationDecision? {
+        let leadingWhitespace = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPriorLine = priorLine?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if isEmptyDisplayChecklistMarker(trimmed) {
+            if trimmedPriorLine.map(isDisplayChecklistAnyLine) == true {
+                return .exitList
+            }
+            return .continueWith(leadingWhitespace + uncheckedChecklistDisplayPrefix)
+        }
+        if isDisplayChecklistLine(trimmed) {
+            return .continueWith(leadingWhitespace + uncheckedChecklistDisplayPrefix)
+        }
+        if trimmed == bulletToken {
+            if trimmedPriorLine.map(isDisplayBulletLine) == true {
+                return .exitList
+            }
+            return .continueWith(leadingWhitespace + bulletDisplayPrefix)
+        }
+        if trimmed.hasPrefix(bulletDisplayPrefix) {
+            return .continueWith(leadingWhitespace + bulletDisplayPrefix)
+        }
+        if isEmptyDisplayNumberedListMarker(trimmed), let number = numberedListValue(for: trimmed) {
+            if trimmedPriorLine.map(isDisplayNumberedListLine) == true {
+                return .exitList
+            }
+            return .continueWith(leadingWhitespace + "\(number + 1). ")
+        }
+        if isDisplayNumberedListLine(trimmed), let number = numberedListValue(for: trimmed) {
+            return .continueWith(leadingWhitespace + "\(number + 1). ")
+        }
+
+        return nil
+    }
+
+    private static func isEmptyDisplayChecklistMarker(_ line: String) -> Bool {
+        line == uncheckedChecklistToken || line == checkedChecklistToken
+    }
+
+    private static func isDisplayChecklistAnyLine(_ line: String) -> Bool {
+        isEmptyDisplayChecklistMarker(line) || isDisplayChecklistLine(line)
+    }
+
+    private static func isDisplayChecklistLine(_ line: String) -> Bool {
+        line.hasPrefix(uncheckedChecklistDisplayPrefix)
+            || line.hasPrefix(checkedChecklistToken + " ")
+    }
+
+    private static func isDisplayBulletLine(_ line: String) -> Bool {
+        line == bulletToken || line.hasPrefix(bulletDisplayPrefix)
+    }
+
+    private static func isEmptyDisplayNumberedListMarker(_ line: String) -> Bool {
+        guard let number = numberedListValue(for: line) else { return false }
+        return line == "\(number)."
+    }
+
+    private static func isDisplayNumberedListLine(_ line: String) -> Bool {
+        guard let number = numberedListValue(for: line) else { return false }
+        return line == "\(number)." || line.hasPrefix("\(number). ")
+    }
+
+    private static func numberedListValue(for line: String) -> Int? {
+        guard let token = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false).first,
+              token.last == "." else { return nil }
+        return Int(token.dropLast())
+    }
+
+    private static func previousLine(before lineStart: String.Index, in text: String) -> String? {
+        guard lineStart > text.startIndex else { return nil }
+
+        let endOfPreviousLine = text.index(before: lineStart)
+        let prefix = text[..<endOfPreviousLine]
+        let previousLineStart = prefix.lastIndex(of: "\n").map { text.index(after: $0) } ?? text.startIndex
+        return String(text[previousLineStart..<endOfPreviousLine])
+    }
+
+    private static func findInsertedNewline(old: String, new: String) -> String.Index? {
+        let oldChars = Array(old)
+        let newChars = Array(new)
+        guard newChars.count == oldChars.count + 1 else { return nil }
+
+        for i in 0..<newChars.count {
+            if i >= oldChars.count || newChars[i] != oldChars[i] {
+                guard newChars[i] == "\n" else { return nil }
+                return new.index(new.startIndex, offsetBy: i)
+            }
+        }
+
+        return nil
     }
 
     private static func lineContext(in text: String, atEditorOffset offset: Int) -> (line: String, lineRange: NSRange)? {

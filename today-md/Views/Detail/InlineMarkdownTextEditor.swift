@@ -131,7 +131,13 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             let original = textView.string
             let newText = (original as NSString).replacingCharacters(in: selection, with: "\n")
 
-            guard let edit = MarkdownInlineDisplay.editForAutoContinuation(oldDisplay: original, newDisplay: newText) else {
+            guard let edit = MarkdownInlineDisplay.editForInsertedNewline(
+                in: original,
+                atEditorOffset: selection.location
+            ) ?? MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: original,
+                newDisplay: newText
+            ) else {
                 return false
             }
 
