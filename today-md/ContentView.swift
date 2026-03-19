@@ -984,7 +984,7 @@ struct ContentView: View {
             SidebarView(selection: $selection)
         } content: {
             contentColumn
-            .navigationSplitViewColumnWidth(min: 560, ideal: 760)
+                .navigationSplitViewColumnWidth(min: 480, ideal: 680)
         } detail: {
             if hasMultipleSelectedTasks {
                 multiSelectionDetailView
@@ -1002,7 +1002,7 @@ struct ContentView: View {
                 )
             }
         }
-        .navigationSplitViewColumnWidth(min: 460, ideal: 560)
+        .navigationSplitViewColumnWidth(min: 360, ideal: 460)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 toolbarSearchField
@@ -1038,7 +1038,7 @@ struct ContentView: View {
                 .help("Open settings and app actions")
             }
         }
-        .navigationSplitViewStyle(.automatic)
+        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 800, minHeight: 500)
         .background(
             KeyboardShortcutMonitor(handler: handleKeyboardShortcut)
