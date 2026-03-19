@@ -270,7 +270,7 @@ struct LaneView: View {
                 dismissEmptyDraftIfNeeded()
             }
         }
-        .frame(minWidth: 210, maxWidth: .infinity)
+        .frame(minWidth: 150, maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(laneBackgroundColor)

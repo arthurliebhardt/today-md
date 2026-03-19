@@ -209,6 +209,9 @@ struct ContentView: View {
     @State private var focusedBlock: TimeBlock?
     @State private var expandedDoneBlocks: Set<TimeBlock> = []
     @State private var allTasksDoneSectionExpanded = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var windowIsNarrow = false
+    @State private var showOverlaySidebar = false
     @State private var showingSettingsSheet = false
     @State private var selectedSettingsSection: SettingsSection = .dataBackup
     @State private var transferAlert: TransferAlert?
@@ -1184,75 +1187,165 @@ struct ContentView: View {
         .opacity(isEnabled ? 1 : 0.72)
     }
 
-    var body: some View {
-        NavigationSplitView {
-            SidebarView(selection: $selection)
-        } content: {
+    private var hasDetailContent: Bool {
+        selectedTask != nil || hasMultipleSelectedTasks
+    }
+
+    @ViewBuilder
+    private var detailPanel: some View {
+        if hasMultipleSelectedTasks {
+            multiSelectionDetailView
+        } else if let task = selectedTask {
+            TaskDetailView(
+                task: task,
+                onToggle: toggleTask,
+                onDelete: deleteTask
+            )
+        }
+    }
+
+    private var inlineContentWithDetail: some View {
+        HStack(spacing: 0) {
             contentColumn
-                .navigationSplitViewColumnWidth(min: 480, ideal: 680)
-        } detail: {
-            if hasMultipleSelectedTasks {
-                multiSelectionDetailView
-            } else if let task = selectedTask {
-                TaskDetailView(
-                    task: task,
-                    onToggle: toggleTask,
-                    onDelete: deleteTask
-                )
-            } else {
-                ContentUnavailableView(
-                    "Select a Task",
-                    systemImage: "checkmark.circle",
-                    description: Text("Click a task to view details.")
-                )
+                .frame(maxWidth: .infinity)
+                .layoutPriority(1)
+
+            if !windowIsNarrow {
+                Divider()
+                inlineDetailColumn
+                    .frame(minWidth: 500, idealWidth: 640, maxWidth: 760)
+                    .clipped()
             }
         }
-        .navigationSplitViewColumnWidth(min: 360, ideal: 460)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                toolbarSearchField
+    }
+
+    @ViewBuilder
+    private var inlineDetailColumn: some View {
+        if hasDetailContent {
+            detailPanel
+        } else {
+            ContentUnavailableView(
+                "Select a Task",
+                systemImage: "checkmark.circle",
+                description: Text("Click a task to view details.")
+            )
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView(selection: $selection)
+            } detail: {
+                inlineContentWithDetail
+            }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    toolbarSearchField
+                }
+
+                ToolbarItemGroup {
+                    Button {
+                        undoController.undo()
+                    } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                    }
+                    .help("Undo the last change")
+
+                    Button {
+                        undoController.redo()
+                    } label: {
+                        Label("Redo", systemImage: "arrow.uturn.forward")
+                    }
+                    .help("Redo the last undone change")
+
+                    Button {
+                        openShortcutCheatsheet()
+                    } label: {
+                        Label("Keyboard Shortcuts", systemImage: "command")
+                    }
+                    .help("Open the keyboard shortcuts cheatsheet")
+
+                    Button {
+                        showingSettingsSheet = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .help("Open settings and app actions")
+                }
+            }
+            .navigationSplitViewStyle(.prominentDetail)
+            .frame(minWidth: 900, minHeight: 500)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onChange(of: geo.size.width, initial: true) { _, newWidth in
+                            let narrow = newWidth < 1200
+                            if narrow != windowIsNarrow {
+                                windowIsNarrow = narrow
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    columnVisibility = narrow ? .detailOnly : .all
+                                    if !narrow { showOverlaySidebar = false }
+                                }
+                            }
+                        }
+                }
+            )
+            .background(
+                KeyboardShortcutMonitor(handler: handleKeyboardShortcut)
+                    .allowsHitTesting(false)
+            )
+            .background(
+                WindowTitleSyncView(title: boardTitle)
+                    .allowsHitTesting(false)
+            )
+
+            // Floating sidebar overlay for narrow windows
+            if showOverlaySidebar {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showOverlaySidebar = false
+                        }
+                    }
+
+                SidebarView(selection: $selection)
+                    .frame(width: 260)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .background(.ultraThickMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: .black.opacity(0.2), radius: 12, x: 4)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 6)
+                    .transition(.move(edge: .leading))
             }
 
-            ToolbarItemGroup {
-                Button {
-                    undoController.undo()
-                } label: {
-                    Label("Undo", systemImage: "arrow.uturn.backward")
-                }
-                .help("Undo the last change")
+            // Floating detail overlay for narrow windows
+            if windowIsNarrow && hasDetailContent {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTaskID = nil
+                            selectedTaskIDs.removeAll()
+                        }
+                    }
 
-                Button {
-                    undoController.redo()
-                } label: {
-                    Label("Redo", systemImage: "arrow.uturn.forward")
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    detailPanel
+                        .frame(width: 520)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .background(.ultraThickMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: .black.opacity(0.2), radius: 12, x: -4)
+                        .padding(.vertical, 8)
+                        .padding(.trailing, 6)
                 }
-                .help("Redo the last undone change")
-
-                Button {
-                    openShortcutCheatsheet()
-                } label: {
-                    Label("Keyboard Shortcuts", systemImage: "command")
-                }
-                .help("Open the keyboard shortcuts cheatsheet")
-
-                Button {
-                    showingSettingsSheet = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Open settings and app actions")
+                .transition(.move(edge: .trailing))
             }
         }
-        .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 800, minHeight: 500)
-        .background(
-            KeyboardShortcutMonitor(handler: handleKeyboardShortcut)
-                .allowsHitTesting(false)
-        )
-        .background(
-            WindowTitleSyncView(title: boardTitle)
-                .allowsHitTesting(false)
-        )
         .sheet(isPresented: $showingSettingsSheet) {
             settingsSheetView
         }
@@ -1281,6 +1374,11 @@ struct ContentView: View {
         }
         .onChange(of: selection, initial: true) { _, _ in
             syncSelectedTask()
+            if showOverlaySidebar {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showOverlaySidebar = false
+                }
+            }
         }
         .onChange(of: markdownArchiveSnapshots, initial: true) { _, _ in
             syncMarkdownArchive()
@@ -1291,6 +1389,14 @@ struct ContentView: View {
         }
         .onDeleteCommand {
             deleteSelectedTasks()
+        }
+        .onChange(of: columnVisibility) { _, newValue in
+            if windowIsNarrow && newValue != .detailOnly {
+                columnVisibility = .detailOnly
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showOverlaySidebar.toggle()
+                }
+            }
         }
     }
 

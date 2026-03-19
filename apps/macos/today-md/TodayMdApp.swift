@@ -56,7 +56,7 @@ private struct MainWindowConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             NSApp.setActivationPolicy(.regular)
-            window.minSize = NSSize(width: 1200, height: 720)
+            window.minSize = NSSize(width: 900, height: 600)
             window.title = ""
             window.titleVisibility = .visible
             window.setContentSize(NSSize(width: 1500, height: 920))
@@ -71,7 +71,7 @@ private struct MainWindowConfigurator: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             guard let window = nsView.window else { return }
-            window.minSize = NSSize(width: 1200, height: 720)
+            window.minSize = NSSize(width: 900, height: 600)
             window.titleVisibility = .visible
         }
     }
@@ -185,9 +185,14 @@ enum ShortcutCheatsheet {
                     detail: "Wrap the current selection in Markdown italic markers."
                 ),
                 ShortcutItem(
-                    title: "Inline code",
+                    title: "Strikethrough",
+                    shortcut: "Cmd-Shift-X",
+                    detail: "Wrap the current selection in Markdown strikethrough markers."
+                ),
+                ShortcutItem(
+                    title: "Code block",
                     shortcut: "Cmd-`",
-                    detail: "Wrap the current selection in backticks."
+                    detail: "Insert a fenced Markdown code block at the cursor."
                 ),
                 ShortcutItem(
                     title: "Bullet list",
@@ -195,9 +200,19 @@ enum ShortcutCheatsheet {
                     detail: "Prefix the current line or selected lines with a bullet marker."
                 ),
                 ShortcutItem(
+                    title: "Numbered list",
+                    shortcut: "Cmd-Shift-O",
+                    detail: "Prefix the current line or selected lines with numbered list markers."
+                ),
+                ShortcutItem(
                     title: "Checklist todo",
                     shortcut: "Cmd-Shift-T",
                     detail: "Insert Markdown checklist items for the current line or selection."
+                ),
+                ShortcutItem(
+                    title: "Divider",
+                    shortcut: "Cmd-Shift-D",
+                    detail: "Insert a Markdown divider at the cursor."
                 )
             ]
         ),
@@ -341,8 +356,7 @@ final class TodayMdStore {
         do {
             database = try TodayMdDatabase(url: databaseURL ?? Self.defaultDatabaseURL())
             let archive = try database.loadArchive()
-            applyArchive(archive, refreshSearch: false)
-            if removeLegacySubtasksIfNeeded() {
+            if applyArchive(archive, refreshSearch: false) {
                 persist()
             }
 
@@ -831,6 +845,7 @@ final class TodayMdStore {
                 let hydrated = archive.instantiate()
                 lists = hydrated.lists
                 unassignedTasks = hydrated.unassignedTasks
+                _ = sanitizeHydratedDataIfNeeded()
                 return
             }
 
@@ -846,6 +861,8 @@ final class TodayMdStore {
                 task.sortOrder = taskSortBase + index
                 unassignedTasks.append(task)
             }
+
+            _ = sanitizeHydratedDataIfNeeded()
         }
     }
 
@@ -1022,6 +1039,28 @@ final class TodayMdStore {
         return didChange
     }
 
+    private func normalizeLegacyNotesIfNeeded() -> Bool {
+        var didChange = false
+
+        for task in allTasks {
+            guard let note = task.note else { continue }
+            let canonical = MarkdownInlineDisplay.canonicalMarkdown(from: note.content)
+            guard canonical != note.content else { continue }
+
+            note.content = canonical
+            note.lastModified = Date()
+            didChange = true
+        }
+
+        return didChange
+    }
+
+    private func sanitizeHydratedDataIfNeeded() -> Bool {
+        let removedLegacySubtasks = removeLegacySubtasksIfNeeded()
+        let normalizedLegacyNotes = normalizeLegacyNotesIfNeeded()
+        return removedLegacySubtasks || normalizedLegacyNotes
+    }
+
     private func performMutation(actionName: String, registersUndo: Bool = true, _ change: () -> Void) {
         let previous = registersUndo ? makeArchive() : nil
         change()
@@ -1046,15 +1085,19 @@ final class TodayMdStore {
         undoManager?.setActionName(actionName)
     }
 
-    private func applyArchive(_ archive: TodayMdArchive, refreshSearch shouldRefreshSearch: Bool) {
+    @discardableResult
+    private func applyArchive(_ archive: TodayMdArchive, refreshSearch shouldRefreshSearch: Bool) -> Bool {
         let hydrated = archive.instantiate()
         lists = hydrated.lists
         unassignedTasks = hydrated.unassignedTasks
+        let didSanitize = sanitizeHydratedDataIfNeeded()
         dataRevision += 1
 
         if shouldRefreshSearch {
             refreshSearch()
         }
+
+        return didSanitize
     }
 
     private func persist(notifySync: Bool = true) {
