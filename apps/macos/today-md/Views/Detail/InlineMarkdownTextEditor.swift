@@ -373,7 +373,7 @@ final class InlineMarkdownNSTextView: NSTextView {
 
         var location = 0
         var inCodeBlock = false
-        var contentCharRange: NSRange?
+        var blockCharRange: NSRange?
 
         while location < nsText.length {
             let lineRange = nsText.lineRange(for: NSRange(location: location, length: 0))
@@ -381,7 +381,7 @@ final class InlineMarkdownNSTextView: NSTextView {
             let line = nsText.substring(with: contentRange)
 
             if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                if inCodeBlock, let charRange = contentCharRange {
+                if inCodeBlock, let charRange = blockCharRange {
                     let glyphRange = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
                     if glyphRange.length > 0 {
                         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
@@ -391,7 +391,7 @@ final class InlineMarkdownNSTextView: NSTextView {
                             drawCodeBlockBackground(in: rect)
                         }
                     }
-                    contentCharRange = nil
+                    blockCharRange = nil
                 }
                 inCodeBlock.toggle()
                 location = NSMaxRange(lineRange)
@@ -399,17 +399,17 @@ final class InlineMarkdownNSTextView: NSTextView {
             }
 
             if inCodeBlock {
-                if let existing = contentCharRange {
-                    contentCharRange = NSUnionRange(existing, contentRange)
+                if let existing = blockCharRange {
+                    blockCharRange = NSUnionRange(existing, lineRange)
                 } else {
-                    contentCharRange = contentRange
+                    blockCharRange = lineRange
                 }
             }
 
             location = NSMaxRange(lineRange)
         }
 
-        if inCodeBlock, let charRange = contentCharRange {
+        if inCodeBlock, let charRange = blockCharRange {
             let glyphRange = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
             if glyphRange.length > 0 {
                 var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
@@ -500,7 +500,7 @@ private enum InlineMarkdownEditorStyle {
 
             if isCodeFence(line) {
                 let isClosingFence = inCodeBlock
-                collapseCodeFenceLine(lineRange, in: attributed)
+                collapseCodeFenceLine(lineRange, isClosingFence: isClosingFence, in: attributed)
                 inCodeBlock.toggle()
                 previousLineClosedCodeBlock = isClosingFence
                 location = NSMaxRange(lineRange)
@@ -508,9 +508,9 @@ private enum InlineMarkdownEditorStyle {
             }
 
             if inCodeBlock {
-                attributed.addAttributes(codeBlockAttributes(), range: contentRange)
+                attributed.addAttributes(codeBlockAttributes(), range: lineRange)
                 attributed.addAttribute(.paragraphStyle, value: codeParagraphStyle(), range: lineRange)
-                protectedRanges.append(contentRange)
+                protectedRanges.append(lineRange)
                 location = NSMaxRange(lineRange)
                 continue
             }
@@ -546,7 +546,7 @@ private enum InlineMarkdownEditorStyle {
             }
 
             if needsSpacingAfterCodeBlock {
-                addSpacingBeforeParagraph(in: lineRange, amount: 10, to: attributed)
+                addSpacingBeforeParagraph(in: lineRange, amount: 14, to: attributed)
             }
 
             location = NSMaxRange(lineRange)
@@ -696,7 +696,8 @@ private enum InlineMarkdownEditorStyle {
             attributed.addAttributes(
                 [
                     .font: tokenFont(for: token.token),
-                    .foregroundColor: NSColor.clear
+                    .foregroundColor: NSColor.clear,
+                    .kern: 4.5
                 ],
                 range: tokenRange
             )
@@ -779,11 +780,15 @@ private enum InlineMarkdownEditorStyle {
     }
 
     private static func isCodeFence(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespaces).hasPrefix("```")
+        isCodeFenceLine(line)
     }
 
-    private static func collapseCodeFenceLine(_ lineRange: NSRange, in attributed: NSMutableAttributedString) {
-        attributed.addAttributes(codeFenceLineAttributes(), range: lineRange)
+    private static func collapseCodeFenceLine(
+        _ lineRange: NSRange,
+        isClosingFence: Bool,
+        in attributed: NSMutableAttributedString
+    ) {
+        attributed.addAttributes(codeFenceLineAttributes(isClosingFence: isClosingFence), range: lineRange)
     }
 
     private static func hideMarkdownRange(_ range: NSRange, in attributed: NSMutableAttributedString) {
@@ -874,9 +879,13 @@ private enum InlineMarkdownEditorStyle {
 
     private static func codeBlockAttributes() -> [NSAttributedString.Key: Any] {
         [
-            .font: NSFont.monospacedSystemFont(ofSize: 12.75, weight: .regular),
+            .font: codeBlockFont(),
             .foregroundColor: NSColor.labelColor.withAlphaComponent(0.72)
         ]
+    }
+
+    private static func codeBlockFont() -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: 12.75, weight: .regular)
     }
 
     private static func tokenFont(for token: MarkdownInlineDisplay.LeadingToken) -> NSFont {
@@ -915,11 +924,11 @@ private enum InlineMarkdownEditorStyle {
         ]
     }
 
-    private static func codeFenceLineAttributes() -> [NSAttributedString.Key: Any] {
+    private static func codeFenceLineAttributes(isClosingFence: Bool) -> [NSAttributedString.Key: Any] {
         [
             .font: NSFont.systemFont(ofSize: 1, weight: .regular),
             .foregroundColor: NSColor.clear,
-            .paragraphStyle: codeFenceParagraphStyle()
+            .paragraphStyle: codeFenceParagraphStyle(isClosingFence: isClosingFence)
         ]
     }
 
@@ -940,7 +949,11 @@ private enum InlineMarkdownEditorStyle {
 
     private static func codeParagraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
+        let font = codeBlockFont()
+        let lineHeight = ceil(font.ascender - font.descender + font.leading + 3)
         style.lineHeightMultiple = 1.02
+        style.minimumLineHeight = lineHeight
+        style.maximumLineHeight = lineHeight
         style.firstLineHeadIndent = 10
         style.headIndent = 10
         style.paragraphSpacing = 1
@@ -956,11 +969,11 @@ private enum InlineMarkdownEditorStyle {
         return style
     }
 
-    private static func codeFenceParagraphStyle() -> NSParagraphStyle {
+    private static func codeFenceParagraphStyle(isClosingFence: Bool) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.minimumLineHeight = 1
         style.maximumLineHeight = 1
-        style.paragraphSpacing = 0
+        style.paragraphSpacing = isClosingFence ? 12 : 0
         style.paragraphSpacingBefore = 0
         return style
     }
@@ -993,4 +1006,23 @@ private func visibleLineContentRange(for lineRange: NSRange, in text: NSString) 
     }
 
     return contentRange
+}
+
+private func lineContentRange(for lineRange: NSRange, in text: NSString) -> NSRange {
+    var contentRange = lineRange
+
+    while contentRange.length > 0 {
+        let lastCharacter = text.character(at: NSMaxRange(contentRange) - 1)
+        if lastCharacter == 10 || lastCharacter == 13 {
+            contentRange.length -= 1
+        } else {
+            break
+        }
+    }
+
+    return contentRange
+}
+
+private func isCodeFenceLine(_ line: String) -> Bool {
+    line.trimmingCharacters(in: .whitespaces).hasPrefix("```")
 }
