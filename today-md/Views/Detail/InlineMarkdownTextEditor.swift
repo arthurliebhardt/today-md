@@ -472,14 +472,36 @@ final class InlineMarkdownNSTextView: NSTextView {
             check.lineWidth = 1.8
             check.lineCapStyle = .round
             check.lineJoinStyle = .round
-            check.move(to: NSPoint(x: boxRect.minX + boxRect.width * 0.24, y: boxRect.midY - 0.5))
-            check.line(to: NSPoint(x: boxRect.minX + boxRect.width * 0.44, y: boxRect.minY + boxRect.height * 0.26))
-            check.line(to: NSPoint(x: boxRect.maxX - boxRect.width * 0.18, y: boxRect.maxY - boxRect.height * 0.26))
+            let firstPoint = point(
+                in: boxRect,
+                x: 0.24,
+                yInFlippedCoordinates: 0.56
+            )
+            let secondPoint = point(
+                in: boxRect,
+                x: 0.43,
+                yInFlippedCoordinates: 0.76
+            )
+            let thirdPoint = point(
+                in: boxRect,
+                x: 0.80,
+                yInFlippedCoordinates: 0.30
+            )
+            check.move(to: firstPoint)
+            check.line(to: secondPoint)
+            check.line(to: thirdPoint)
             check.stroke()
         } else {
             strokeColor.setStroke()
             path.stroke()
         }
+    }
+
+    private func point(in rect: NSRect, x: CGFloat, yInFlippedCoordinates: CGFloat) -> NSPoint {
+        let y = isFlipped
+            ? rect.minY + (rect.height * yInFlippedCoordinates)
+            : rect.maxY - (rect.height * yInFlippedCoordinates)
+        return NSPoint(x: rect.minX + (rect.width * x), y: y)
     }
 }
 
