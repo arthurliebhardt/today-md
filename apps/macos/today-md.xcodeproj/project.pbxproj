@@ -31,6 +31,8 @@
 		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
 		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025; };
 		AA000026 /* TodayMdSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026; };
+		AA000027 /* MarkdownInlineDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000027; };
+		AA000028 /* InlineMarkdownTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +63,8 @@
 		AB000024 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		AB000025 /* SearchPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPresentation.swift; sourceTree = "<group>"; };
 		AB000026 /* TodayMdSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdSyncService.swift; sourceTree = "<group>"; };
+		AB000027 /* MarkdownInlineDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownInlineDisplay.swift; sourceTree = "<group>"; };
+		AB000028 /* InlineMarkdownTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownTextEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,6 +158,7 @@
 				AB000011 /* TaskDetailView.swift */,
 				AB000012 /* SubTaskListView.swift */,
 				AB000013 /* MarkdownEditorView.swift */,
+				AB000028 /* InlineMarkdownTextEditor.swift */,
 				AB000020 /* ChecklistSection.swift */,
 			);
 			path = Detail;
@@ -163,6 +168,7 @@
 			isa = PBXGroup;
 			children = (
 				AB000014 /* MarkdownRenderer.swift */,
+				AB000027 /* MarkdownInlineDisplay.swift */,
 				AB000025 /* SearchPresentation.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
 				AB000026 /* TodayMdSyncService.swift */,
@@ -263,6 +269,8 @@
 				AA000023 /* TodayMdDatabase.swift in Sources */,
 				AA000026 /* TodayMdSyncService.swift in Sources */,
 				AA000025 /* SearchPresentation.swift in Sources */,
+				AA000027 /* MarkdownInlineDisplay.swift in Sources */,
+				AA000028 /* InlineMarkdownTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -393,7 +401,7 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -404,7 +412,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.3;
+				MARKETING_VERSION = 1.5.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -420,7 +428,7 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -431,7 +439,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.3;
+				MARKETING_VERSION = 1.5.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
