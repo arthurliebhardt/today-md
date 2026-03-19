@@ -15,7 +15,7 @@ Built with SwiftUI, `@Observable` models, and a local SQLite store, `today-md` k
 - Global search across task titles, notes, and subtasks from the centered toolbar search field
 - Import and export of task data as JSON backups, with markdown note exports alongside them
 - Automatic mirror of task notes as `.md` files in Application Support
-- Seeded sample data on first launch for local testing
+- Seeded sample data on first install
 
 ## Tech Stack
 
@@ -47,7 +47,7 @@ bash scripts/dev-run.sh
 
 Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 
-The app stores its local data in SQLite at `~/Library/Application Support/today-md/today-md.sqlite` and creates sample lists and tasks the first time it launches.
+The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Sample data is seeded only on the first app launch.
 
 ## Project Structure
 
@@ -69,9 +69,11 @@ Download the latest `.zip` from the [Releases](https://github.com/arthurliebhard
 curl -sL https://raw.githubusercontent.com/arthurliebhardt/today-md/main/scripts/install.sh | bash
 ```
 
+The installer preserves an existing sandbox database and migrates older unsandboxed data into the app container when needed.
+
 **Manual install:**
 
-1. Unzip `today-md-v1.4.2-macos.zip`
+1. Unzip `today-md-v1.5.0-macos.zip`
 2. Move `today-md.app` to your Applications folder
 3. On first launch macOS will block the app because it's not notarized:
 
@@ -90,7 +92,7 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
 
 ```bash
-bash scripts/install.sh ~/Downloads/today-md-v1.4.2-macos.zip
+bash scripts/install.sh ~/Downloads/today-md-v1.5.0-macos.zip
 ```
 
 ## Data Portability

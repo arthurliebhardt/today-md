@@ -240,11 +240,22 @@ struct TodayMdApp: App {
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
     @State private var store: TodayMdStore
+    static let hasLaunchedBeforeDefaultsKey = "TodayMdHasLaunchedBefore"
 
     init() {
         let syncService = TodayMdSyncService()
+        let userDefaults = UserDefaults.standard
+        let shouldSeedShowcaseData = Self.shouldSeedShowcaseData(
+            syncEnabled: syncService.syncEnabled,
+            userDefaults: userDefaults
+        )
+        Self.markHasLaunchedBefore(userDefaults: userDefaults)
         _syncService = StateObject(wrappedValue: syncService)
-        _store = State(initialValue: TodayMdStore(shouldSeedShowcaseData: !syncService.syncEnabled))
+        _store = State(
+            initialValue: TodayMdStore(
+                shouldSeedShowcaseData: shouldSeedShowcaseData
+            )
+        )
     }
 
     var body: some Scene {
@@ -296,6 +307,15 @@ struct TodayMdApp: App {
                 .keyboardShortcut("/", modifiers: [.command])
             }
         }
+    }
+
+    static func shouldSeedShowcaseData(syncEnabled: Bool, userDefaults: UserDefaults) -> Bool {
+        guard !syncEnabled else { return false }
+        return !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey)
+    }
+
+    static func markHasLaunchedBefore(userDefaults: UserDefaults) {
+        userDefaults.set(true, forKey: hasLaunchedBeforeDefaultsKey)
     }
 }
 

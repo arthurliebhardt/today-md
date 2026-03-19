@@ -3,6 +3,27 @@ set -euo pipefail
 
 APP_NAME="today-md"
 REPO="arthurliebhardt/today-md"
+BUNDLE_ID="com.today-md.app"
+LEGACY_DATA_DIR="$HOME/Library/Application Support/$APP_NAME"
+SANDBOX_DATA_DIR="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/$APP_NAME"
+
+migrate_existing_data_if_needed() {
+    local legacy_db="$LEGACY_DATA_DIR/$APP_NAME.sqlite"
+    local sandbox_db="$SANDBOX_DATA_DIR/$APP_NAME.sqlite"
+
+    if [ -f "$sandbox_db" ]; then
+        echo "Preserving existing app data in $SANDBOX_DATA_DIR"
+        return
+    fi
+
+    if [ ! -f "$legacy_db" ]; then
+        return
+    fi
+
+    echo "Migrating existing app data into the sandbox container..."
+    mkdir -p "$SANDBOX_DATA_DIR"
+    ditto "$LEGACY_DATA_DIR" "$SANDBOX_DATA_DIR"
+}
 
 download_latest_zip() {
     local api_url="https://api.github.com/repos/$REPO/releases/latest"
@@ -42,6 +63,11 @@ fi
 echo "Found $ZIP_PATH"
 echo "Installing $APP_NAME..."
 
+if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+    echo "Error: please quit $APP_NAME before installing."
+    exit 1
+fi
+
 # Unzip
 EXTRACT_DIR="$TMPDIR/extracted"
 mkdir -p "$EXTRACT_DIR"
@@ -68,6 +94,8 @@ if [ -d "$INSTALL_DIR/$APP_NAME.app" ]; then
     echo "Removing existing $APP_NAME from $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR/$APP_NAME.app"
 fi
+
+migrate_existing_data_if_needed
 
 mv "$APP_PATH" "$INSTALL_DIR/"
 echo "✓ $APP_NAME installed to $INSTALL_DIR"
