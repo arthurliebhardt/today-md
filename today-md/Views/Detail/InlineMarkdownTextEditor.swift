@@ -369,7 +369,7 @@ final class InlineMarkdownNSTextView: NSTextView {
         )
 
         let path = NSBezierPath(roundedRect: dividerRect, xRadius: lineHeight / 2, yRadius: lineHeight / 2)
-        NSColor.separatorColor.withAlphaComponent(0.28).setFill()
+        InlineMarkdownEditorStyle.dividerTintColor().setFill()
         path.fill()
     }
 
@@ -458,7 +458,7 @@ final class InlineMarkdownNSTextView: NSTextView {
     private func drawChecklistMarker(in rect: NSRect, checked: Bool) {
         let boxRect = rect.insetBy(dx: 2, dy: 2)
         let cornerRadius = boxRect.width * 0.28
-        let strokeColor = checked ? NSColor.systemGreen : NSColor.systemRed
+        let strokeColor = InlineMarkdownEditorStyle.accentColor()
 
         let path = NSBezierPath(roundedRect: boxRect, xRadius: cornerRadius, yRadius: cornerRadius)
         path.lineWidth = 1.55
@@ -541,7 +541,7 @@ private enum InlineMarkdownEditorStyle {
                 attributed.addAttributes(
                     [
                         .font: NSFont.systemFont(ofSize: 15, weight: .medium),
-                        .foregroundColor: NSColor.systemRed
+                        .foregroundColor: accentColor()
                     ],
                     range: offset(numbered.markerRange, by: contentRange.location)
                 )
@@ -860,7 +860,7 @@ private enum InlineMarkdownEditorStyle {
 
     private static func linkAttributes() -> [NSAttributedString.Key: Any] {
         [
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: accentColor(),
             .underlineStyle: NSUnderlineStyle.single.rawValue
         ]
     }
@@ -906,12 +906,28 @@ private enum InlineMarkdownEditorStyle {
     private static func tokenColor(for token: MarkdownInlineDisplay.LeadingToken) -> NSColor {
         switch token {
         case .uncheckedChecklist:
-            return .systemRed
+            return accentColor()
         case .checkedChecklist:
-            return .systemGreen
+            return accentColor()
         case .bullet:
-            return .systemRed
+            return accentColor()
         }
+    }
+
+    static func accentColor(alpha: CGFloat = 1) -> NSColor {
+        NSColor.controlAccentColor.withAlphaComponent(alpha)
+    }
+
+    static func dividerTintColor() -> NSColor {
+        let accent = accentColor().usingColorSpace(.sRGB) ?? accentColor()
+        let separator = NSColor.separatorColor.usingColorSpace(.sRGB) ?? NSColor.separatorColor
+        let mix = CGFloat(0.24)
+        return NSColor(
+            srgbRed: separator.redComponent + (accent.redComponent - separator.redComponent) * mix,
+            green: separator.greenComponent + (accent.greenComponent - separator.greenComponent) * mix,
+            blue: separator.blueComponent + (accent.blueComponent - separator.blueComponent) * mix,
+            alpha: 0.24
+        )
     }
 
     private static func hiddenMarkdownAttributes() -> [NSAttributedString.Key: Any] {
