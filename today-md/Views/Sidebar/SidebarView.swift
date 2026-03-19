@@ -29,28 +29,47 @@ struct SidebarView: View {
         List {
             Section {
                 Button(action: { selection = .all }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "tray.2")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(width: 24)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "tray.2")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 24)
 
-                        Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .layoutPriority(1)
+                            Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .layoutPriority(1)
 
-                        Spacer()
+                            Spacer(minLength: 8)
 
-                        Text("\(allActiveCount)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            Text("\(allActiveCount)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: "tray.2")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 24)
+
+                            Text(store.hasActiveSearch ? "Search Results" : "All Tasks")
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .layoutPriority(1)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .buttonStyle(.plain)
                 .listRowBackground(
-                    selection == .all ? Color.blue.opacity(0.12) : Color.clear
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(selection == .all ? Color.blue.opacity(0.12) : Color.clear)
+                        .padding(.horizontal, 4)
                 )
             }
 
@@ -65,8 +84,7 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             shortcutHintFooter
         }
-        .safeAreaPadding(.leading)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 230)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: { isAddingList = true }) {
@@ -84,22 +102,38 @@ struct SidebarView: View {
             Divider()
 
             Button(action: { presentationState.presentKeyboardShortcuts() }) {
-                HStack(spacing: 8) {
-                    ShortcutSequenceView(
-                        shortcut: "Cmd + /",
-                        tone: .secondary,
-                        font: .system(size: 11, weight: .semibold, design: .rounded)
-                    )
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        ShortcutSequenceView(
+                            shortcut: "Cmd + /",
+                            tone: .secondary,
+                            font: .system(size: 11, weight: .semibold, design: .rounded)
+                        )
 
-                    Text("to show keyboard shortcuts")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .layoutPriority(1)
+                        Text("to show keyboard shortcuts")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
 
-                    Spacer(minLength: 0)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 8) {
+                        ShortcutSequenceView(
+                            shortcut: "Cmd + /",
+                            tone: .secondary,
+                            font: .system(size: 11, weight: .semibold, design: .rounded)
+                        )
+
+                        Text("Shortcuts")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .contentShape(Rectangle())
@@ -115,35 +149,59 @@ struct SidebarView: View {
     private func listRow(_ list: TaskList) -> some View {
         let activeCount = list.items.filter { !$0.isDone }.count
         return Button(action: { selection = .list(list.id) }) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(list.listColor.color.opacity(0.18))
-                        .frame(width: 26, height: 26)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(list.listColor.color.opacity(0.18))
+                            .frame(width: 26, height: 26)
 
-                    Image(systemName: list.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(list.listColor.color)
+                        Image(systemName: list.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(list.listColor.color)
+                    }
+
+                    Text(list.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: 8)
+
+                    Text("\(activeCount)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 
-                Text(list.name)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .layoutPriority(1)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(list.listColor.color.opacity(0.18))
+                            .frame(width: 26, height: 26)
 
-                Spacer()
+                        Image(systemName: list.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(list.listColor.color)
+                    }
 
-                Text("\(activeCount)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(list.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .buttonStyle(.plain)
         .listRowBackground(
-            selection == .list(list.id) ? list.listColor.color.opacity(0.1) : Color.clear
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selection == .list(list.id) ? list.listColor.color.opacity(0.1) : Color.clear)
+                .padding(.horizontal, 4)
         )
         .contextMenu {
             Button("Rename...") {

@@ -12,16 +12,24 @@ struct TaskDetailView: View {
     var body: some View {
         let searchQuery = SearchPresentationQuery(store.searchText)
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                headerSection(searchQuery: searchQuery)
-                Divider()
-                ChecklistSection(task: task)
-                Divider()
-                MarkdownEditorView(task: task)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    headerSection(searchQuery: searchQuery)
+                    Divider()
+                    ChecklistSection(task: task)
+                    Divider()
+                    MarkdownEditorView(task: task)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: max(proxy.size.height - 32, 0),
+                    alignment: .topLeading
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
         .onAppear {
             draftTitle = task.title
