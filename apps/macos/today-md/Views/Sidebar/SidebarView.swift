@@ -65,7 +65,8 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             shortcutHintFooter
         }
-        .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+        .safeAreaPadding(.leading)
+        .navigationSplitViewColumnWidth(min: 200, ideal: 230)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: { isAddingList = true }) {
