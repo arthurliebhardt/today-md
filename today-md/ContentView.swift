@@ -16,6 +16,58 @@ private struct MarkdownArchiveSnapshot: Equatable {
     let noteLastModified: Date
 }
 
+private enum SettingsSection: String, CaseIterable, Identifiable {
+    case dataBackup
+    case sync
+    case shortcuts
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dataBackup:
+            return "Data"
+        case .sync:
+            return "Sync"
+        case .shortcuts:
+            return "Shortcuts"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .dataBackup:
+            return "Import, export, and archive"
+        case .sync:
+            return "Cloud folder and sync status"
+        case .shortcuts:
+            return "App commands and cheatsheet"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .dataBackup:
+            return "internaldrive"
+        case .sync:
+            return "arrow.triangle.2.circlepath.icloud"
+        case .shortcuts:
+            return "command"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .dataBackup:
+            return .orange
+        case .sync:
+            return .teal
+        case .shortcuts:
+            return .purple
+        }
+    }
+}
+
 @MainActor
 private struct WindowTitleSyncView: NSViewRepresentable {
     let title: String
@@ -158,6 +210,7 @@ struct ContentView: View {
     @State private var expandedDoneBlocks: Set<TimeBlock> = []
     @State private var allTasksDoneSectionExpanded = false
     @State private var showingSettingsSheet = false
+    @State private var selectedSettingsSection: SettingsSection = .dataBackup
     @State private var transferAlert: TransferAlert?
 
     private var selectedList: TaskList? {
@@ -517,46 +570,105 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .top, spacing: 16) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.orange.opacity(0.95), Color.orange.opacity(0.65)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+            HStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.orange.opacity(0.95), Color.orange.opacity(0.65)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
 
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(.white)
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .frame(width: 54, height: 54)
+                        .shadow(color: Color.orange.opacity(0.18), radius: 10, y: 4)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Settings")
+                                .font(.system(size: 28, weight: .bold))
+
+                            Text("Keep the utility actions grouped instead of stacking the whole workspace into one long sheet.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text("Workspace")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(Color.orange.opacity(0.12)))
+                        }
                     }
-                    .frame(width: 58, height: 58)
-                    .shadow(color: Color.orange.opacity(0.18), radius: 10, y: 4)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Settings")
-                            .font(.system(size: 28, weight: .bold))
-
-                        Text("Manage backups, keyboard shortcuts, and note archives without coupling the app to Xcode-only persistence.")
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text("Workspace")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Capsule().fill(Color.orange.opacity(0.12)))
+                    VStack(spacing: 10) {
+                        ForEach(SettingsSection.allCases) { section in
+                            settingsSectionButton(section)
+                        }
                     }
 
                     Spacer()
-                }
 
+                    Text("The actions stay the same, but only one group is visible at a time.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(width: 230, alignment: .topLeading)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        settingsSectionHeader(
+                            selectedSettingsSection.title,
+                            subtitle: selectedSettingsSection.subtitle,
+                            tint: selectedSettingsSection.tint
+                        )
+
+                        settingsSectionContent
+                    }
+                    .padding(.trailing, 6)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    showingSettingsSheet = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Close settings")
+                .keyboardShortcut(.cancelAction)
+                .padding(22)
+            }
+            .padding(28)
+            .frame(width: 760, height: 680)
+        }
+    }
+
+    private var settingsSectionContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            switch selectedSettingsSection {
+            case .dataBackup:
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Data & Backup")
+                    Text("Backups and note exports")
                         .font(.headline)
 
                     VStack(spacing: 12) {
@@ -595,16 +707,65 @@ struct ContentView: View {
                     )
 
                     if let markdownArchivePath {
-                        Text("Markdown archive: \(markdownArchivePath)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Archive location")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(markdownArchivePath)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
                     }
                 }
 
+            case .sync:
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Sync")
+                    Text("Cloud sync")
                         .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(syncStatusColor)
+                                .frame(width: 10, height: 10)
+
+                            Text("Status: \(syncService.statusLabel)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text("Last successful sync: \(syncLastSyncText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let folderPath = syncService.folderPath {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Sync folder")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(folderPath)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+
+                        if let lastError = syncService.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.teal.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.teal.opacity(0.14), lineWidth: 1)
+                    )
 
                     VStack(spacing: 12) {
                         settingsActionCard(
@@ -651,39 +812,11 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
                     )
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(syncStatusColor)
-                                .frame(width: 10, height: 10)
-
-                            Text("Status: \(syncService.statusLabel)")
-                                .font(.subheadline.weight(.semibold))
-                        }
-
-                        Text("Last successful sync: \(syncLastSyncText)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if let folderPath = syncService.folderPath {
-                            Text("Sync folder: \(folderPath)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                        }
-
-                        if let lastError = syncService.lastError {
-                            Text(lastError)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
                 }
 
+            case .shortcuts:
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Keyboard Shortcuts")
+                    Text("Keyboard shortcuts")
                         .font(.headline)
 
                     settingsActionCard(
@@ -693,30 +826,102 @@ struct ContentView: View {
                         tint: .purple,
                         action: openShortcutCheatsheetFromSettings
                     )
-                }
-                .padding(18)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
-                )
 
-                HStack {
-                    Text("Future settings can build on top of the current local-first store without changing the app architecture again.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Close") {
-                        showingSettingsSheet = false
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Quick access")
+                            .font(.subheadline.weight(.semibold))
+
+                        shortcutPreviewRow(title: "Open shortcuts", shortcut: "Cmd-/")
+                        shortcutPreviewRow(title: "Open settings", shortcut: "Toolbar")
+                        shortcutPreviewRow(title: "New task", shortcut: "Cmd-N")
+                        shortcutPreviewRow(title: "Mark done", shortcut: "Cmd-Shift-D")
                     }
-                    .keyboardShortcut(.cancelAction)
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.purple.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.purple.opacity(0.12), lineWidth: 1)
+                    )
                 }
             }
-            .padding(28)
-            .frame(width: 540)
+        }
+        .padding(.bottom, 56)
+    }
+
+    private func settingsSectionButton(_ section: SettingsSection) -> some View {
+        let isSelected = selectedSettingsSection == section
+
+        return Button {
+            selectedSettingsSection = section
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(section.tint.opacity(isSelected ? 0.16 : 0.08))
+
+                    Image(systemName: section.systemImage)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isSelected ? section.tint : .secondary)
+                }
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(section.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(section.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isSelected ? Color(nsColor: .controlBackgroundColor).opacity(0.92) : Color.white.opacity(0.001))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(isSelected ? section.tint.opacity(0.18) : Color(nsColor: .separatorColor).opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func settingsSectionHeader(_ title: String, subtitle: String, tint: Color) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(tint.opacity(0.12))
+
+                Image(systemName: selectedSettingsSection.systemImage)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 50, height: 50)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 24, weight: .bold))
+                Text(subtitle)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func shortcutPreviewRow(title: String, shortcut: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+            Spacer()
+            ShortcutSequenceView(shortcut: shortcut, tone: .secondary)
         }
     }
 
