@@ -612,8 +612,8 @@ enum MarkdownAutoContinuation {
 
     private static func continuationDecision(for line: String, priorLine: String?) -> Decision? {
         let leadingWhitespace = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        let trimmedPriorLine = priorLine?.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPriorLine = priorLine?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if isEmptyChecklistMarker(trimmed) {
             if trimmedPriorLine.map(isChecklistAnyLine) == true {
