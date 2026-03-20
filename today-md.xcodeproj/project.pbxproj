@@ -20,7 +20,6 @@
 		AA000011 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011; };
 		AA000012 /* SubTaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012; };
 		AA000013 /* MarkdownEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000013; };
-		AA000014 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000014; };
 		AA000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB000015; };
 		AA000016 /* BacklogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018; };
 		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019; };
@@ -50,7 +49,6 @@
 		AB000011 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		AB000012 /* SubTaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubTaskListView.swift; sourceTree = "<group>"; };
 		AB000013 /* MarkdownEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditorView.swift; sourceTree = "<group>"; };
-		AB000014 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		AB000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB000016 /* today-md.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = today-md.entitlements; sourceTree = "<group>"; };
 		AB000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -167,7 +165,6 @@
 		AD000009 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
-				AB000014 /* MarkdownRenderer.swift */,
 				AB000027 /* MarkdownInlineDisplay.swift */,
 				AB000025 /* SearchPresentation.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
@@ -260,7 +257,6 @@
 				AA000011 /* TaskDetailView.swift in Sources */,
 				AA000012 /* SubTaskListView.swift in Sources */,
 				AA000013 /* MarkdownEditorView.swift in Sources */,
-				AA000014 /* MarkdownRenderer.swift in Sources */,
 				AA000016 /* BacklogView.swift in Sources */,
 				AA000017 /* WeeklyReviewView.swift in Sources */,
 				AA000020 /* ChecklistSection.swift in Sources */,

@@ -5,7 +5,6 @@ struct MarkdownEditorView: View {
     @Environment(TodayMdStore.self) private var store
     let task: TaskItem
 
-    @State private var showPreview = false
     @State private var hoveredToolbarButtonID: String?
     @State private var markdownText = ""
     @State private var editorText = ""
@@ -23,28 +22,15 @@ struct MarkdownEditorView: View {
                 Text("Notes")
                     .font(.subheadline.bold())
                 Spacer()
-                if task.note != nil || !markdownText.isEmpty {
-                    Toggle(isOn: $showPreview) {
-                        Image(systemName: showPreview ? "eye.fill" : "pencil")
-                    }
-                    .toggleStyle(.button)
-                    .controlSize(.small)
-                }
             }
 
-            if !showPreview {
-                mdToolbar
-            }
+            mdToolbar
 
             if !matchingNoteExcerpts.isEmpty {
                 searchMatchesView
             }
 
-            if showPreview {
-                previewView
-            } else {
-                editorView
-            }
+            editorView
         }
         .onAppear {
             suppressInlineNormalization = true
@@ -53,7 +39,6 @@ struct MarkdownEditorView: View {
         .onChange(of: task.id, initial: true) { _, _ in
             suppressInlineNormalization = true
             loadNoteContent(task.note?.content ?? "")
-            showPreview = false
             cachedTextView = nil
         }
         .onChange(of: task.note?.content) { _, newValue in
@@ -383,21 +368,6 @@ struct MarkdownEditorView: View {
         .background(noteSurface)
     }
 
-    private var previewView: some View {
-        ScrollView {
-            MarkdownPreview(markdown: previewMarkdownBinding)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-        }
-        .frame(minHeight: 220, maxHeight: .infinity)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(noteSurface)
-        .onChange(of: markdownText) { _, _ in
-            debouncedSave()
-        }
-    }
-
     private func autoContinueList(old: String, new: String) {
         guard !suppressAutoContinue else {
             suppressAutoContinue = false
@@ -415,7 +385,7 @@ struct MarkdownEditorView: View {
     }
 
     private func handleMarkdownShortcut(_ event: NSEvent) -> Bool {
-        guard !showPreview, activeTextView != nil else { return false }
+        guard activeTextView != nil else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard let characters = event.charactersIgnoringModifiers?.lowercased() else { return false }
 
@@ -486,21 +456,6 @@ struct MarkdownEditorView: View {
                     .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.05), radius: 18, y: 6)
-    }
-
-    private var previewMarkdownBinding: Binding<String> {
-        Binding(
-            get: { markdownText },
-            set: { newValue in
-                markdownText = newValue
-
-                let rendered = MarkdownInlineDisplay.display(from: newValue)
-                if editorText != rendered {
-                    suppressInlineNormalization = true
-                    editorText = rendered
-                }
-            }
-        )
     }
 
     private func loadNoteContent(_ content: String) {
