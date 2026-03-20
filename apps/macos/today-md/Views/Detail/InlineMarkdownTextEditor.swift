@@ -134,7 +134,11 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
         }
 
         func handleInsertNewline(from textView: NSTextView) -> Bool {
-            let selection = textView.selectedRange()
+            let selection = InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(
+                textView.selectedRange(),
+                in: textView.string,
+                attributedText: textView.attributedString()
+            )
             guard selection.length == 0 else { return false }
 
             let original = textView.string
@@ -214,7 +218,13 @@ final class InlineMarkdownNSTextView: NSTextView {
     var onCheckboxToggle: ((Int) -> Void)?
 
     override func setSelectedRange(_ charRange: NSRange) {
-        super.setSelectedRange(InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(charRange, in: string))
+        super.setSelectedRange(
+            InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(
+                charRange,
+                in: string,
+                attributedText: attributedString()
+            )
+        )
         setNeedsDisplay(bounds)
     }
 
@@ -224,7 +234,11 @@ final class InlineMarkdownNSTextView: NSTextView {
         stillSelecting flag: Bool
     ) {
         super.setSelectedRange(
-            InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(charRange, in: string),
+            InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(
+                charRange,
+                in: string,
+                attributedText: attributedString()
+            ),
             affinity: affinity,
             stillSelecting: flag
         )
@@ -637,7 +651,11 @@ private enum InlineMarkdownEditorStyle {
         return attributed
     }
 
-    static func selectionAvoidingHiddenMarkdown(_ range: NSRange, in text: String) -> NSRange {
+    static func selectionAvoidingHiddenMarkdown(
+        _ range: NSRange,
+        in text: String,
+        attributedText: NSAttributedString? = nil
+    ) -> NSRange {
         let nsText = text as NSString
         let length = nsText.length
         let location = min(max(range.location, 0), length)
@@ -672,6 +690,7 @@ private enum InlineMarkdownEditorStyle {
             adjustedLocation = nextLocation
         }
 
+        adjustedLocation = locationAvoidingHiddenAttributes(adjustedLocation, in: attributedText)
         return NSRange(location: adjustedLocation, length: 0)
     }
 
@@ -1185,6 +1204,36 @@ private enum InlineMarkdownEditorStyle {
         let usesTinyFont = (font?.pointSize ?? 0) <= 2
         let isTransparent = (foregroundColor?.alphaComponent ?? 1) <= 0.01
         return usesTinyFont || isTransparent
+    }
+
+    private static func locationAvoidingHiddenAttributes(
+        _ location: Int,
+        in attributedText: NSAttributedString?
+    ) -> Int {
+        guard let attributedText, attributedText.length > 0 else { return location }
+
+        let length = attributedText.length
+        var adjustedLocation = min(max(location, 0), length)
+
+        while adjustedLocation < length {
+            var effectiveRange = NSRange(location: 0, length: 0)
+            let attributes = attributedText.attributes(
+                at: adjustedLocation,
+                effectiveRange: &effectiveRange
+            )
+
+            guard isHiddenTypingAttributes(attributes) else { break }
+
+            let nextLocation = NSMaxRange(effectiveRange)
+            guard nextLocation > adjustedLocation else {
+                adjustedLocation += 1
+                continue
+            }
+
+            adjustedLocation = nextLocation
+        }
+
+        return adjustedLocation
     }
 
     private static func semanticTypingAttributes(
