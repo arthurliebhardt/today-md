@@ -53,6 +53,9 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
         textView.onInsertNewlineCommand = { [weak coordinator = context.coordinator] textView in
             coordinator?.handleInsertNewline(from: textView) ?? false
         }
+        textView.onListIndentCommand = { [weak coordinator = context.coordinator] textView, isOutdenting in
+            coordinator?.handleListIndentation(from: textView, isOutdenting: isOutdenting) ?? false
+        }
         textView.onCheckboxToggle = { [weak coordinator = context.coordinator] offset in
             coordinator?.toggleCheckbox(at: offset)
         }
@@ -163,6 +166,21 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             return true
         }
 
+        func handleListIndentation(from textView: NSTextView, isOutdenting: Bool) -> Bool {
+            let selection = textView.selectedRange()
+            let edit = if isOutdenting {
+                MarkdownListFormatting.outdentListLines(in: textView.string, selection: selection)
+            } else {
+                MarkdownListFormatting.indentListLines(in: textView.string, selection: selection)
+            }
+
+            guard let edit else { return false }
+
+            applyText(edit.text, to: textView, preservingSelection: edit.selection)
+            text.wrappedValue = edit.text
+            return true
+        }
+
         func toggleCheckbox(at offset: Int) {
             guard let textView,
                   let toggled = MarkdownInlineDisplay.toggledCheckbox(in: textView.string, atEditorOffset: offset) else {
@@ -215,6 +233,7 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
 
 final class InlineMarkdownNSTextView: NSTextView {
     var onInsertNewlineCommand: ((InlineMarkdownNSTextView) -> Bool)?
+    var onListIndentCommand: ((InlineMarkdownNSTextView, Bool) -> Bool)?
     var onCheckboxToggle: ((Int) -> Void)?
 
     override func setSelectedRange(_ charRange: NSRange) {
@@ -261,6 +280,20 @@ final class InlineMarkdownNSTextView: NSTextView {
             return
         }
         super.insertNewline(sender)
+    }
+
+    override func insertTab(_ sender: Any?) {
+        if onListIndentCommand?(self, false) == true {
+            return
+        }
+        super.insertTab(sender)
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        if onListIndentCommand?(self, true) == true {
+            return
+        }
+        super.insertBacktab(sender)
     }
 
     override func insertLineBreak(_ sender: Any?) {

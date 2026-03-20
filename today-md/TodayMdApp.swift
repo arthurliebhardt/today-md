@@ -210,6 +210,16 @@ enum ShortcutCheatsheet {
                     detail: "Insert Markdown checklist items for the current line or selection."
                 ),
                 ShortcutItem(
+                    title: "Indent list level",
+                    shortcut: "Tab",
+                    detail: "Indent the current list item or the selected list items, up to three levels deep."
+                ),
+                ShortcutItem(
+                    title: "Outdent list level",
+                    shortcut: "Shift-Tab",
+                    detail: "Move the current list item or selected list items back toward the left margin."
+                ),
+                ShortcutItem(
                     title: "Divider",
                     shortcut: "Cmd-Shift-D",
                     detail: "Insert a Markdown divider at the cursor."
