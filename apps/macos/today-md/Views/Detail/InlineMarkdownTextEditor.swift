@@ -124,6 +124,15 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             text.wrappedValue = textView.string
         }
 
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView, !isApplyingProgrammaticUpdate else { return }
+            textView.typingAttributes = InlineMarkdownEditorStyle.typingAttributes(
+                for: textView.attributedString(),
+                text: textView.string,
+                selection: textView.selectedRange()
+            )
+        }
+
         func handleInsertNewline(from textView: NSTextView) -> Bool {
             let selection = textView.selectedRange()
             guard selection.length == 0 else { return false }
@@ -165,6 +174,11 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             isApplyingProgrammaticUpdate = true
             textView.textStorage?.setAttributedString(InlineMarkdownEditorStyle.attributedText(for: text))
             textView.setSelectedRange(clamped(selection, in: text))
+            textView.typingAttributes = InlineMarkdownEditorStyle.typingAttributes(
+                for: textView.attributedString(),
+                text: text,
+                selection: textView.selectedRange()
+            )
             textView.setNeedsDisplay(textView.bounds)
             lastTextSnapshot = text
             isApplyingProgrammaticUpdate = false
@@ -175,6 +189,11 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             let rawText = textView.string
             textView.textStorage?.setAttributedString(InlineMarkdownEditorStyle.attributedText(for: rawText))
             textView.setSelectedRange(clamped(selection, in: rawText))
+            textView.typingAttributes = InlineMarkdownEditorStyle.typingAttributes(
+                for: textView.attributedString(),
+                text: rawText,
+                selection: textView.selectedRange()
+            )
             textView.setNeedsDisplay(textView.bounds)
             lastTextSnapshot = rawText
             isApplyingProgrammaticUpdate = false
@@ -185,7 +204,7 @@ struct InlineMarkdownTextEditor: NSViewRepresentable {
             let location = min(max(range.location, 0), length)
             let end = min(max(range.location + range.length, 0), length)
             let clampedRange = NSRange(location: location, length: max(end - location, 0))
-            return InlineMarkdownEditorStyle.selectionAvoidingHiddenCodeFence(clampedRange, in: text)
+            return InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(clampedRange, in: text)
         }
     }
 }
@@ -195,7 +214,7 @@ final class InlineMarkdownNSTextView: NSTextView {
     var onCheckboxToggle: ((Int) -> Void)?
 
     override func setSelectedRange(_ charRange: NSRange) {
-        super.setSelectedRange(InlineMarkdownEditorStyle.selectionAvoidingHiddenCodeFence(charRange, in: string))
+        super.setSelectedRange(InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(charRange, in: string))
         setNeedsDisplay(bounds)
     }
 
@@ -205,7 +224,7 @@ final class InlineMarkdownNSTextView: NSTextView {
         stillSelecting flag: Bool
     ) {
         super.setSelectedRange(
-            InlineMarkdownEditorStyle.selectionAvoidingHiddenCodeFence(charRange, in: string),
+            InlineMarkdownEditorStyle.selectionAvoidingHiddenMarkdown(charRange, in: string),
             affinity: affinity,
             stillSelecting: flag
         )
@@ -242,6 +261,10 @@ final class InlineMarkdownNSTextView: NSTextView {
             return
         }
         super.insertNewlineIgnoringFieldEditor(sender)
+    }
+
+    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
+        super.drawInsertionPoint(in: adjustedInsertionPointRect(from: rect), color: color, turnedOn: flag)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -503,6 +526,35 @@ final class InlineMarkdownNSTextView: NSTextView {
             : rect.maxY - (rect.height * yInFlippedCoordinates)
         return NSPoint(x: rect.minX + (rect.width * x), y: y)
     }
+
+    private func adjustedInsertionPointRect(from rect: NSRect) -> NSRect {
+        guard rect.height < 8 else { return rect }
+
+        let font = resolvedInsertionPointFont()
+        let targetHeight = max(layoutManager?.defaultLineHeight(for: font) ?? font.pointSize, 12)
+        var adjusted = rect
+        adjusted.size.width = max(rect.width, 2)
+        adjusted.origin.y -= max(targetHeight - rect.height, 0) / 2
+        adjusted.size.height = targetHeight
+        return adjusted.integral
+    }
+
+    private func resolvedInsertionPointFont() -> NSFont {
+        if let font = typingAttributes[.font] as? NSFont, font.pointSize > 2 {
+            return font
+        }
+
+        if let textStorage, textStorage.length > 0 {
+            let selectedRange = selectedRange()
+            let location = min(max(selectedRange.location, 0), textStorage.length - 1)
+            let attributes = textStorage.attributes(at: location, effectiveRange: nil)
+            if let font = attributes[.font] as? NSFont, font.pointSize > 2 {
+                return font
+            }
+        }
+
+        return font ?? NSFont.systemFont(ofSize: 14, weight: .regular)
+    }
 }
 
 @MainActor
@@ -585,7 +637,7 @@ private enum InlineMarkdownEditorStyle {
         return attributed
     }
 
-    static func selectionAvoidingHiddenCodeFence(_ range: NSRange, in text: String) -> NSRange {
+    static func selectionAvoidingHiddenMarkdown(_ range: NSRange, in text: String) -> NSRange {
         let nsText = text as NSString
         let length = nsText.length
         let location = min(max(range.location, 0), length)
@@ -605,6 +657,14 @@ private enum InlineMarkdownEditorStyle {
             let contentRange = lineContentRange(for: lineRange, in: nsText)
             let line = nsText.substring(with: contentRange)
 
+            if let heading = headingInfo(for: line) {
+                let markerRange = offset(heading.markerRange, by: contentRange.location)
+                if NSLocationInRange(adjustedLocation, markerRange) {
+                    adjustedLocation = NSMaxRange(markerRange)
+                    break
+                }
+            }
+
             guard isCodeFence(line) else { break }
 
             let nextLocation = NSMaxRange(lineRange)
@@ -613,6 +673,24 @@ private enum InlineMarkdownEditorStyle {
         }
 
         return NSRange(location: adjustedLocation, length: 0)
+    }
+
+    static func typingAttributes(
+        for attributedText: NSAttributedString,
+        text: String,
+        selection: NSRange
+    ) -> [NSAttributedString.Key: Any] {
+        let safeSelection = selectionAvoidingHiddenMarkdown(selection, in: text)
+
+        if let visibleAttributes = visibleTypingAttributes(in: attributedText, text: text, selection: safeSelection) {
+            return visibleAttributes
+        }
+
+        if let semanticAttributes = semanticTypingAttributes(in: text, selection: safeSelection) {
+            return semanticAttributes
+        }
+
+        return baseAttributes()
     }
 
     private static func applyInlineMarkdownStyles(
@@ -1034,6 +1112,105 @@ private enum InlineMarkdownEditorStyle {
         let style = existingStyle.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
         style.paragraphSpacingBefore = max(style.paragraphSpacingBefore, amount)
         attributed.addAttribute(.paragraphStyle, value: style, range: lineRange)
+    }
+
+    private static func visibleTypingAttributes(
+        in attributedText: NSAttributedString,
+        text: String,
+        selection: NSRange
+    ) -> [NSAttributedString.Key: Any]? {
+        let nsText = text as NSString
+        let length = nsText.length
+
+        guard length > 0 else { return nil }
+
+        let lineAnchor = min(max(selection.location, 0), max(length - 1, 0))
+        let lineRange = nsText.lineRange(for: NSRange(location: lineAnchor, length: 0))
+        let preferredOffsets = preferredSearchOffsets(
+            around: selection.location,
+            within: lineRange,
+            length: length
+        )
+
+        for index in preferredOffsets {
+            let attributes = attributedText.attributes(at: index, effectiveRange: nil)
+            guard !isHiddenTypingAttributes(attributes) else { continue }
+            return normalizedTypingAttributes(from: attributes)
+        }
+
+        return nil
+    }
+
+    private static func preferredSearchOffsets(
+        around location: Int,
+        within lineRange: NSRange,
+        length: Int
+    ) -> [Int] {
+        let clampedLocation = min(max(location, lineRange.location), NSMaxRange(lineRange))
+        var offsets: [Int] = []
+
+        if clampedLocation < length {
+            offsets.append(clampedLocation)
+        }
+        if clampedLocation > lineRange.location {
+            offsets.append(clampedLocation - 1)
+        }
+
+        var forward = clampedLocation + 1
+        while forward < NSMaxRange(lineRange), forward < length {
+            offsets.append(forward)
+            forward += 1
+        }
+
+        var backward = clampedLocation - 2
+        while backward >= lineRange.location {
+            offsets.append(backward)
+            backward -= 1
+        }
+
+        return offsets
+    }
+
+    private static func normalizedTypingAttributes(
+        from attributes: [NSAttributedString.Key: Any]
+    ) -> [NSAttributedString.Key: Any] {
+        var normalized = baseAttributes()
+        normalized.merge(attributes) { _, new in new }
+        return normalized
+    }
+
+    private static func isHiddenTypingAttributes(_ attributes: [NSAttributedString.Key: Any]) -> Bool {
+        let font = attributes[.font] as? NSFont
+        let foregroundColor = attributes[.foregroundColor] as? NSColor
+        let usesTinyFont = (font?.pointSize ?? 0) <= 2
+        let isTransparent = (foregroundColor?.alphaComponent ?? 1) <= 0.01
+        return usesTinyFont || isTransparent
+    }
+
+    private static func semanticTypingAttributes(
+        in text: String,
+        selection: NSRange
+    ) -> [NSAttributedString.Key: Any]? {
+        let nsText = text as NSString
+        guard nsText.length > 0 else { return nil }
+
+        let lineAnchor = min(max(selection.location, 0), max(nsText.length - 1, 0))
+        let lineRange = nsText.lineRange(for: NSRange(location: lineAnchor, length: 0))
+        let contentRange = lineContentRange(for: lineRange, in: nsText)
+        let line = nsText.substring(with: contentRange)
+
+        if let heading = headingInfo(for: line) {
+            let markerRange = offset(heading.markerRange, by: contentRange.location)
+            if selection.location >= markerRange.location && selection.location <= NSMaxRange(markerRange) {
+                return [
+                    .font: headingAttributes(level: heading.level)[.font] as Any,
+                    .foregroundColor: headingAttributes(level: heading.level)[.foregroundColor] as Any,
+                    .paragraphStyle: headingParagraphStyle(level: heading.level)
+                ]
+            }
+        }
+
+        return nil
     }
 }
 
