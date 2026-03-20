@@ -66,7 +66,7 @@ struct MarkdownEditorView: View {
 
             mdBtn(title: "Bold", icon: "bold", shortcut: "⌘B") { wrapSelection("**") }
             mdBtn(title: "Italic", icon: "italic", shortcut: "⌘I") { wrapSelection("_") }
-            mdBtn(title: "Strikethrough", icon: "strikethrough", shortcut: "⌘⇧X") { wrapSelection("~~") }
+            mdBtn(title: "Strikethrough", icon: "strikethrough", shortcut: "⌘⇧S") { wrapSelection("~~") }
             mdBtn(title: "Code Block", icon: "curlybraces", shortcut: "⌘`") {
                 insertSnippetAtCursor("\n```\n\n```\n", caretOffset: 5)
             }
@@ -247,18 +247,49 @@ struct MarkdownEditorView: View {
         }
         let ns = original as NSString
         let range = selection.range
+        let wrapperLength = (wrapper as NSString).length
+
         if range.length > 0 {
+            if let enclosingRange = rangeByRemovingWrapper(wrapper, around: range, in: ns) {
+                let replacement = ns.substring(with: range)
+                let newSelection = NSRange(
+                    location: enclosingRange.location,
+                    length: range.length
+                )
+                editorText = ns.replacingCharacters(in: enclosingRange, with: replacement)
+                restoreSelection(newSelection, in: selection.tv)
+                return
+            }
+
             let selected = ns.substring(with: range)
             let replacement = wrapper + selected + wrapper
-            let newSelection = NSRange(location: range.location + wrapper.count, length: range.length)
+            let newSelection = NSRange(location: range.location + wrapperLength, length: range.length)
             editorText = ns.replacingCharacters(in: range, with: replacement)
             restoreSelection(newSelection, in: selection.tv)
         } else {
             let replacement = wrapper + wrapper
-            let caret = NSRange(location: range.location + wrapper.count, length: 0)
+            let caret = NSRange(location: range.location + wrapperLength, length: 0)
             editorText = ns.replacingCharacters(in: range, with: replacement)
             restoreSelection(caret, in: selection.tv)
         }
+    }
+
+    private func rangeByRemovingWrapper(_ wrapper: String, around range: NSRange, in text: NSString) -> NSRange? {
+        let wrapperLength = (wrapper as NSString).length
+        guard range.location >= wrapperLength,
+              NSMaxRange(range) + wrapperLength <= text.length else {
+            return nil
+        }
+
+        let leadingRange = NSRange(location: range.location - wrapperLength, length: wrapperLength)
+        let trailingRange = NSRange(location: NSMaxRange(range), length: wrapperLength)
+
+        guard text.substring(with: leadingRange) == wrapper,
+              text.substring(with: trailingRange) == wrapper else {
+            return nil
+        }
+
+        return NSRange(location: leadingRange.location, length: range.length + (wrapperLength * 2))
     }
 
     private func insertPrefix(_ prefix: String) {
@@ -405,7 +436,7 @@ struct MarkdownEditorView: View {
         case ([.command], "i"):
             wrapSelection("_")
             return true
-        case ([.command, .shift], "x"):
+        case ([.command, .shift], "s"):
             wrapSelection("~~")
             return true
         case ([.command], "`"):

@@ -186,7 +186,7 @@ enum ShortcutCheatsheet {
                 ),
                 ShortcutItem(
                     title: "Strikethrough",
-                    shortcut: "Cmd-Shift-X",
+                    shortcut: "Cmd-Shift-S",
                     detail: "Wrap the current selection in Markdown strikethrough markers."
                 ),
                 ShortcutItem(
