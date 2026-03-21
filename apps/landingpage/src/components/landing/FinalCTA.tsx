@@ -22,7 +22,7 @@ export function FinalCTA() {
               Download for macOS
             </button>
             <a
-              href="https://github.com"
+              href="https://github.com/arthurliebhardt/today-md"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full border border-border text-foreground text-sm font-semibold hover:bg-foreground/5 transition-colors duration-200"
