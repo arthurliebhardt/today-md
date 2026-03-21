@@ -659,11 +659,17 @@ final class TodayMdStore {
         if beforeID == draggedID { return }
 
         performMutation(actionName: "Reorder Tasks") {
+            guard let draggedTask = task(id: draggedID) else { return }
+
+            if draggedTask.isDone {
+                draggedTask.isDone = false
+            }
+
             var active = allTasks.filter { !$0.isDone }.sorted(by: taskSort)
             let done = allTasks.filter(\.isDone).sorted(by: taskSort)
 
             guard let draggedIndex = active.firstIndex(where: { $0.id == draggedID }) else { return }
-            let draggedTask = active.remove(at: draggedIndex)
+            let moving = active.remove(at: draggedIndex)
 
             let insertIndex: Int
             if let beforeID,
@@ -673,7 +679,7 @@ final class TodayMdStore {
                 insertIndex = active.count
             }
 
-            active.insert(draggedTask, at: insertIndex)
+            active.insert(moving, at: insertIndex)
             applyGlobalSortOrder(active + done)
         }
     }
@@ -681,8 +687,7 @@ final class TodayMdStore {
     func reorderTaskInListBlock(listID: UUID, draggedID: UUID, block: TimeBlock, before beforeID: UUID?) {
         if beforeID == draggedID { return }
         guard let list = list(id: listID),
-              let draggedTask = list.items.first(where: { $0.id == draggedID }),
-              !draggedTask.isDone
+              let draggedTask = list.items.first(where: { $0.id == draggedID })
         else {
             return
         }
@@ -693,6 +698,10 @@ final class TodayMdStore {
             if draggedTask.block != block {
                 draggedTask.block = block
                 draggedTask.sortOrder = nextSortOrder(for: list, in: block)
+            }
+
+            if draggedTask.isDone {
+                draggedTask.isDone = false
             }
 
             var active = list.items
