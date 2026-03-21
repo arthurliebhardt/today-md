@@ -4,6 +4,7 @@ const lanes = [
   {
     name: "Today",
     color: "bg-primary",
+    desc: "What you're doing right now. A short, focused list that resets your attention each morning.",
     tasks: [
       { label: "Finalize API auth flow", done: true },
       { label: "Write migration script", done: false },
@@ -13,6 +14,7 @@ const lanes = [
   {
     name: "This Week",
     color: "bg-secondary",
+    desc: "Committed work for the week. Drag tasks into Today when you're ready to act on them.",
     tasks: [
       { label: "Draft onboarding copy", done: false },
       { label: "Set up CI pipeline", done: false },
@@ -23,6 +25,7 @@ const lanes = [
   {
     name: "Backlog",
     color: "bg-neutral-accent",
+    desc: "Everything else. Ideas, someday-tasks, and things that haven't earned a deadline yet.",
     tasks: [
       { label: "Explore CalDAV sync", done: false },
       { label: "Keyboard shortcut editor", done: false },
