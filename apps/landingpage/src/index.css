@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,15 +6,15 @@
 
 @layer base {
   :root {
-    --background: 36 38% 94%;
-    --background-deep: 32 30% 88%;
-    --foreground: 216 14% 14%;
+    --background: 40 20% 98%;
+    --background-deep: 36 18% 95%;
+    --foreground: 220 14% 10%;
 
-    --card: 36 38% 94%;
-    --card-foreground: 216 14% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 10%;
 
-    --popover: 36 38% 94%;
-    --popover-foreground: 216 14% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 10%;
 
     --primary: 32 78% 53%;
     --primary-foreground: 0 0% 100%;
@@ -22,8 +22,8 @@
     --secondary: 210 68% 59%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 32 18% 82%;
-    --muted-foreground: 218 7% 46%;
+    --muted: 40 10% 92%;
+    --muted-foreground: 220 6% 44%;
 
     --accent: 32 78% 53%;
     --accent-foreground: 0 0% 100%;
@@ -31,11 +31,11 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 30 18% 81%;
-    --input: 30 18% 81%;
+    --border: 220 10% 90%;
+    --input: 220 10% 90%;
     --ring: 32 78% 53%;
 
-    --radius: 0.625rem;
+    --radius: 0.75rem;
 
     --neutral-accent: 220 6% 58%;
 
@@ -73,15 +73,6 @@
   }
   .text-pretty {
     text-wrap: pretty;
-  }
-  .font-display {
-    font-family: 'Newsreader', Georgia, serif;
-  }
-  .bg-paper-texture {
-    background-image: 
-      radial-gradient(ellipse at 20% 50%, hsl(36 38% 94% / 0.8), transparent 70%),
-      radial-gradient(ellipse at 80% 20%, hsl(32 30% 90% / 0.6), transparent 60%),
-      radial-gradient(ellipse at 50% 80%, hsl(30 25% 91% / 0.5), transparent 50%);
   }
   .bg-section-alt {
     background-color: hsl(var(--background-deep));
