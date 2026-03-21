@@ -529,12 +529,33 @@ struct MarkdownEditorView: View {
 }
 
 enum MarkdownListFormatting {
+    struct Edit: Equatable {
+        let text: String
+        let selection: NSRange
+    }
+
+    private struct LineAdjustment {
+        let lineStart: Int
+        let delta: Int
+    }
+
+    private static let indentationWidth = 4
+    private static let maximumIndentationLevel = 3
+
     static func numberLines(in text: String) -> String {
         text
             .components(separatedBy: "\n")
             .enumerated()
             .map { index, line in "\(index + 1). \(line)" }
             .joined(separator: "\n")
+    }
+
+    static func indentListLines(in text: String, selection: NSRange) -> Edit? {
+        transformListLines(in: text, selection: selection, transform: indentListLine)
+    }
+
+    static func outdentListLines(in text: String, selection: NSRange) -> Edit? {
+        transformListLines(in: text, selection: selection, transform: outdentListLine)
     }
 
     static func nextNumberedListPrefix(in text: String, at lineStart: Int) -> String {
@@ -552,6 +573,172 @@ enum MarkdownListFormatting {
             return "1. "
         }
         return "\(previousNumber + 1). "
+    }
+
+    private static func transformListLines(
+        in text: String,
+        selection: NSRange,
+        transform: (String) -> String?
+    ) -> Edit? {
+        let ns = text as NSString
+        let safeSelection = clamped(selection, in: ns.length)
+        guard ns.length > 0 else { return nil }
+
+        let lineSelectionRange = ns.lineRange(for: safeSelection)
+        var cursor = lineSelectionRange.location
+        var replacement = ""
+        var adjustments: [LineAdjustment] = []
+        var didChangeAnyLine = false
+
+        while cursor < NSMaxRange(lineSelectionRange) {
+            let lineRange = ns.lineRange(for: NSRange(location: cursor, length: 0))
+            let line = ns.substring(with: lineRange)
+            let (content, lineEnding) = splitLineEnding(from: line)
+
+            let updatedContent = transform(content) ?? content
+            let updatedLine = updatedContent + lineEnding
+            let delta = (updatedLine as NSString).length - lineRange.length
+
+            replacement += updatedLine
+            adjustments.append(LineAdjustment(lineStart: lineRange.location, delta: delta))
+            didChangeAnyLine = didChangeAnyLine || delta != 0
+            cursor = NSMaxRange(lineRange)
+        }
+
+        guard didChangeAnyLine else { return nil }
+
+        let updatedText = ns.replacingCharacters(in: lineSelectionRange, with: replacement)
+
+        if safeSelection.length == 0 {
+            let lineStart = lineSelectionRange.location
+            let currentLineDelta = adjustments.first?.delta ?? 0
+            let updatedCaret = max(lineStart, safeSelection.location + currentLineDelta)
+            return Edit(
+                text: updatedText,
+                selection: NSRange(location: updatedCaret, length: 0)
+            )
+        }
+
+        let updatedStart = adjustedOffset(for: safeSelection.location, adjustments: adjustments)
+        let updatedEnd = adjustedOffset(for: NSMaxRange(safeSelection), adjustments: adjustments)
+
+        return Edit(
+            text: updatedText,
+            selection: NSRange(location: updatedStart, length: max(updatedEnd - updatedStart, 0))
+        )
+    }
+
+    private static func indentListLine(_ line: String) -> String? {
+        guard isListLine(line) else { return nil }
+
+        let indentation = leadingWhitespace(in: line)
+        let currentColumns = indentationColumns(in: indentation)
+        let maximumColumns = indentationWidth * maximumIndentationLevel
+        guard currentColumns < maximumColumns else { return nil }
+
+        let addedColumns = min(indentationWidth, maximumColumns - currentColumns)
+        return String(repeating: " ", count: addedColumns) + line
+    }
+
+    private static func outdentListLine(_ line: String) -> String? {
+        guard isListLine(line) else { return nil }
+
+        let removablePrefix = removableIndentationPrefix(in: line)
+        guard !removablePrefix.isEmpty else { return nil }
+
+        return String(line.dropFirst(removablePrefix.count))
+    }
+
+    private static func isListLine(_ line: String) -> Bool {
+        let content = String(line.drop(while: { $0 == " " || $0 == "\t" }))
+        guard !content.isEmpty else { return false }
+
+        if hasListMarker("☐", in: content) || hasListMarker("☑", in: content) || hasListMarker("•", in: content) {
+            return true
+        }
+
+        if hasChecklistMarker(in: content) {
+            return true
+        }
+
+        if hasListMarker("-", in: content) || hasListMarker("*", in: content) || hasListMarker("+", in: content) {
+            return true
+        }
+
+        return hasOrderedListMarker(in: content)
+    }
+
+    private static func hasChecklistMarker(in content: String) -> Bool {
+        ["- [ ]", "- [x]", "- [X]"].contains { marker in
+            content == marker || content.hasPrefix(marker + " ")
+        }
+    }
+
+    private static func hasListMarker(_ marker: String, in content: String) -> Bool {
+        content == marker || content.hasPrefix(marker + " ")
+    }
+
+    private static func hasOrderedListMarker(in content: String) -> Bool {
+        guard let dotIndex = content.firstIndex(of: "."),
+              content[..<dotIndex].allSatisfy(\.isNumber) else {
+            return false
+        }
+
+        let remainderStart = content.index(after: dotIndex)
+        guard remainderStart <= content.endIndex else { return false }
+        let remainder = String(content[remainderStart...])
+        return remainder.isEmpty || remainder.first?.isWhitespace == true
+    }
+
+    private static func leadingWhitespace(in line: String) -> String {
+        String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+    }
+
+    private static func indentationColumns(in indentation: String) -> Int {
+        indentation.reduce(into: 0) { columns, character in
+            columns += character == "\t" ? indentationWidth : 1
+        }
+    }
+
+    private static func removableIndentationPrefix(in line: String) -> String {
+        var removedColumns = 0
+        var index = line.startIndex
+
+        while index < line.endIndex, removedColumns < indentationWidth {
+            let character = line[index]
+
+            if character == " " {
+                removedColumns += 1
+            } else if character == "\t" {
+                removedColumns += indentationWidth
+            } else {
+                break
+            }
+
+            index = line.index(after: index)
+        }
+
+        return String(line[..<index])
+    }
+
+    private static func splitLineEnding(from line: String) -> (String, String) {
+        let newlineStart = line.firstIndex(where: \.isNewline) ?? line.endIndex
+        return (
+            String(line[..<newlineStart]),
+            String(line[newlineStart...])
+        )
+    }
+
+    private static func clamped(_ range: NSRange, in length: Int) -> NSRange {
+        let location = min(max(range.location, 0), length)
+        let end = min(max(range.location + range.length, 0), length)
+        return NSRange(location: location, length: max(end - location, 0))
+    }
+
+    private static func adjustedOffset(for originalOffset: Int, adjustments: [LineAdjustment]) -> Int {
+        adjustments.reduce(originalOffset) { partial, adjustment in
+            adjustment.lineStart < originalOffset ? partial + adjustment.delta : partial
+        }
     }
 }
 
