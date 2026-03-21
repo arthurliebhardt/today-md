@@ -79,7 +79,7 @@ export function WhyDifferent() {
   return (
     <section id="features" className="py-20 md:py-28">
       <div className="max-w-[700px] mx-auto px-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-10">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-10">
           {features.map((f, i) => (
             <ScrollReveal key={i} delay={i * 0.04}>
               <div className="flex flex-col items-center text-center">
