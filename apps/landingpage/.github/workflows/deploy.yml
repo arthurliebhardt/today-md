@@ -6,7 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  validate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        env:
+          KUBECONFIG_BASE64: ${{ secrets.KUBECONFIG_BASE64 }}
+        run: |
+          if [ -z "$KUBECONFIG_BASE64" ]; then
+            echo "KUBECONFIG_BASE64 is not configured for this repository."
+            exit 1
+          fi
+
   deploy:
+    needs: [validate-secrets]
     uses: liebhardt-io/shared-workflows/.github/workflows/docker-deploy.yml@main
     with:
       image_name: liebhardt-io/today-md-landingpage
