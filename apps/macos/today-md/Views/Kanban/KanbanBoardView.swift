@@ -107,8 +107,10 @@ struct BoardView: View {
                     }
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding()
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func collapsedLane(block: TimeBlock, expand: @escaping () -> Void) -> some View {
@@ -223,46 +225,57 @@ struct LaneView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            ScrollView {
-                LazyVStack(spacing: 5) {
-                    ForEach(activeTasks) { task in
-                        TaskCardView(
-                            task: task,
-                            isSelected: selectedTaskIDs.contains(task.id),
-                            showsListBadge: showsListBadge,
-                            onToggle: { onToggle(task) },
-                            onMove: { targetBlock in onMove(task.id, targetBlock) },
-                            onDelete: { onDelete(task) }
-                        )
-                        .gesture(taskTapGesture(for: task))
-                        .draggable(TaskItemTransfer(id: task.id))
-                        .overlay {
-                            if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
-                                Rectangle()
-                                    .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
+            VStack(alignment: .leading, spacing: 8) {
+                ScrollView {
+                    LazyVStack(spacing: 5) {
+                        ForEach(activeTasks) { task in
+                            TaskCardView(
+                                task: task,
+                                isSelected: selectedTaskIDs.contains(task.id),
+                                showsListBadge: showsListBadge,
+                                onToggle: { onToggle(task) },
+                                onMove: { targetBlock in onMove(task.id, targetBlock) },
+                                onDelete: { onDelete(task) }
+                            )
+                            .gesture(taskTapGesture(for: task))
+                            .draggable(TaskItemTransfer(id: task.id))
+                            .overlay {
+                                if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
+                                    Rectangle()
+                                        .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .dropDestination(for: TaskItemTransfer.self) { items, location in
+                                let target: ReorderTarget = location.y > 40 ? .after(task.id) : .before(task.id)
+                                return handleReorderDrop(items, target: target)
+                            } isTargeted: { targeted in
+                                updateDropTarget(targeted: targeted, target: .before(task.id))
                             }
                         }
-                        .contentShape(Rectangle())
-                        .dropDestination(for: TaskItemTransfer.self) { items, location in
-                            let target: ReorderTarget = location.y > 40 ? .after(task.id) : .before(task.id)
-                            return handleReorderDrop(items, target: target)
-                        } isTargeted: { targeted in
-                            updateDropTarget(targeted: targeted, target: .before(task.id))
+                        reorderDropZone(target: .end, height: 48)
+                        if allowsAdding {
+                            addCard
                         }
                     }
-                    reorderDropZone(target: .end, height: 48)
-                    if allowsAdding {
-                        addCard
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, doneSectionExpanded ? 8 : 0)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onFocus()
+                        dismissEmptyDraftIfNeeded()
                     }
-                    doneSection
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onFocus()
-                    dismissEmptyDraftIfNeeded()
+                .frame(maxHeight: .infinity, alignment: .top)
+
+                if !doneSectionExpanded {
+                    Spacer(minLength: 0)
                 }
+
+                doneSection
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -270,7 +283,7 @@ struct LaneView: View {
                 dismissEmptyDraftIfNeeded()
             }
         }
-        .frame(minWidth: 150, maxWidth: .infinity)
+        .frame(minWidth: 150, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(laneBackgroundColor)
