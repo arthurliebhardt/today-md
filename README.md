@@ -47,7 +47,7 @@ bash scripts/dev-run.sh
 
 Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 
-The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Sample data is seeded only on the first app launch.
+The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Packaged app builds seed sample data on first launch. `swift run` now launches against a dedicated showcase database in `.build` and resets it to the example dataset on every local start.
 
 ## Project Structure
 
@@ -73,7 +73,7 @@ The installer preserves an existing sandbox database and migrates older unsandbo
 
 **Manual install:**
 
-1. Unzip `today-md-v1.5.9-macos.zip`
+1. Unzip `today-md-v1.6.0-macos.zip`
 2. Move `today-md.app` to your Applications folder
 3. On first launch macOS will block the app because it's not notarized:
 
@@ -92,7 +92,7 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
 
 ```bash
-bash scripts/install.sh ~/Downloads/today-md-v1.5.9-macos.zip
+bash scripts/install.sh ~/Downloads/today-md-v1.6.0-macos.zip
 ```
 
 ## Data Portability

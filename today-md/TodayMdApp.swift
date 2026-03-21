@@ -275,26 +275,39 @@ final class AppPresentationState: ObservableObject {
 
 @main
 struct TodayMdApp: App {
+    struct LaunchConfiguration {
+        let databaseURL: URL?
+        let shouldSeedShowcaseData: Bool
+        let shouldResetShowcaseData: Bool
+        let shouldRunSyncLifecycle: Bool
+    }
+
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
     @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
     @State private var store: TodayMdStore
+    private let shouldRunSyncLifecycle: Bool
     static let hasLaunchedBeforeDefaultsKey = "TodayMdHasLaunchedBefore"
 
     init() {
         let syncService = TodayMdSyncService()
         let userDefaults = UserDefaults.standard
-        let shouldSeedShowcaseData = Self.shouldSeedShowcaseData(
+        let launchConfiguration = Self.makeLaunchConfiguration(
             syncEnabled: syncService.syncEnabled,
-            userDefaults: userDefaults
+            userDefaults: userDefaults,
+            bundleURL: Bundle.main.bundleURL,
+            executableURL: Bundle.main.executableURL
         )
+        shouldRunSyncLifecycle = launchConfiguration.shouldRunSyncLifecycle
         Self.markHasLaunchedBefore(userDefaults: userDefaults)
         _syncService = StateObject(wrappedValue: syncService)
         _store = State(
             initialValue: TodayMdStore(
-                shouldSeedShowcaseData: shouldSeedShowcaseData
+                databaseURL: launchConfiguration.databaseURL,
+                shouldSeedShowcaseData: launchConfiguration.shouldSeedShowcaseData,
+                shouldResetShowcaseData: launchConfiguration.shouldResetShowcaseData
             )
         )
     }
@@ -310,13 +323,16 @@ struct TodayMdApp: App {
                 .background(MainWindowConfigurator())
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
-                    syncService.attach(store: store)
                     dynamicIslandController.attach(store: store)
+
+                    guard shouldRunSyncLifecycle else { return }
+                    syncService.attach(store: store)
                     syncService.handleAppLaunchIfNeeded()
                 }
         }
         .defaultSize(width: 1500, height: 920)
         .onChange(of: scenePhase) { _, newPhase in
+            guard shouldRunSyncLifecycle else { return }
             guard newPhase == .active else { return }
             syncService.handleAppDidBecomeActive()
         }
@@ -363,13 +379,47 @@ struct TodayMdApp: App {
         .menuBarExtraStyle(.window)
     }
 
-    static func shouldSeedShowcaseData(syncEnabled: Bool, userDefaults: UserDefaults) -> Bool {
-        guard !syncEnabled else { return false }
-        return !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey)
+    static func makeLaunchConfiguration(
+        syncEnabled: Bool,
+        userDefaults: UserDefaults,
+        bundleURL: URL,
+        executableURL: URL?
+    ) -> LaunchConfiguration {
+        if isRunningLocallyFromSwiftRun(bundleURL: bundleURL, executableURL: executableURL) {
+            return LaunchConfiguration(
+                databaseURL: localSwiftRunShowcaseDatabaseURL(executableURL: executableURL),
+                shouldSeedShowcaseData: true,
+                shouldResetShowcaseData: true,
+                shouldRunSyncLifecycle: false
+            )
+        }
+
+        return LaunchConfiguration(
+            databaseURL: nil,
+            shouldSeedShowcaseData: !syncEnabled && !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey),
+            shouldResetShowcaseData: false,
+            shouldRunSyncLifecycle: true
+        )
     }
 
     static func markHasLaunchedBefore(userDefaults: UserDefaults) {
         userDefaults.set(true, forKey: hasLaunchedBeforeDefaultsKey)
+    }
+
+    static func isRunningLocallyFromSwiftRun(bundleURL: URL, executableURL: URL?) -> Bool {
+        guard bundleURL.pathExtension.caseInsensitiveCompare("app") != .orderedSame else {
+            return false
+        }
+
+        guard let executableURL else { return false }
+        return executableURL.path.contains("/.build/")
+    }
+
+    static func localSwiftRunShowcaseDatabaseURL(executableURL: URL?) -> URL? {
+        guard let executableURL else { return nil }
+        return executableURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("today-md-showcase.sqlite", isDirectory: false)
     }
 }
 
@@ -391,9 +441,19 @@ final class TodayMdStore {
     @ObservationIgnored
     private var syncHandler: (() -> Void)?
 
-    init(databaseURL: URL? = nil, shouldSeedShowcaseData: Bool = true) {
+    init(
+        databaseURL: URL? = nil,
+        shouldSeedShowcaseData: Bool = true,
+        shouldResetShowcaseData: Bool = false
+    ) {
         do {
             database = try TodayMdDatabase(url: databaseURL ?? Self.defaultDatabaseURL())
+
+            if shouldResetShowcaseData {
+                loadShowcaseData()
+                return
+            }
+
             let archive = try database.loadArchive()
             if applyArchive(archive, refreshSearch: false) {
                 persist()
@@ -401,7 +461,7 @@ final class TodayMdStore {
 
             if allTasks.isEmpty {
                 if shouldSeedShowcaseData {
-                    seedShowcaseDataIfNeeded()
+                    loadShowcaseData()
                 } else {
                     refreshSearch()
                 }
@@ -943,7 +1003,7 @@ final class TodayMdStore {
         persist(notifySync: false)
     }
 
-    private func seedShowcaseDataIfNeeded() {
+    private func loadShowcaseData() {
         let privateList = TaskList(name: "Private", icon: "person", color: .blue, sortOrder: 0)
         let workList = TaskList(name: "Work", icon: "briefcase", color: .purple, sortOrder: 1)
 
