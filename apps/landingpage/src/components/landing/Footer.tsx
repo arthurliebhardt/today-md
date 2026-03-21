@@ -19,12 +19,12 @@ export function Footer() {
           </div>
         </ScrollReveal>
 
-        {/* Logo watermark */}
-        <div className="flex justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" className="w-16 h-14">
-            <rect x="14" y="8" width="104" height="104" rx="31" fill="#5A462C" opacity="0.15"/>
-            <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06" opacity="0.2"/>
-            <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" opacity="0.15"/>
+        {/* Logo */}
+        <div className="flex justify-center opacity-30">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" width="28" height="26">
+            <rect x="14" y="8" width="104" height="104" rx="31" fill="#5A462C"/>
+            <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06"/>
+            <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
       </div>
