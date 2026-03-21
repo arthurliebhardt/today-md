@@ -7,35 +7,36 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA000001 /* TodayMdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001; };
-		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002; };
-		AA000003 /* TaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003; };
-		AA000004 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004; };
-		AA000005 /* SubTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000005; };
-		AA000006 /* TaskNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000006; };
-		AA000007 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000007; };
-		AA000008 /* KanbanBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000008; };
-		AA000009 /* KanbanColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000009; };
-		AA000010 /* TaskCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010; };
-		AA000011 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011; };
-		AA000012 /* SubTaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012; };
-		AA000013 /* MarkdownEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000013; };
-		AA000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB000015; };
-		AA000016 /* BacklogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018; };
-		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019; };
-		AA000020 /* ChecklistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020; };
-		AA000021 /* TodayMdTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021; };
-		AA000022 /* TodayMdArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022; };
-		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023; };
-		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
-		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025; };
-		AA000026 /* TodayMdSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026; };
-		AA000027 /* MarkdownInlineDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000027; };
-		AA000028 /* InlineMarkdownTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028; };
+		AA000001 /* TodayMdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001 /* TodayMdApp.swift */; };
+		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002 /* ContentView.swift */; };
+		AA000003 /* TaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003 /* TaskList.swift */; };
+		AA000004 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004 /* TaskItem.swift */; };
+		AA000005 /* SubTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000005 /* SubTask.swift */; };
+		AA000006 /* TaskNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000006 /* TaskNote.swift */; };
+		AA000007 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000007 /* SidebarView.swift */; };
+		AA000008 /* KanbanBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000008 /* KanbanBoardView.swift */; };
+		AA000009 /* KanbanColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000009 /* KanbanColumnView.swift */; };
+		AA000010 /* TaskCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010 /* TaskCardView.swift */; };
+		AA000011 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011 /* TaskDetailView.swift */; };
+		AA000012 /* SubTaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012 /* SubTaskListView.swift */; };
+		AA000013 /* MarkdownEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000013 /* MarkdownEditorView.swift */; };
+		AA000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB000015 /* Assets.xcassets */; };
+		AA000016 /* BacklogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018 /* BacklogView.swift */; };
+		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019 /* WeeklyReviewView.swift */; };
+		AA000020 /* ChecklistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020 /* ChecklistSection.swift */; };
+		AA000021 /* TodayMdTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021 /* TodayMdTransferService.swift */; };
+		AA000022 /* TodayMdArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022 /* TodayMdArchive.swift */; };
+		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023 /* TodayMdDatabase.swift */; };
+		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024 /* libsqlite3.tbd */; };
+		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025 /* SearchPresentation.swift */; };
+		AA000026 /* TodayMdSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026 /* TodayMdSyncService.swift */; };
+		AA000027 /* MarkdownInlineDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000027 /* MarkdownInlineDisplay.swift */; };
+		AA000028 /* InlineMarkdownTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028 /* InlineMarkdownTextEditor.swift */; };
+		AA000034 /* TodayMdMenuBarExtraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035 /* TodayMdMenuBarExtraView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AB000000 /* today-md.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = today-md.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000000 /* today-md.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "today-md.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB000001 /* TodayMdApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdApp.swift; sourceTree = "<group>"; };
 		AB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AB000003 /* TaskList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskList.swift; sourceTree = "<group>"; };
@@ -50,7 +51,7 @@
 		AB000012 /* SubTaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubTaskListView.swift; sourceTree = "<group>"; };
 		AB000013 /* MarkdownEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditorView.swift; sourceTree = "<group>"; };
 		AB000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		AB000016 /* today-md.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = today-md.entitlements; sourceTree = "<group>"; };
+		AB000016 /* today-md.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "today-md.entitlements"; sourceTree = "<group>"; };
 		AB000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB000018 /* BacklogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklogView.swift; sourceTree = "<group>"; };
 		AB000019 /* WeeklyReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewView.swift; sourceTree = "<group>"; };
@@ -63,6 +64,7 @@
 		AB000026 /* TodayMdSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdSyncService.swift; sourceTree = "<group>"; };
 		AB000027 /* MarkdownInlineDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownInlineDisplay.swift; sourceTree = "<group>"; };
 		AB000028 /* InlineMarkdownTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownTextEditor.swift; sourceTree = "<group>"; };
+		AB000035 /* TodayMdMenuBarExtraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdMenuBarExtraView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +128,7 @@
 				AD000006 /* Sidebar */,
 				AD000007 /* Kanban */,
 				AD000008 /* Detail */,
+				AD000011 /* MenuBar */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -173,6 +176,14 @@
 				AB000024 /* libsqlite3.tbd */,
 			);
 			path = Helpers;
+			sourceTree = "<group>";
+		};
+		AD000011 /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				AB000035 /* TodayMdMenuBarExtraView.swift */,
+			);
+			path = MenuBar;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -267,6 +278,7 @@
 				AA000025 /* SearchPresentation.swift in Sources */,
 				AA000027 /* MarkdownInlineDisplay.swift in Sources */,
 				AA000028 /* InlineMarkdownTextEditor.swift in Sources */,
+				AA000034 /* TodayMdMenuBarExtraView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -409,7 +421,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.5.8;
-				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -436,7 +448,6 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.5.8;
-				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -465,7 +476,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = AE000010 /* Project object */;
 }

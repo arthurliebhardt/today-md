@@ -1394,6 +1394,10 @@ struct ContentView: View {
             validateSelection()
             syncSelectedTask()
         }
+        .onChange(of: presentationState.taskNavigationRequest) { _, request in
+            guard let request else { return }
+            openTaskFromMenuBar(request.taskID)
+        }
         .onDeleteCommand {
             deleteSelectedTasks()
         }
@@ -1438,6 +1442,17 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
+    }
+
+    private func openTaskFromMenuBar(_ taskID: UUID) {
+        guard let task = store.task(id: taskID) else { return }
+
+        store.searchText = ""
+        selection = .all
+        allTasksDoneSectionExpanded = false
+        focusedBlock = task.block
+        setSingleSelection(task.id, focusedBlock: task.block)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private var boardTitle: String {

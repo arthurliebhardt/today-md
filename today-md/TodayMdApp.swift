@@ -1,6 +1,10 @@
 import AppKit
 import SwiftUI
 
+enum TodayMdSceneID {
+    static let mainWindow = "today-md-main-window"
+}
+
 struct KeyboardShortcutMonitor: NSViewRepresentable {
     let handler: (NSEvent) -> Bool
 
@@ -240,11 +244,22 @@ enum ShortcutCheatsheet {
 }
 
 @MainActor
+struct TaskNavigationRequest: Equatable {
+    let id = UUID()
+    let taskID: UUID
+}
+
+@MainActor
 final class AppPresentationState: ObservableObject {
     @Published var showingKeyboardShortcuts = false
+    @Published var taskNavigationRequest: TaskNavigationRequest?
 
     func presentKeyboardShortcuts() {
         showingKeyboardShortcuts = true
+    }
+
+    func openTask(_ taskID: UUID) {
+        taskNavigationRequest = TaskNavigationRequest(taskID: taskID)
     }
 }
 
@@ -274,7 +289,7 @@ struct TodayMdApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("today-md", id: TodayMdSceneID.mainWindow) {
             ContentView()
                 .environment(store)
                 .environmentObject(syncService)
@@ -322,6 +337,17 @@ struct TodayMdApp: App {
                 .keyboardShortcut("/", modifiers: [.command])
             }
         }
+
+        MenuBarExtra {
+            TodayMdMenuBarExtraView()
+                .environment(store)
+                .environmentObject(syncService)
+                .environmentObject(presentationState)
+        } label: {
+            Image(nsImage: TodayMdMenuBarIcon.image)
+                .accessibilityLabel("today-md")
+        }
+        .menuBarExtraStyle(.window)
     }
 
     static func shouldSeedShowcaseData(syncEnabled: Bool, userDefaults: UserDefaults) -> Bool {
@@ -1220,6 +1246,7 @@ final class TodayMdStore {
             .appendingPathComponent("today-md", isDirectory: true)
             .appendingPathComponent("today-md.sqlite", isDirectory: false)
     }
+
 }
 
 private enum StoreError: LocalizedError {
