@@ -17,6 +17,7 @@ private struct MarkdownArchiveSnapshot: Equatable {
 }
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
+    case interface
     case dataBackup
     case sync
     case shortcuts
@@ -25,6 +26,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .interface:
+            return "Interface"
         case .dataBackup:
             return "Data"
         case .sync:
@@ -36,6 +39,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
+        case .interface:
+            return "Global notch quick capture"
         case .dataBackup:
             return "Import, export, and archive"
         case .sync:
@@ -47,6 +52,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .interface:
+            return "rectangle.topthird.inset.filled"
         case .dataBackup:
             return "internaldrive"
         case .sync:
@@ -58,6 +65,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var tint: Color {
         switch self {
+        case .interface:
+            return .indigo
         case .dataBackup:
             return .orange
         case .sync:
@@ -201,6 +210,7 @@ struct ContentView: View {
     @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
+    @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
@@ -676,6 +686,39 @@ struct ContentView: View {
     private var settingsSectionContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             switch selectedSettingsSection {
+            case .interface:
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Global notch quick capture")
+                        .font(.headline)
+
+                    settingsToggleCard(
+                        title: "Top Screen Notch",
+                        subtitle: "Show the floating notch when the pointer reaches the top-center edge of the screen, even outside the app window.",
+                        systemImage: "rectangle.topthird.inset.filled",
+                        tint: .indigo,
+                        isOn: $dynamicIslandController.isEnabled
+                    )
+
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(dynamicIslandController.isEnabled ? Color.green : Color.secondary.opacity(0.5))
+                            .frame(width: 10, height: 10)
+
+                        Text(dynamicIslandController.isEnabled ? "The notch is active and can appear from the screen edge." : "The notch is off and will stay hidden until you enable it again.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.indigo.opacity(0.07))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.indigo.opacity(0.12), lineWidth: 1)
+                    )
+                }
+
             case .dataBackup:
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Backups and note exports")
@@ -1192,6 +1235,64 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.72)
+    }
+
+    private func settingsToggleCard(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(tint.opacity(isOn.wrappedValue ? 0.14 : 0.08))
+
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(isOn.wrappedValue ? tint : .secondary)
+            }
+            .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 8) {
+                Text(isOn.wrappedValue ? "On" : "Off")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isOn.wrappedValue ? tint : .secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(isOn.wrappedValue ? tint.opacity(0.14) : Color.secondary.opacity(0.12))
+                    )
+
+                Toggle("", isOn: isOn)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .tint(tint)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(tint.opacity(0.14), lineWidth: 1)
+        )
     }
 
     private var hasDetailContent: Bool {
