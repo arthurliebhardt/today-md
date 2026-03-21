@@ -25,7 +25,6 @@ export function Hero() {
             className="text-muted-foreground text-lg md:text-xl leading-relaxed max-w-xl mx-auto text-pretty mb-8">
             A native macOS task manager for turning notes into action — across Today, This Week, and Backlog.
           </motion.p>
-          </motion.h1>
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
