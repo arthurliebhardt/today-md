@@ -254,6 +254,7 @@ struct TodayMdApp: App {
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
+    @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
     @State private var store: TodayMdStore
     static let hasLaunchedBeforeDefaultsKey = "TodayMdHasLaunchedBefore"
 
@@ -280,10 +281,12 @@ struct TodayMdApp: App {
                 .environmentObject(syncService)
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
+                .environmentObject(dynamicIslandController)
                 .background(MainWindowConfigurator())
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
                     syncService.attach(store: store)
+                    dynamicIslandController.attach(store: store)
                     syncService.handleAppLaunchIfNeeded()
                 }
         }
