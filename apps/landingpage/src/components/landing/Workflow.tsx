@@ -4,6 +4,7 @@ const lanes = [
   {
     name: "Today",
     color: "bg-primary",
+    desc: "What you're doing right now. A short, focused list that resets your attention each morning.",
     tasks: [
       { label: "Finalize API auth flow", done: true },
       { label: "Write migration script", done: false },
@@ -13,6 +14,7 @@ const lanes = [
   {
     name: "This Week",
     color: "bg-secondary",
+    desc: "Committed work for the week. Drag tasks into Today when you're ready to act on them.",
     tasks: [
       { label: "Draft onboarding copy", done: false },
       { label: "Set up CI pipeline", done: false },
@@ -23,6 +25,7 @@ const lanes = [
   {
     name: "Backlog",
     color: "bg-neutral-accent",
+    desc: "Everything else. Ideas, someday-tasks, and things that haven't earned a deadline yet.",
     tasks: [
       { label: "Explore CalDAV sync", done: false },
       { label: "Keyboard shortcut editor", done: false },
@@ -52,7 +55,8 @@ export function Workflow() {
             <ScrollReveal key={lane.name} delay={i * 0.1} className="h-full">
               <div className="rounded-2xl border border-border/50 bg-card p-8 hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
                 <div className={`w-3/4 h-1 ${lane.color} rounded-full mb-6 opacity-70`} />
-                <h3 className="text-foreground font-semibold text-lg mb-4">{lane.name}</h3>
+                <h3 className="text-foreground font-semibold text-lg mb-2">{lane.name}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed text-pretty mb-4">{lane.desc}</p>
                 <ul className="space-y-2.5 flex-1">
                   {lane.tasks.map((task) => (
                     <li key={task.label} className="flex items-start gap-2.5">
