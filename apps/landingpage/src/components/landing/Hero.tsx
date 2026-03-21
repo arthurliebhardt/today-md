@@ -64,7 +64,7 @@ export function Hero() {
           transition={{ duration: 0.5, delay: 1 }}
           className="text-center text-muted-foreground text-xs mt-6 flex items-center justify-center gap-1.5">
           
-          <span className="text-primary">▶</span> A native macOS task manager. Local-first.
+          <span className="text-primary">▶</span> A native macOS task manager. Local-first. Open source.
         </motion.p>
       </div>
     </section>);
