@@ -24,13 +24,12 @@ export function Hero() {
             transition={{ duration: 0.4, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-wrap justify-center gap-3 mb-16 md:mb-20">
             
-            <a
-              href="#download"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-foreground text-background text-sm font-semibold hover:bg-foreground/85 transition-colors duration-150 active:scale-[0.97]">
-              
+            <button
+              disabled
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-foreground/40 text-background text-sm font-semibold cursor-not-allowed">
               <AppleIcon />
-              Download for Mac
-            </a>
+              Coming Soon
+            </button>
             <a
               href="https://github.com"
               target="_blank"

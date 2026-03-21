@@ -25,13 +25,13 @@ export function Navbar() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             FAQs
           </a>
-          <a
-            href="#download"
-            className="text-[13px] font-medium px-4 py-2 rounded-lg bg-foreground text-background hover:bg-foreground/85 transition-colors duration-150 active:scale-[0.97] inline-flex items-center gap-2"
+          <button
+            disabled
+            className="text-[13px] font-medium px-4 py-2 rounded-lg bg-foreground/40 text-background cursor-not-allowed inline-flex items-center gap-2"
           >
             <AppleIcon />
-            Download for Mac
-          </a>
+            Coming Soon
+          </button>
         </div>
       </div>
     </motion.nav>
