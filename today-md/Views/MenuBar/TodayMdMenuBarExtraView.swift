@@ -57,6 +57,9 @@ struct TodayMdMenuBarExtraView: View {
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var syncService: TodayMdSyncService
+    @FocusState private var isQuickAddFieldFocused: Bool
+    @State private var draftTitle = ""
+    @State private var selectedQuickAddListID: UUID?
 
     private let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -74,6 +77,31 @@ struct TodayMdMenuBarExtraView: View {
 
     private var hiddenTodayTaskCount: Int {
         max(todayTasks.count - visibleTodayTasks.count, 0)
+    }
+
+    private var trimmedDraftTitle: String {
+        draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var sortedLists: [TaskList] {
+        store.lists.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    private var selectedQuickAddList: TaskList? {
+        guard let selectedQuickAddListID else { return nil }
+        return sortedLists.first { $0.id == selectedQuickAddListID }
+    }
+
+    private var quickAddListLabel: String {
+        selectedQuickAddList?.name ?? "Unassigned"
+    }
+
+    private var quickAddListIcon: String {
+        selectedQuickAddList?.icon ?? "tray"
+    }
+
+    private var quickAddListColor: Color {
+        selectedQuickAddList?.listColor.color ?? .secondary
     }
 
     private var syncSummary: String {
@@ -128,6 +156,11 @@ struct TodayMdMenuBarExtraView: View {
                 endPoint: .bottomTrailing
             )
         )
+        .onAppear {
+            DispatchQueue.main.async {
+                isQuickAddFieldFocused = true
+            }
+        }
     }
 
     private var header: some View {
@@ -179,6 +212,8 @@ struct TodayMdMenuBarExtraView: View {
 
     private var todayAgenda: some View {
         VStack(alignment: .leading, spacing: 12) {
+            quickAddRow
+
             HStack(alignment: .firstTextBaseline) {
                 Text("Today")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -223,13 +258,104 @@ struct TodayMdMenuBarExtraView: View {
         }
     }
 
+    private var quickAddRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(MenuBarPalette.accent)
+
+                TextField("Add a task to Today", text: $draftTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .focused($isQuickAddFieldFocused)
+                    .onSubmit(submitQuickAdd)
+
+                Button(action: submitQuickAdd) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(trimmedDraftTitle.isEmpty ? MenuBarPalette.ink.opacity(0.25) : MenuBarPalette.ink)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(trimmedDraftTitle.isEmpty)
+                .help("Add task to Today")
+            }
+
+            Menu {
+                Button {
+                    selectedQuickAddListID = nil
+                } label: {
+                    quickAddListMenuItem(
+                        title: "Unassigned",
+                        icon: "tray",
+                        color: .secondary,
+                        isSelected: selectedQuickAddList == nil
+                    )
+                }
+
+                if !sortedLists.isEmpty {
+                    Divider()
+                }
+
+                ForEach(sortedLists) { list in
+                    Button {
+                        selectedQuickAddListID = list.id
+                    } label: {
+                        quickAddListMenuItem(
+                            title: list.name,
+                            icon: list.icon,
+                            color: list.listColor.color,
+                            isSelected: selectedQuickAddList?.id == list.id
+                        )
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: quickAddListIcon)
+                        .font(.system(size: 11, weight: .semibold))
+
+                    Text(quickAddListLabel)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .lineLimit(1)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(quickAddListColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(quickAddListColor.opacity(0.14))
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .padding(.leading, 25)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.8))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(MenuBarPalette.accent.opacity(0.10), lineWidth: 1)
+        )
+    }
+
     private var emptyTodayState: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No tasks scheduled for today.")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(MenuBarPalette.ink)
 
-            Text("Open the workspace to pull something forward from This Week or Backlog.")
+            Text("Add something above or open the workspace to pull work forward from This Week or Backlog.")
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -331,5 +457,36 @@ struct TodayMdMenuBarExtraView: View {
 
     private func markTaskDone(_ taskID: UUID) {
         store.setTaskCompletion(id: taskID, isDone: true)
+    }
+
+    private func submitQuickAdd() {
+        guard store.quickAddTask(title: draftTitle, to: .today, listID: selectedQuickAddList?.id) != nil else { return }
+        draftTitle = ""
+        isQuickAddFieldFocused = true
+    }
+
+    private func quickAddListMenuItem(
+        title: String,
+        icon: String,
+        color: Color,
+        isSelected: Bool
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(color)
+
+            Spacer(minLength: 12)
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(color)
+            }
+        }
     }
 }

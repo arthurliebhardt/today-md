@@ -481,10 +481,11 @@ final class TodayMdStore {
 
     func addTask(title: String, block: TimeBlock, listID: UUID) -> TaskItem? {
         guard let list = list(id: listID) else { return nil }
-        let task = TaskItem(title: title, block: block, sortOrder: nextSortOrder(for: list, in: block))
+        let task = TaskItem(title: title, block: block, sortOrder: 0)
         task.list = list
 
         performMutation(actionName: "Add Task") {
+            shiftSortOrderForNewTask(atTopOf: list, in: block)
             list.items.append(task)
         }
 
@@ -492,13 +493,25 @@ final class TodayMdStore {
     }
 
     func addUnassignedTask(title: String, block: TimeBlock) -> TaskItem {
-        let task = TaskItem(title: title, block: block, sortOrder: nextSortOrder(for: nil, in: block))
+        let task = TaskItem(title: title, block: block, sortOrder: 0)
 
         performMutation(actionName: "Add Task") {
+            shiftSortOrderForNewTask(atTopOf: nil, in: block)
             unassignedTasks.append(task)
         }
 
         return task
+    }
+
+    func quickAddTask(title: String, to block: TimeBlock = .today, listID: UUID? = nil) -> TaskItem? {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else { return nil }
+
+        if let listID {
+            return addTask(title: normalizedTitle, block: block, listID: listID)
+        }
+
+        return addUnassignedTask(title: normalizedTitle, block: block)
     }
 
     func assignTask(id: UUID, toListID listID: UUID?) {
@@ -521,6 +534,8 @@ final class TodayMdStore {
         }
 
         performMutation(actionName: actionName) {
+            let preservedSortOrder = task.sortOrder
+
             if let sourceList {
                 sourceList.items.removeAll { $0.id == id }
             } else {
@@ -528,16 +543,7 @@ final class TodayMdStore {
             }
 
             task.list = destinationList
-            task.sortOrder = nextSortOrder(for: destinationList, in: task.block)
-
-            if let destinationList {
-                destinationList.items.append(task)
-            } else {
-                unassignedTasks.append(task)
-            }
-
-            normalizeSortOrder(for: sourceList, in: task.block)
-            normalizeSortOrder(for: destinationList, in: task.block)
+            insertTask(task, into: destinationList, in: task.block, preferredSortOrder: preservedSortOrder)
         }
     }
 
@@ -1225,6 +1231,36 @@ final class TodayMdStore {
     private func normalizeSubtaskSortOrder(in task: TaskItem) {
         for (index, subtask) in task.subtasks.enumerated() {
             subtask.sortOrder = index
+        }
+    }
+
+    private func insertTask(
+        _ task: TaskItem,
+        into list: TaskList?,
+        in block: TimeBlock,
+        preferredSortOrder: Int
+    ) {
+        let tasks = list?.items ?? unassignedTasks
+        let blockTasks = tasks.filter { $0.block == block }
+        let insertionSortOrder = max(0, min(preferredSortOrder, blockTasks.count))
+
+        for existingTask in blockTasks where existingTask.sortOrder >= insertionSortOrder {
+            existingTask.sortOrder += 1
+        }
+
+        task.sortOrder = insertionSortOrder
+
+        if let list {
+            list.items.append(task)
+        } else {
+            unassignedTasks.append(task)
+        }
+    }
+
+    private func shiftSortOrderForNewTask(atTopOf list: TaskList?, in block: TimeBlock) {
+        let tasks = list?.items ?? unassignedTasks
+        for task in tasks where task.block == block {
+            task.sortOrder += 1
         }
     }
 

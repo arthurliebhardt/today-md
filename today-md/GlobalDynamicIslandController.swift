@@ -258,13 +258,12 @@ final class GlobalDynamicIslandController: ObservableObject {
     }
 
     private func submitTask() {
-        let title = viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, let store else {
+        guard let store else {
             hide()
             return
         }
 
-        _ = store.addUnassignedTask(title: title, block: .today)
+        _ = store.quickAddTask(title: viewModel.draftTitle, to: .today)
         hide()
     }
 }

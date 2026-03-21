@@ -208,8 +208,18 @@ struct TodayMdArchive: Codable {
 }
 
 func taskSort(lhs: TaskItem, rhs: TaskItem) -> Bool {
-    let lhsTuple = (blockRank(lhs.block), lhs.sortOrder, lhs.creationDate, lhs.id.uuidString)
-    let rhsTuple = (blockRank(rhs.block), rhs.sortOrder, rhs.creationDate, rhs.id.uuidString)
+    let lhsTuple = (
+        blockRank(lhs.block),
+        lhs.sortOrder,
+        -lhs.creationDate.timeIntervalSinceReferenceDate,
+        lhs.id.uuidString
+    )
+    let rhsTuple = (
+        blockRank(rhs.block),
+        rhs.sortOrder,
+        -rhs.creationDate.timeIntervalSinceReferenceDate,
+        rhs.id.uuidString
+    )
     return lhsTuple < rhsTuple
 }
 
