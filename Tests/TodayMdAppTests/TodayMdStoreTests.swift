@@ -405,6 +405,30 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(task.note?.content, "- [x] Ship\n- Bullet\n1. Test")
     }
 
+    func testWidgetSnapshotIncludesOnlyTodayTasksAndKeepsDoneCount() throws {
+        let store = try makeStore()
+        let workList = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let todayTask = try XCTUnwrap(store.addTask(title: "Ship widget", block: .today, listID: workList.id))
+        _ = store.addTask(title: "Later this week", block: .thisWeek, listID: workList.id)
+        let inboxTask = store.addUnassignedTask(title: "Inbox today", block: .today)
+        store.setTaskCompletion(id: inboxTask.id, isDone: true)
+
+        let snapshot = TodayMdWidgetSnapshotWriter.makeSnapshot(
+            lists: store.lists,
+            unassignedTasks: store.unassignedTasks,
+            generatedAt: Date(timeIntervalSince1970: 123)
+        )
+
+        XCTAssertEqual(snapshot.generatedAt, Date(timeIntervalSince1970: 123))
+        XCTAssertEqual(snapshot.tasks.map(\.title), ["Ship widget", "Inbox today"])
+        XCTAssertEqual(snapshot.tasks.first?.listName, "Work")
+        XCTAssertNil(snapshot.tasks.last?.listName)
+        XCTAssertEqual(snapshot.remainingTasks.map(\.title), ["Ship widget"])
+        XCTAssertEqual(snapshot.completedCount, 1)
+        XCTAssertEqual(todayTask.title, "Ship widget")
+    }
+
     private func makeStore() throws -> TodayMdStore {
         let databaseURL = try makeDatabaseURL()
         return TodayMdStore(

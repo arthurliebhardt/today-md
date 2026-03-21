@@ -369,6 +369,8 @@ final class TodayMdStore {
             } else {
                 refreshSearch()
             }
+
+            syncWidgetSnapshot()
         } catch {
             fatalError("Failed to initialize store: \(error.localizedDescription)")
         }
@@ -1103,6 +1105,7 @@ final class TodayMdStore {
     private func persist(notifySync: Bool = true) {
         do {
             try database.replaceAll(with: makeArchive())
+            syncWidgetSnapshot()
             if notifySync {
                 syncHandler?()
             }
@@ -1219,6 +1222,13 @@ final class TodayMdStore {
         return applicationSupportURL
             .appendingPathComponent("today-md", isDirectory: true)
             .appendingPathComponent("today-md.sqlite", isDirectory: false)
+    }
+
+    private func syncWidgetSnapshot() {
+        TodayMdWidgetSnapshotWriter.sync(
+            lists: lists,
+            unassignedTasks: unassignedTasks
+        )
     }
 }
 
