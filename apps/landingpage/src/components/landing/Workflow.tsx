@@ -20,14 +20,16 @@ const lanes = [
 
 export function Workflow() {
   return (
-    <section id="workflow" className="py-24 md:py-32">
-      <div className="max-w-5xl mx-auto px-6">
+    <section id="workflow" className="py-28 md:py-36 bg-section-alt">
+      <div className="max-w-[1120px] mx-auto px-6">
         <ScrollReveal>
-          <p className="text-primary text-sm font-medium tracking-wide uppercase mb-3">Workflow</p>
-          <h2 className="font-display text-3xl md:text-4xl tracking-[-0.02em] leading-[1.15] text-foreground max-w-lg mb-6">
-            Three lanes. Zero noise.
-          </h2>
-          <p className="text-muted-foreground text-base leading-relaxed max-w-lg mb-16 text-pretty">
+          <div className="text-center max-w-2xl mx-auto mb-6">
+            <p className="text-primary text-sm font-semibold tracking-wide uppercase mb-4">Workflow</p>
+            <h2 className="text-foreground text-3xl md:text-5xl font-bold tracking-[-0.035em] leading-[1.1] text-balance">
+              Three lanes. Zero noise.
+            </h2>
+          </div>
+          <p className="text-muted-foreground text-base md:text-lg leading-relaxed max-w-lg mx-auto mb-20 text-center text-pretty">
             Organize work across three time horizons. Drag tasks forward as priorities shift. No sprints, no points, no ceremony.
           </p>
         </ScrollReveal>
@@ -35,9 +37,9 @@ export function Workflow() {
         <div className="grid md:grid-cols-3 gap-6">
           {lanes.map((lane, i) => (
             <ScrollReveal key={lane.name} delay={i * 0.1}>
-              <div className="relative rounded-xl border border-border/60 bg-background p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
-                <div className={`w-full h-1 ${lane.color} rounded-full mb-5 opacity-80`} />
-                <h3 className="text-foreground font-semibold text-base mb-2">{lane.name}</h3>
+              <div className="rounded-2xl border border-border/50 bg-card p-8 hover:shadow-lg transition-shadow duration-300">
+                <div className={`w-full h-1 ${lane.color} rounded-full mb-6 opacity-70`} />
+                <h3 className="text-foreground font-semibold text-lg mb-2">{lane.name}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed text-pretty">{lane.desc}</p>
               </div>
             </ScrollReveal>
@@ -45,14 +47,14 @@ export function Workflow() {
         </div>
 
         <ScrollReveal delay={0.3}>
-          <div className="mt-12 grid sm:grid-cols-3 gap-6 text-sm">
+          <div className="mt-16 grid sm:grid-cols-3 gap-8 text-sm">
             {[
               ["Lists & sublists", "Group tasks by project, context, or area of focus."],
               ["Checklists", "Break tasks into subtasks with checkboxes that track completion."],
               ["Markdown notes", "Attach rich notes to any task — formatted in real Markdown."],
             ].map(([title, desc]) => (
-              <div key={title} className="border-t border-border pt-4">
-                <p className="text-foreground font-medium mb-1">{title}</p>
+              <div key={title} className="border-t border-border/50 pt-5">
+                <p className="text-foreground font-semibold mb-1">{title}</p>
                 <p className="text-muted-foreground text-pretty leading-relaxed">{desc}</p>
               </div>
             ))}

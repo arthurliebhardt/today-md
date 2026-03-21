@@ -3,43 +3,43 @@ import appMockup from "@/assets/app-mockup.png";
 
 export function Hero() {
   return (
-    <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden">
-      <div className="max-w-5xl mx-auto px-6">
-        {/* Text */}
-        <div className="max-w-2xl">
+    <section className="relative pt-32 pb-20 md:pt-44 md:pb-28 overflow-hidden">
+      <div className="max-w-[1120px] mx-auto px-6">
+        {/* Centered text */}
+        <div className="text-center max-w-3xl mx-auto">
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-primary font-semibold tracking-tight text-lg mb-4"
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="text-primary font-semibold text-sm tracking-wide uppercase mb-5"
           >
-            today-md
+            For macOS
           </motion.p>
           <motion.h1
-            initial={{ opacity: 0, y: 16, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.7, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="font-display text-5xl md:text-[3.75rem] leading-[1.05] tracking-[-0.025em] text-foreground text-balance mb-5"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-foreground text-5xl md:text-7xl font-bold tracking-[-0.04em] leading-[1.05] text-balance mb-6"
           >
-            Plan the day<br />in Markdown.
+            Plan the day in Markdown.
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="text-muted-foreground text-lg leading-relaxed text-pretty max-w-lg mb-8"
+            transition={{ duration: 0.5, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="text-muted-foreground text-lg md:text-xl leading-relaxed max-w-xl mx-auto mb-10"
           >
             A native macOS task manager for turning notes into action — across Today, This Week, and Backlog.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-wrap gap-3"
+            transition={{ duration: 0.4, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-wrap justify-center gap-3"
           >
             <a
               href="#download"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_12px_rgba(229,138,43,0.2)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.15),0_6px_20px_rgba(229,138,43,0.25)] transition-all duration-200 active:scale-[0.97]"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-foreground text-background text-sm font-medium hover:bg-foreground/85 transition-colors duration-150 active:scale-[0.97]"
             >
               <AppleIcon />
               Download for macOS
@@ -48,7 +48,7 @@ export function Hero() {
               href="https://github.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-foreground text-sm font-medium hover:bg-muted/50 transition-all duration-200 active:scale-[0.97]"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border text-foreground text-sm font-medium hover:bg-muted/60 transition-colors duration-150 active:scale-[0.97]"
             >
               View on GitHub
             </a>
@@ -57,12 +57,12 @@ export function Hero() {
 
         {/* App mockup */}
         <motion.div
-          initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.9, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-16 md:mt-20"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-20 md:mt-24"
         >
-          <div className="rounded-xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] border border-border/60">
+          <div className="rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] border border-border/50">
             <img
               src={appMockup}
               alt="today-md app showing three planning lanes — Today, This Week, and Backlog — with task cards and a Markdown notes panel"

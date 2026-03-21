@@ -9,7 +9,7 @@ import { Footer } from "@/components/landing/Footer";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-paper-texture">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <Hero />
       <WhyDifferent />
