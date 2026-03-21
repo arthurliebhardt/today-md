@@ -1,46 +1,86 @@
 import { ScrollReveal } from "./ScrollReveal";
-import { Monitor, HardDrive, Feather } from "lucide-react";
 
-const points = [
+const features = [
   {
-    icon: Monitor,
-    title: "Native to macOS",
-    text: "Built for the Mac. No Electron wrapper, no browser tab. Feels like the rest of your desktop.",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
+      </svg>
+    ),
+    label: "Native\nmacOS app",
   },
   {
-    icon: HardDrive,
-    title: "Local-first, always",
-    text: "Tasks, subtasks, and notes live in a local SQLite store on your machine. No account required.",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/><path d="M10 4v16"/>
+      </svg>
+    ),
+    label: "Three-lane\nplanning",
   },
   {
-    icon: Feather,
-    title: "Calm by design",
-    text: "No notifications, no team feeds, no activity graphs. Just a quiet space to decide what matters today.",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+      </svg>
+    ),
+    label: "Markdown\nnotes",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+    ),
+    label: "Global\nsearch",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/>
+      </svg>
+    ),
+    label: "Local-first\nstorage",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+    label: "Checklists &\nsubtasks",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+    ),
+    label: "Backup &\nexport",
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+    ),
+    label: "Blazing fast\n& private",
   },
 ];
 
 export function WhyDifferent() {
   return (
-    <section id="features" className="py-28 md:py-36 border-t border-border/40">
-      <div className="max-w-[1120px] mx-auto px-6">
-        <ScrollReveal>
-          <div className="text-center max-w-2xl mx-auto mb-20">
-            <p className="text-primary text-sm font-semibold tracking-wide uppercase mb-4">Why it feels different</p>
-            <h2 className="text-foreground text-3xl md:text-5xl font-bold tracking-[-0.035em] leading-[1.1] text-balance">
-              Your work stays on your machine.
-            </h2>
-          </div>
-        </ScrollReveal>
-
-        <div className="grid md:grid-cols-3 gap-12 md:gap-16">
-          {points.map((p, i) => (
-            <ScrollReveal key={p.title} delay={i * 0.08}>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-5 mx-auto">
-                  <p.icon className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+    <section id="features" className="py-20 md:py-28">
+      <div className="max-w-[700px] mx-auto px-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-10">
+          {features.map((f, i) => (
+            <ScrollReveal key={i} delay={i * 0.04}>
+              <div className="flex flex-col items-center text-center">
+                <div className="text-foreground mb-3">
+                  {f.icon}
                 </div>
-                <h3 className="text-foreground font-semibold text-base mb-2">{p.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed text-pretty max-w-xs mx-auto">{p.text}</p>
+                <p className="text-foreground font-semibold text-sm leading-snug whitespace-pre-line">
+                  {f.label}
+                </p>
               </div>
             </ScrollReveal>
           ))}
