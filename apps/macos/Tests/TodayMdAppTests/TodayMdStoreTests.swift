@@ -16,6 +16,89 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertNil(task.list)
     }
 
+    func testNewUnassignedTasksAreInsertedAtTopOfBlock() throws {
+        let store = try makeStore()
+
+        let first = store.addUnassignedTask(title: "First", block: .today)
+        let second = store.addUnassignedTask(title: "Second", block: .today)
+
+        let tasks = store.allTasks.filter { $0.block == .today }
+        XCTAssertEqual(tasks.map(\.title), ["Second", "First"])
+        XCTAssertEqual(second.sortOrder, 0)
+        XCTAssertEqual(first.sortOrder, 1)
+    }
+
+    func testNewListTasksAreInsertedAtTopOfBlock() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let first = try XCTUnwrap(store.addTask(title: "First", block: .today, listID: list.id))
+        let second = try XCTUnwrap(store.addTask(title: "Second", block: .today, listID: list.id))
+
+        let tasks = list.items
+            .filter { $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Second", "First"])
+        XCTAssertEqual(second.sortOrder, 0)
+        XCTAssertEqual(first.sortOrder, 1)
+    }
+
+    func testNewerTaskWinsGlobalOrderingWhenSortOrdersMatch() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let older = try XCTUnwrap(store.addTask(title: "Older", block: .today, listID: list.id))
+        older.sortOrder = 0
+        older.creationDate = Date(timeIntervalSinceReferenceDate: 100)
+
+        let newer = store.addUnassignedTask(title: "Newer", block: .today)
+        newer.sortOrder = 0
+        newer.creationDate = Date(timeIntervalSinceReferenceDate: 200)
+
+        let tasks = store.allTasks.filter { $0.block == .today }
+        XCTAssertEqual(tasks.map(\.title), ["Newer", "Older"])
+    }
+
+    func testQuickAddTaskTrimsWhitespaceBeforeCreatingTodayTask() throws {
+        let store = try makeStore()
+
+        let task = try XCTUnwrap(store.quickAddTask(title: "  Inbox task  ", to: .today))
+
+        XCTAssertEqual(task.title, "Inbox task")
+        XCTAssertEqual(task.block, .today)
+        XCTAssertEqual(store.unassignedTasks.map(\.id), [task.id])
+    }
+
+    func testQuickAddTaskCanCreateTaskInSelectedList() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let task = try XCTUnwrap(store.quickAddTask(title: "  Inbox task  ", to: .today, listID: list.id))
+
+        XCTAssertEqual(task.title, "Inbox task")
+        XCTAssertEqual(task.block, .today)
+        XCTAssertEqual(task.list?.id, list.id)
+        XCTAssertEqual(list.items.map(\.id), [task.id])
+    }
+
+    func testQuickAddTaskRejectsBlankTitles() throws {
+        let store = try makeStore()
+
+        let task = store.quickAddTask(title: " \n\t ", to: .today)
+
+        XCTAssertNil(task)
+        XCTAssertTrue(store.allTasks.isEmpty)
+    }
+
+    func testQuickAddTaskRejectsUnknownListID() throws {
+        let store = try makeStore()
+
+        let task = store.quickAddTask(title: "Inbox task", to: .today, listID: UUID())
+
+        XCTAssertNil(task)
+        XCTAssertTrue(store.allTasks.isEmpty)
+    }
+
     func testAssignTaskMovesUnassignedTaskIntoSelectedList() throws {
         let store = try makeStore()
         let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
@@ -27,6 +110,78 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(list.items.count, 1)
         XCTAssertEqual(list.items.first?.id, task.id)
         XCTAssertEqual(task.list?.id, list.id)
+    }
+
+    func testAssignTaskPreservesPositionWhenMovingIntoList() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        _ = try XCTUnwrap(store.addTask(title: "Dest second", block: .today, listID: list.id))
+        let destinationTop = try XCTUnwrap(store.addTask(title: "Dest top", block: .today, listID: list.id))
+
+        let taskToMove = store.addUnassignedTask(title: "Move me", block: .today)
+        _ = store.addUnassignedTask(title: "Stay above", block: .today)
+
+        XCTAssertEqual(taskToMove.sortOrder, 1)
+        XCTAssertEqual(destinationTop.sortOrder, 0)
+
+        store.assignTask(id: taskToMove.id, toListID: list.id)
+
+        let tasks = list.items
+            .filter { $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Dest top", "Move me", "Dest second"])
+    }
+
+    func testAssignTaskPreservesPositionWhenMovingToUnassigned() throws {
+        let store = try makeStore()
+        let sourceList = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        _ = try XCTUnwrap(store.addTask(title: "Source second", block: .today, listID: sourceList.id))
+        let taskToMove = try XCTUnwrap(store.addTask(title: "Move me", block: .today, listID: sourceList.id))
+
+        _ = store.addUnassignedTask(title: "Unassigned second", block: .today)
+        let unassignedTop = store.addUnassignedTask(title: "Unassigned top", block: .today)
+
+        XCTAssertEqual(taskToMove.sortOrder, 0)
+        XCTAssertEqual(unassignedTop.sortOrder, 0)
+
+        store.assignTask(id: taskToMove.id, toListID: nil)
+
+        let tasks = store.allTasks
+            .filter { $0.list == nil && $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Move me", "Unassigned top", "Unassigned second"])
+    }
+
+    func testAssignTaskBetweenListsPreservesGlobalAllTasksPosition() throws {
+        let store = try makeStore()
+        let work = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let privateList = store.addList(name: "Private", icon: "person", color: .green)
+
+        let workBottom = try XCTUnwrap(store.addTask(title: "Work bottom", block: .today, listID: work.id))
+        let moveMe = try XCTUnwrap(store.addTask(title: "Move me", block: .today, listID: work.id))
+        let workTop = try XCTUnwrap(store.addTask(title: "Work top", block: .today, listID: work.id))
+
+        let privateSecond = try XCTUnwrap(store.addTask(title: "Private second", block: .today, listID: privateList.id))
+        let privateTop = try XCTUnwrap(store.addTask(title: "Private top", block: .today, listID: privateList.id))
+
+        workTop.creationDate = Date(timeIntervalSinceReferenceDate: 100)
+        privateTop.creationDate = Date(timeIntervalSinceReferenceDate: 50)
+        moveMe.creationDate = Date(timeIntervalSinceReferenceDate: 200)
+        privateSecond.creationDate = Date(timeIntervalSinceReferenceDate: 150)
+        workBottom.creationDate = Date(timeIntervalSinceReferenceDate: 300)
+
+        let beforeTasks = store.allTasks.filter { $0.block == .today }
+        let beforeIndex = try XCTUnwrap(beforeTasks.firstIndex(where: { $0.id == moveMe.id }))
+        XCTAssertEqual(beforeTasks.map(\.title), ["Work top", "Private top", "Move me", "Private second", "Work bottom"])
+
+        store.assignTask(id: moveMe.id, toListID: privateList.id)
+
+        let afterTasks = store.allTasks.filter { $0.block == .today }
+        let afterIndex = try XCTUnwrap(afterTasks.firstIndex(where: { $0.id == moveMe.id }))
+        XCTAssertEqual(afterTasks.map(\.title), ["Work top", "Private top", "Move me", "Work bottom", "Private second"])
+        XCTAssertEqual(afterIndex, beforeIndex)
     }
 
     func testMarkdownAutoContinuationCreatesChecklistFromInitialEmptyItem() {
