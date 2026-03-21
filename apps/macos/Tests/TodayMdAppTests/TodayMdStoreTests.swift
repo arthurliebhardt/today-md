@@ -611,6 +611,22 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(task.note?.content, "- [x] Ship\n- Bullet\n1. Test")
     }
 
+    func testStoreCanResetToShowcaseDataOnLaunch() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        _ = store.addUnassignedTask(title: "Existing task", block: .today)
+
+        let resetStore = TodayMdStore(
+            databaseURL: databaseURL,
+            shouldSeedShowcaseData: false,
+            shouldResetShowcaseData: true
+        )
+
+        XCTAssertFalse(resetStore.allTasks.contains(where: { $0.title == "Existing task" }))
+        XCTAssertEqual(Set(resetStore.lists.map(\.name)), ["Private", "Work"])
+        XCTAssertEqual(resetStore.allTasks.count, 8)
+    }
+
     private func makeStore() throws -> TodayMdStore {
         let databaseURL = try makeDatabaseURL()
         return TodayMdStore(
