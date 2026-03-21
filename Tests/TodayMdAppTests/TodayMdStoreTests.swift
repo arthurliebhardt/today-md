@@ -133,6 +133,57 @@ final class TodayMdStoreTests: XCTestCase {
         )
     }
 
+    func testMarkdownListFormattingIndentsBulletListItem() {
+        XCTAssertEqual(
+            MarkdownListFormatting.indentListLines(
+                in: "• Ship update",
+                selection: NSRange(location: ("• " as NSString).length, length: 0)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • Ship update",
+                selection: NSRange(location: ("    • " as NSString).length, length: 0)
+            )
+        )
+    }
+
+    func testMarkdownListFormattingCapsIndentAtThreeLevels() {
+        XCTAssertNil(
+            MarkdownListFormatting.indentListLines(
+                in: "            • Ship update",
+                selection: NSRange(location: ("            • " as NSString).length, length: 0)
+            )
+        )
+    }
+
+    func testMarkdownListFormattingIndentsSelectedListLinesOnly() {
+        XCTAssertEqual(
+            MarkdownListFormatting.indentListLines(
+                in: "• First\nPlain paragraph\n☐ Second",
+                selection: NSRange(location: 0, length: ("• First\nPlain paragraph\n☐ Second" as NSString).length)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • First\nPlain paragraph\n    ☐ Second",
+                selection: NSRange(
+                    location: 0,
+                    length: ("    • First\nPlain paragraph\n    ☐ Second" as NSString).length
+                )
+            )
+        )
+    }
+
+    func testMarkdownListFormattingOutdentsListItem() {
+        XCTAssertEqual(
+            MarkdownListFormatting.outdentListLines(
+                in: "        • Ship update",
+                selection: NSRange(location: ("        • " as NSString).length, length: 0)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • Ship update",
+                selection: NSRange(location: ("    • " as NSString).length, length: 0)
+            )
+        )
+    }
+
     func testMarkdownInlineDisplayRendersChecklistAndBullets() {
         XCTAssertEqual(
             MarkdownInlineDisplay.display(from: "- [ ] Ship update\n- Prep release\n* Follow up"),
