@@ -18,6 +18,14 @@ export function Hero() {
             Now in <span className="px-2 rounded-md inline-block bg-[#f8b262]">Markdown</span>
           </motion.h1>
 
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="text-muted-foreground text-lg md:text-xl leading-relaxed max-w-xl mx-auto text-pretty mb-8">
+            A native macOS task manager for turning notes into action — across Today, This Week, and Backlog.
+          </motion.p>
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
