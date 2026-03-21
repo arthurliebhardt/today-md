@@ -1,0 +1,20 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: liebhardt-io/shared-workflows/.github/workflows/docker-deploy.yml@main
+    with:
+      image_name: liebhardt-io/today-md-landingpage
+      app_name: today-md-landingpage
+      domain: todaymd.app
+    secrets:
+      KUBE_CONFIG: ${{ secrets.KUBECONFIG_BASE64 }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    permissions:
+      contents: read
+      packages: write
