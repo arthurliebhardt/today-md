@@ -19,11 +19,13 @@ export function Footer() {
           </div>
         </ScrollReveal>
 
-        {/* Large watermark text */}
-        <div className="relative overflow-hidden">
-          <p className="text-center text-[clamp(4rem,15vw,12rem)] font-black tracking-[-0.05em] leading-none text-foreground/[0.04] select-none">
-            today-md
-          </p>
+        {/* Logo watermark */}
+        <div className="flex justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" className="w-16 h-14 opacity-[0.08]">
+            <rect x="14" y="8" width="104" height="104" rx="31" fill="currentColor"/>
+            <rect x="35" y="29" width="62" height="62" rx="19" fill="currentColor"/>
+            <path d="M47 61 L61 75 L86 48" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
       </div>
     </footer>
