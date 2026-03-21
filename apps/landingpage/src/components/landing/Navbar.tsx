@@ -21,10 +21,7 @@ export function Navbar() {
           <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">v1.0</span>
         </div>
         <div className="flex items-center gap-3">
-          <a href="#features" className="hidden sm:flex items-center gap-1.5 text-[13px] text-muted-foreground font-medium hover:text-foreground transition-colors duration-150">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            FAQs
-          </a>
+          
           <button
             disabled
             className="text-[13px] font-medium px-4 py-2 rounded-lg bg-foreground/40 text-background cursor-not-allowed inline-flex items-center gap-2"
