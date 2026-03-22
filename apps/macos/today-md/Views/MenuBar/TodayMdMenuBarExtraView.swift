@@ -2,10 +2,42 @@ import AppKit
 import SwiftUI
 
 private enum MenuBarPalette {
-    static let paper = Color(red: 240 / 255, green: 237 / 255, blue: 232 / 255)
-    static let ink = Color(red: 28 / 255, green: 25 / 255, blue: 23 / 255)
     static let accent = Color(red: 217 / 255, green: 119 / 255, blue: 6 / 255)
     static let accentSoft = Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255)
+    static let actionFill = Color(red: 28 / 255, green: 25 / 255, blue: 23 / 255)
+
+    static func paperTop(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .windowBackgroundColor)
+    }
+
+    static func paperBottom(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: colorScheme == .dark ? .windowBackgroundColor : .underPageBackgroundColor)
+    }
+
+    static func surface(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.92 : 0.80)
+    }
+
+    static func elevatedSurface(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.88 : 0.72)
+    }
+
+    static func cardSurface(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.84 : 0.62)
+    }
+
+    static func ink(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: .labelColor)
+    }
+
+    static func secondaryInk(for colorScheme: ColorScheme) -> Color {
+        Color(nsColor: .secondaryLabelColor)
+    }
+
+    static func border(for colorScheme: ColorScheme, emphasis: CGFloat = 1) -> Color {
+        let baseOpacity = colorScheme == .dark ? 0.28 : 0.12
+        return Color(nsColor: .separatorColor).opacity(baseOpacity * emphasis)
+    }
 }
 
 enum TodayMdMenuBarIcon {
@@ -14,19 +46,24 @@ enum TodayMdMenuBarIcon {
         let image = NSImage(size: size)
         image.lockFocus()
 
-        let boxRect = NSRect(x: 1.5, y: 1.5, width: 15, height: 15)
-        let boxPath = NSBezierPath(roundedRect: boxRect, xRadius: 4.8, yRadius: 4.8)
-        NSColor(calibratedRed: 217 / 255, green: 119 / 255, blue: 6 / 255, alpha: 1).setFill()
-        boxPath.fill()
+        let outerRect = NSRect(x: 0.8, y: 0.8, width: 16.4, height: 16.4)
+        let outerPath = NSBezierPath(roundedRect: outerRect, xRadius: 5.6, yRadius: 5.6)
+        NSColor(calibratedRed: 90 / 255, green: 70 / 255, blue: 44 / 255, alpha: 1).setFill()
+        outerPath.fill()
+
+        let innerRect = NSRect(x: 4.4, y: 4.4, width: 9.2, height: 9.2)
+        let innerPath = NSBezierPath(roundedRect: innerRect, xRadius: 3.0, yRadius: 3.0)
+        NSColor(calibratedRed: 238 / 255, green: 139 / 255, blue: 6 / 255, alpha: 1).setFill()
+        innerPath.fill()
 
         let checkPath = NSBezierPath()
-        checkPath.lineWidth = 2.1
+        checkPath.lineWidth = 1.6
         checkPath.lineCapStyle = .round
         checkPath.lineJoinStyle = .round
-        checkPath.move(to: NSPoint(x: 5.0, y: 8.8))
-        checkPath.line(to: NSPoint(x: 7.6, y: 5.8))
-        checkPath.line(to: NSPoint(x: 13.1, y: 12.5))
-        NSColor.white.setStroke()
+        checkPath.move(to: NSPoint(x: 6.3, y: 9.0))
+        checkPath.line(to: NSPoint(x: 8.2, y: 7.0))
+        checkPath.line(to: NSPoint(x: 11.9, y: 11.0))
+        NSColor(calibratedRed: 74 / 255, green: 59 / 255, blue: 40 / 255, alpha: 1).setStroke()
         checkPath.stroke()
 
         image.unlockFocus()
@@ -35,26 +72,41 @@ enum TodayMdMenuBarIcon {
     }()
 }
 
+private struct TodayMdCheckPath: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.27, y: rect.minY + rect.height * 0.51))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.44, y: rect.minY + rect.height * 0.68))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.76, y: rect.minY + rect.height * 0.35))
+        return path
+    }
+}
+
 private struct TodayMdCheckboxMark: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(MenuBarPalette.accent)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(red: 90 / 255, green: 70 / 255, blue: 44 / 255))
 
-            Path { path in
-                path.move(to: CGPoint(x: 9, y: 16))
-                path.addLine(to: CGPoint(x: 14, y: 21))
-                path.addLine(to: CGPoint(x: 24, y: 9))
-            }
-            .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color(red: 238 / 255, green: 139 / 255, blue: 6 / 255))
+                .padding(7)
+
+            TodayMdCheckPath()
+                .stroke(
+                    Color(red: 74 / 255, green: 59 / 255, blue: 40 / 255),
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                )
+                .padding(8)
         }
-        .frame(width: 32, height: 32)
+        .frame(width: 46, height: 46)
     }
 }
 
 struct TodayMdMenuBarExtraView: View {
     @Environment(TodayMdStore.self) private var store
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var syncService: TodayMdSyncService
     @FocusState private var isQuickAddFieldFocused: Bool
@@ -137,6 +189,38 @@ struct TodayMdMenuBarExtraView: View {
         }
     }
 
+    private var paperTop: Color {
+        MenuBarPalette.paperTop(for: colorScheme)
+    }
+
+    private var paperBottom: Color {
+        MenuBarPalette.paperBottom(for: colorScheme)
+    }
+
+    private var surface: Color {
+        MenuBarPalette.surface(for: colorScheme)
+    }
+
+    private var elevatedSurface: Color {
+        MenuBarPalette.elevatedSurface(for: colorScheme)
+    }
+
+    private var taskSurface: Color {
+        MenuBarPalette.cardSurface(for: colorScheme)
+    }
+
+    private var ink: Color {
+        MenuBarPalette.ink(for: colorScheme)
+    }
+
+    private var secondaryInk: Color {
+        MenuBarPalette.secondaryInk(for: colorScheme)
+    }
+
+    private var border: Color {
+        MenuBarPalette.border(for: colorScheme)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
@@ -148,9 +232,9 @@ struct TodayMdMenuBarExtraView: View {
         .background(
             LinearGradient(
                 colors: [
-                    MenuBarPalette.paper,
-                    MenuBarPalette.paper.opacity(0.96),
-                    Color.white.opacity(0.94)
+                    paperTop,
+                    paperTop.opacity(0.96),
+                    paperBottom
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -181,16 +265,16 @@ struct TodayMdMenuBarExtraView: View {
 
                     TodayMdCheckboxMark()
                 }
-                .frame(width: 62, height: 62)
+                .frame(width: 72, height: 72)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("today-md")
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MenuBarPalette.ink)
+                        .foregroundStyle(ink)
 
                     Text("Today’s focus from the menu bar.")
                         .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryInk)
 
                     HStack(spacing: 8) {
                         Circle()
@@ -199,14 +283,14 @@ struct TodayMdMenuBarExtraView: View {
 
                         Text(syncService.statusLabel)
                             .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(MenuBarPalette.ink)
+                            .foregroundStyle(ink)
                     }
                 }
             }
 
             Text(syncSummary)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryInk)
         }
     }
 
@@ -217,13 +301,13 @@ struct TodayMdMenuBarExtraView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Today")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MenuBarPalette.ink)
+                    .foregroundStyle(ink)
 
                 Spacer()
 
                 Text(todayTasks.count == 1 ? "1 task" : "\(todayTasks.count) tasks")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryInk)
             }
 
             Group {
@@ -238,7 +322,7 @@ struct TodayMdMenuBarExtraView: View {
                         if hiddenTodayTaskCount > 0 {
                             Text("+\(hiddenTodayTaskCount) more in the workspace")
                                 .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(secondaryInk)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 4)
                         }
@@ -249,11 +333,11 @@ struct TodayMdMenuBarExtraView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.72))
+                    .fill(elevatedSurface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(MenuBarPalette.accent.opacity(0.12), lineWidth: 1)
+                    .stroke(border, lineWidth: 1)
             )
         }
     }
@@ -278,7 +362,7 @@ struct TodayMdMenuBarExtraView: View {
                         .frame(width: 28, height: 28)
                         .background(
                             Circle()
-                                .fill(trimmedDraftTitle.isEmpty ? MenuBarPalette.ink.opacity(0.25) : MenuBarPalette.ink)
+                                .fill(trimmedDraftTitle.isEmpty ? MenuBarPalette.actionFill.opacity(0.25) : MenuBarPalette.actionFill)
                         )
                 }
                 .buttonStyle(.plain)
@@ -341,11 +425,11 @@ struct TodayMdMenuBarExtraView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.8))
+                .fill(surface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(MenuBarPalette.accent.opacity(0.10), lineWidth: 1)
+                .stroke(border, lineWidth: 1)
         )
     }
 
@@ -353,11 +437,11 @@ struct TodayMdMenuBarExtraView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No tasks scheduled for today.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(MenuBarPalette.ink)
+                .foregroundStyle(ink)
 
             Text("Add something above or open the workspace to pull work forward from This Week or Backlog.")
                 .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -387,7 +471,7 @@ struct TodayMdMenuBarExtraView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(task.title)
                         .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(MenuBarPalette.ink)
+                        .foregroundStyle(ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
@@ -414,11 +498,11 @@ struct TodayMdMenuBarExtraView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.62))
+                .fill(taskSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(border, lineWidth: 1)
         )
     }
 
@@ -439,7 +523,7 @@ struct TodayMdMenuBarExtraView: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(MenuBarPalette.ink)
+                    .fill(MenuBarPalette.actionFill)
             )
         }
         .buttonStyle(.plain)

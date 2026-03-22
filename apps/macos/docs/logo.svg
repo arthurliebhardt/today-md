@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="480" height="120">
-  <!-- Background - Anthropic beige -->
-  <rect x="0" y="0" width="480" height="120" rx="16" ry="16" fill="#F0EDE8"/>
-
-  <!-- "today_md" in Anthropic orange -->
-  <text x="240" y="68" font-family="'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace" font-size="48" font-weight="700" fill="#D97706" text-anchor="middle">today_md</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" width="132" height="120">
+  <rect x="14" y="8" width="104" height="104" rx="31" fill="#5A462C"/>
+  <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06"/>
+  <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
