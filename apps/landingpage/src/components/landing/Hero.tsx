@@ -13,9 +13,9 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="text-foreground text-[clamp(2.5rem,7vw,5rem)] font-black tracking-[-0.04em] leading-[1.0] text-balance mb-8">
             
-            Focus on <span className="px-2 rounded-md inline-block bg-[#f8b262]">today.</span>{" "}
+            Plan your <span className="px-2 rounded-md inline-block bg-[#f8b262]">day,</span>{" "}
             <br className="hidden sm:block" />
-            Not your backlog
+            not your tooling
           </motion.h1>
 
           <motion.p
