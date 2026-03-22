@@ -13,9 +13,9 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="text-foreground text-[clamp(2.5rem,7vw,5rem)] font-black tracking-[-0.04em] leading-[1.0] text-balance mb-8">
             
-            Plan the day.{" "}
+            Focus on today.{" "}
             <br className="hidden sm:block" />
-            Now in <span className="px-2 rounded-md inline-block bg-[#f8b262]">Markdown</span>
+            Not your <span className="px-2 rounded-md inline-block bg-[#f8b262]">backlog</span>
           </motion.h1>
 
           <motion.p

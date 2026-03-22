@@ -26,11 +26,11 @@ export function Workflow() {
           <div className="text-center max-w-2xl mx-auto mb-6">
             <p className="text-primary text-sm font-semibold tracking-wide uppercase mb-4">Workflow</p>
             <h2 className="text-foreground text-3xl md:text-5xl font-bold tracking-[-0.035em] leading-[1.1] text-balance">
-              Focus on today. Not your backlog.
+              Three lanes. Zero noise.
             </h2>
           </div>
           <p className="text-muted-foreground text-base md:text-lg leading-relaxed max-w-lg mx-auto mb-20 text-center text-pretty">
-            Three lanes keep your attention where it matters — what's in front of you right now. Everything else stays out of the way until you need it.
+            Organize work across three time horizons. Drag tasks forward as priorities shift. No sprints, no points, no ceremony.
           </p>
         </ScrollReveal>
 
