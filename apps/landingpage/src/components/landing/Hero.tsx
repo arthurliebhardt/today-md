@@ -23,7 +23,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="text-muted-foreground text-lg md:text-xl leading-relaxed max-w-xl mx-auto text-pretty mb-8">
-            A native macOS task manager for turning notes into action — across Today, This Week, and Backlog.
+            A native macOS Kanban planner with three time-based lanes. Markdown notes, keyboard shortcuts, zero cloud dependencies. Your tasks stay on your machine.
           </motion.p>
 
           <motion.div
