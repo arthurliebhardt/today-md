@@ -447,16 +447,18 @@ struct TodayMdMenuBarExtraView: View {
     }
 
     private func todayTaskButton(_ task: TaskItem) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let listTint = task.list?.listColor.color ?? .secondary
+
+        return HStack(alignment: .top, spacing: 12) {
             Button {
                 markTaskDone(task.id)
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(MenuBarPalette.accent.opacity(0.08))
+                        .fill(listTint.opacity(0.10))
 
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(MenuBarPalette.accent, lineWidth: 1.8)
+                        .stroke(listTint, lineWidth: 1.8)
                         .frame(width: 16, height: 16)
                 }
                 .frame(width: 28, height: 28)
@@ -478,12 +480,12 @@ struct TodayMdMenuBarExtraView: View {
                     if let list = task.list {
                         Text(list.name.uppercased())
                             .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(MenuBarPalette.accent.opacity(0.9))
+                            .foregroundStyle(listTint)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(
                                 Capsule()
-                                    .fill(MenuBarPalette.accent.opacity(0.10))
+                                    .fill(listTint.opacity(0.12))
                             )
                     }
                 }
