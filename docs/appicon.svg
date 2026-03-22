@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Background - Anthropic beige -->
-  <rect width="1024" height="1024" fill="#F0EDE8"/>
-
-  <!-- "t_md" in Anthropic orange -->
-  <text x="512" y="540" font-family="'SF Mono', 'Menlo', monospace" font-size="260" font-weight="700" fill="#D97706" text-anchor="middle" dominant-baseline="middle">t_md</text>
+  <rect x="128" y="128" width="768" height="768" rx="230" fill="#5A462C"/>
+  <rect x="312" y="312" width="400" height="400" rx="126" fill="#EE8B06"/>
+  <path d="M396 516 L482 602 L632 432" fill="none" stroke="#4A3B28" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
