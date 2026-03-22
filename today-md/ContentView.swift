@@ -40,7 +40,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .interface:
-            return "Global notch quick capture"
+            return "Appearance and quick capture"
         case .dataBackup:
             return "Import, export, and archive"
         case .sync:
@@ -53,7 +53,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .interface:
-            return "rectangle.topthird.inset.filled"
+            return "paintbrush.pointed.fill"
         case .dataBackup:
             return "internaldrive"
         case .sync:
@@ -211,6 +211,7 @@ struct ContentView: View {
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
+    @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
@@ -223,7 +224,7 @@ struct ContentView: View {
     @State private var windowIsNarrow = false
     @State private var showOverlaySidebar = false
     @State private var showingSettingsSheet = false
-    @State private var selectedSettingsSection: SettingsSection = .dataBackup
+    @State private var selectedSettingsSection: SettingsSection = .interface
     @State private var transferAlert: TransferAlert?
 
     private var selectedList: TaskList? {
@@ -242,6 +243,17 @@ struct ContentView: View {
 
     private var isListBoardSelectionActive: Bool {
         !store.hasActiveSearch && selectedList != nil
+    }
+
+    private var appearanceMode: AppAppearanceMode {
+        AppAppearanceMode(rawValue: appearanceModeRawValue) ?? .system
+    }
+
+    private var appearanceModeSelection: Binding<AppAppearanceMode> {
+        Binding(
+            get: { appearanceMode },
+            set: { appearanceModeRawValue = $0.rawValue }
+        )
     }
 
     private func listTasks(for block: TimeBlock) -> [TaskItem] {
@@ -688,8 +700,55 @@ struct ContentView: View {
             switch selectedSettingsSection {
             case .interface:
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Global notch quick capture")
+                    Text("Appearance and quick capture")
                         .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .top, spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.indigo.opacity(0.14))
+
+                                Image(systemName: appearanceMode.systemImage)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.indigo)
+                            }
+                            .frame(width: 44, height: 44)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("App appearance")
+                                    .font(.headline)
+
+                                Text("Choose whether today-md follows macOS or stays in a fixed light or dark theme.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 12)
+                        }
+
+                        Picker("Appearance", selection: appearanceModeSelection) {
+                            ForEach(AppAppearanceMode.allCases) { mode in
+                                Text(mode.title)
+                                    .tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(appearanceMode.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.indigo.opacity(0.14), lineWidth: 1)
+                    )
 
                     settingsToggleCard(
                         title: "Top Screen Notch",
@@ -1375,6 +1434,7 @@ struct ContentView: View {
                     .help("Open the keyboard shortcuts cheatsheet")
 
                     Button {
+                        selectedSettingsSection = .interface
                         showingSettingsSheet = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")

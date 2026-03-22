@@ -5,6 +5,62 @@ enum TodayMdSceneID {
     static let mainWindow = "today-md-main-window"
 }
 
+enum TodayMdPreferenceKey {
+    static let appearanceMode = "TodayMdAppearanceMode"
+}
+
+enum AppAppearanceMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return "System"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .system:
+            return "Follow the current macOS appearance automatically."
+        case .light:
+            return "Keep the workspace in light mode."
+        case .dark:
+            return "Keep the workspace in dark mode."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .system:
+            return "circle.lefthalf.filled"
+        case .light:
+            return "sun.max.fill"
+        case .dark:
+            return "moon.fill"
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
 struct KeyboardShortcutMonitor: NSViewRepresentable {
     let handler: (NSEvent) -> Bool
 
@@ -283,6 +339,7 @@ struct TodayMdApp: App {
     }
 
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
@@ -312,6 +369,10 @@ struct TodayMdApp: App {
         )
     }
 
+    private var appearanceMode: AppAppearanceMode {
+        AppAppearanceMode(rawValue: appearanceModeRawValue) ?? .system
+    }
+
     var body: some Scene {
         Window("today-md", id: TodayMdSceneID.mainWindow) {
             ContentView()
@@ -320,6 +381,7 @@ struct TodayMdApp: App {
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
                 .background(MainWindowConfigurator())
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
@@ -372,6 +434,7 @@ struct TodayMdApp: App {
                 .environment(store)
                 .environmentObject(syncService)
                 .environmentObject(presentationState)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         } label: {
             Image(nsImage: TodayMdMenuBarIcon.image)
                 .accessibilityLabel("today-md")
