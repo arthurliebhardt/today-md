@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import appMockup from "@/assets/app-mockup.png";
 
 export function Hero() {
   return (
@@ -56,12 +55,14 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}>
           
           <div className="rounded-3xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.06)]">
-            <img
-              src={appMockup}
-              alt="today-md app showing three planning lanes — Today, This Week, and Backlog — with task cards and a Markdown notes panel"
+            <video
+              src="/videos/hero-demo.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
               className="w-full h-auto block"
-              loading="eager" />
-            
+            />
           </div>
         </motion.div>
 
