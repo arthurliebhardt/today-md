@@ -34,6 +34,8 @@
 		AA000028 /* InlineMarkdownTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028 /* InlineMarkdownTextEditor.swift */; };
 		AA000034 /* TodayMdMenuBarExtraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035 /* TodayMdMenuBarExtraView.swift */; };
 		AA000035 /* GlobalDynamicIslandController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000036 /* GlobalDynamicIslandController.swift */; };
+		AA000036 /* TodayMdCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000037 /* TodayMdCalendarService.swift */; };
+		AA000037 /* TaskCalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000038 /* TaskCalendarPlannerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +69,8 @@
 		AB000028 /* InlineMarkdownTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownTextEditor.swift; sourceTree = "<group>"; };
 		AB000035 /* TodayMdMenuBarExtraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdMenuBarExtraView.swift; sourceTree = "<group>"; };
 		AB000036 /* GlobalDynamicIslandController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalDynamicIslandController.swift; sourceTree = "<group>"; };
+		AB000037 /* TodayMdCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdCalendarService.swift; sourceTree = "<group>"; };
+		AB000038 /* TaskCalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCalendarPlannerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +166,7 @@
 				AB000011 /* TaskDetailView.swift */,
 				AB000012 /* SubTaskListView.swift */,
 				AB000013 /* MarkdownEditorView.swift */,
+				AB000038 /* TaskCalendarPlannerView.swift */,
 				AB000028 /* InlineMarkdownTextEditor.swift */,
 				AB000020 /* ChecklistSection.swift */,
 			);
@@ -175,6 +180,7 @@
 				AB000025 /* SearchPresentation.swift */,
 				AB000021 /* TodayMdTransferService.swift */,
 				AB000026 /* TodayMdSyncService.swift */,
+				AB000037 /* TodayMdCalendarService.swift */,
 				AB000023 /* TodayMdDatabase.swift */,
 				AB000024 /* libsqlite3.tbd */,
 			);
@@ -283,6 +289,8 @@
 				AA000028 /* InlineMarkdownTextEditor.swift in Sources */,
 				AA000034 /* TodayMdMenuBarExtraView.swift in Sources */,
 				AA000035 /* GlobalDynamicIslandController.swift in Sources */,
+				AA000036 /* TodayMdCalendarService.swift in Sources */,
+				AA000037 /* TaskCalendarPlannerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

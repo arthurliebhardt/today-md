@@ -164,6 +164,15 @@ struct TaskItemTransfer: Codable, Transferable {
     }
 }
 
+struct CalendarBlockTransfer: Codable, Transferable {
+    let eventIdentifier: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .calendarBlock)
+    }
+}
+
 extension UTType {
     static let taskItem = UTType(exportedAs: "com.today-md.app.taskitem")
+    static let calendarBlock = UTType(exportedAs: "com.today-md.app.calendarblock")
 }

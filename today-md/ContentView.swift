@@ -7,6 +7,22 @@ enum SidebarSelection: Hashable {
     case list(UUID)
 }
 
+private enum AuxiliaryPanelMode: String, CaseIterable, Identifiable {
+    case details
+    case week
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .details:
+            return "Details"
+        case .week:
+            return "Week"
+        }
+    }
+}
+
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
@@ -18,6 +34,7 @@ private struct MarkdownArchiveSnapshot: Equatable {
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
+    case calendar
     case dataBackup
     case sync
     case shortcuts
@@ -28,6 +45,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Interface"
+        case .calendar:
+            return "Calendar"
         case .dataBackup:
             return "Data"
         case .sync:
@@ -41,6 +60,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Appearance and quick capture"
+        case .calendar:
+            return "Availability and time blocking"
         case .dataBackup:
             return "Import, export, and archive"
         case .sync:
@@ -54,6 +75,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "paintbrush.pointed.fill"
+        case .calendar:
+            return "calendar.badge.clock"
         case .dataBackup:
             return "internaldrive"
         case .sync:
@@ -67,6 +90,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return .indigo
+        case .calendar:
+            return .orange
         case .dataBackup:
             return .orange
         case .sync:
@@ -207,11 +232,14 @@ struct ShortcutSequenceView: View {
 
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
+    @EnvironmentObject private var calendarService: TodayMdCalendarService
     @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
     @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
+    @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
+    @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
@@ -220,6 +248,7 @@ struct ContentView: View {
     @State private var focusedBlock: TimeBlock?
     @State private var expandedDoneBlocks: Set<TimeBlock> = []
     @State private var allTasksDoneSectionExpanded = false
+    @State private var auxiliaryPanelMode: AuxiliaryPanelMode = .details
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowIsNarrow = false
     @State private var showOverlaySidebar = false
@@ -480,6 +509,14 @@ struct ContentView: View {
         syncService.disableSync()
     }
 
+    private func requestCalendarAccessFromSettings() {
+        calendarService.requestFullAccess()
+    }
+
+    private func refreshCalendarFromSettings() {
+        calendarService.refreshIfNeeded()
+    }
+
     private func presentTransferError(title: String, error: Error) {
         transferAlert = TransferAlert(
             title: title,
@@ -533,6 +570,62 @@ struct ContentView: View {
             get: { syncService.conflict != nil },
             set: { _ in }
         )
+    }
+
+    private var calendarPreferredIdentifier: String? {
+        calendarDefaultIdentifier.isEmpty ? nil : calendarDefaultIdentifier
+    }
+
+    private var calendarDefaultDurationSelection: Binding<Int> {
+        Binding(
+            get: {
+                [30, 60, 90, 120].contains(calendarDefaultDurationMinutes) ? calendarDefaultDurationMinutes : 60
+            },
+            set: { calendarDefaultDurationMinutes = $0 }
+        )
+    }
+
+    private var calendarStatusColor: Color {
+        switch calendarService.authorizationStatus {
+        case .notDetermined:
+            return .secondary
+        case .denied, .restricted:
+            return .red
+        case .writeOnly:
+            return .orange
+        case .fullAccess:
+            return .green
+        }
+    }
+
+    private var calendarDestinationSummary: String {
+        if let selectedCalendar = calendarService.selectedDestinationCalendar(preferredIdentifier: calendarPreferredIdentifier) {
+            return selectedCalendar.displayTitle
+        }
+
+        return "No writable calendar found"
+    }
+
+    private func calendarSuggestedSlotText(durationMinutes: Int) -> String {
+        guard let interval = calendarService.suggestedBlockInterval(durationMinutes: durationMinutes) else {
+            return "No open slot found in the next two weeks."
+        }
+
+        let formatter = DateIntervalFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: interval.start, to: interval.end)
+    }
+
+    private func calendarEventTimeText(_ event: TodayMdCalendarEventSummary) -> String {
+        if event.isAllDay {
+            return "All day"
+        }
+
+        let intervalFormatter = DateIntervalFormatter()
+        intervalFormatter.dateStyle = Calendar.current.isDate(event.startDate, inSameDayAs: Date()) ? .none : .medium
+        intervalFormatter.timeStyle = .short
+        return intervalFormatter.string(from: event.startDate, to: event.endDate)
     }
 
     private var syncStatusColor: Color {
@@ -776,6 +869,155 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(Color.indigo.opacity(0.12), lineWidth: 1)
                     )
+                }
+
+            case .calendar:
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Calendar blocking")
+                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(calendarStatusColor)
+                                .frame(width: 10, height: 10)
+
+                            Text("Status: \(calendarService.authorizationStatus.label)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text(calendarService.authorizationStatus.guidance)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("Calendars shown here come from macOS Calendar. Outlook / Exchange calendars appear here when the account is added to Calendar on this Mac.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let lastError = calendarService.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.orange.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.orange.opacity(0.14), lineWidth: 1)
+                    )
+
+                    VStack(spacing: 12) {
+                        settingsActionCard(
+                            title: calendarService.authorizationStatus.canReadEvents ? "Refresh Calendar" : "Connect Calendar",
+                            subtitle: calendarService.authorizationStatus.canReadEvents
+                                ? "Refresh available calendars and upcoming events from macOS Calendar."
+                                : "Grant full access so today-md can read availability and create focus blocks.",
+                            systemImage: calendarService.authorizationStatus.canReadEvents ? "arrow.clockwise" : "calendar.badge.plus",
+                            tint: .orange,
+                            action: calendarService.authorizationStatus.canReadEvents ? refreshCalendarFromSettings : requestCalendarAccessFromSettings
+                        )
+                    }
+
+                    if calendarService.authorizationStatus.canReadEvents {
+                        VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Destination calendar")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Picker("Destination calendar", selection: $calendarDefaultIdentifier) {
+                                    Text("Auto (prefer Outlook / Exchange)")
+                                        .tag("")
+
+                                    ForEach(calendarService.writableCalendars) { calendar in
+                                        Text(calendar.displayTitle)
+                                            .tag(calendar.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+
+                                Text("Current target: \(calendarDestinationSummary)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Default block length")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Picker("Default block length", selection: calendarDefaultDurationSelection) {
+                                    Text("30m").tag(30)
+                                    Text("60m").tag(60)
+                                    Text("90m").tag(90)
+                                    Text("120m").tag(120)
+                                }
+                                .pickerStyle(.segmented)
+
+                                Text("Next open \(calendarDefaultDurationSelection.wrappedValue)m slot: \(calendarSuggestedSlotText(durationMinutes: calendarDefaultDurationSelection.wrappedValue))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+                        )
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Upcoming events")
+                                .font(.headline)
+
+                            if calendarService.upcomingEvents.isEmpty {
+                                Text("No events found in the next seven days.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(Array(calendarService.upcomingEvents.prefix(6)), id: \.id) { event in
+                                    HStack(alignment: .top, spacing: 12) {
+                                        Image(systemName: event.isAllDay ? "sun.max" : "calendar")
+                                            .foregroundStyle(.orange)
+                                            .frame(width: 18)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(event.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(calendarEventTimeText(event))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Text(event.calendarTitle)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                        .padding(18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                        )
+                    }
                 }
 
             case .dataBackup:
@@ -1388,14 +1630,31 @@ struct ContentView: View {
 
     @ViewBuilder
     private var inlineDetailColumn: some View {
-        if hasDetailContent {
-            detailPanel
-        } else {
-            ContentUnavailableView(
-                "Select a Task",
-                systemImage: "checkmark.circle",
-                description: Text("Click a task to view details.")
-            )
+        VStack(spacing: 0) {
+            Picker("Workspace", selection: $auxiliaryPanelMode) {
+                ForEach(AuxiliaryPanelMode.allCases) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            if auxiliaryPanelMode == .week {
+                WeekCalendarPanelView()
+            } else if hasDetailContent {
+                detailPanel
+            } else {
+                ContentUnavailableView(
+                    "Select a Task",
+                    systemImage: "checkmark.circle",
+                    description: Text("Click a task to view details.")
+                )
+            }
         }
     }
 

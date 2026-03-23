@@ -17,10 +17,10 @@ struct TaskDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     headerSection(searchQuery: searchQuery)
                     Divider()
-                    ChecklistSection(task: task)
-                    Divider()
                     MarkdownEditorView(task: task)
                         .frame(maxHeight: .infinity, alignment: .top)
+                    Divider()
+                    ChecklistSection(task: task)
                 }
                 .frame(
                     maxWidth: .infinity,
