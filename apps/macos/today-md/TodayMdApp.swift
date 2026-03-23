@@ -7,6 +7,8 @@ enum TodayMdSceneID {
 
 enum TodayMdPreferenceKey {
     static let appearanceMode = "TodayMdAppearanceMode"
+    static let calendarDefaultDurationMinutes = "TodayMdCalendarDefaultDurationMinutes"
+    static let calendarDefaultIdentifier = "TodayMdCalendarDefaultIdentifier"
 }
 
 enum AppAppearanceMode: String, CaseIterable, Identifiable {
@@ -343,6 +345,7 @@ struct TodayMdApp: App {
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
+    @StateObject private var calendarService = TodayMdCalendarService()
     @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
     @State private var store: TodayMdStore
     private let shouldRunSyncLifecycle: Bool
@@ -378,6 +381,7 @@ struct TodayMdApp: App {
             ContentView()
                 .environment(store)
                 .environmentObject(syncService)
+                .environmentObject(calendarService)
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
@@ -386,6 +390,7 @@ struct TodayMdApp: App {
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
                     dynamicIslandController.attach(store: store)
+                    calendarService.refreshIfNeeded()
 
                     guard shouldRunSyncLifecycle else { return }
                     syncService.attach(store: store)
@@ -394,8 +399,10 @@ struct TodayMdApp: App {
         }
         .defaultSize(width: 1500, height: 920)
         .onChange(of: scenePhase) { _, newPhase in
-            guard shouldRunSyncLifecycle else { return }
             guard newPhase == .active else { return }
+            calendarService.refreshIfNeeded()
+
+            guard shouldRunSyncLifecycle else { return }
             syncService.handleAppDidBecomeActive()
         }
         .commands {
