@@ -34,10 +34,50 @@ private struct TaskCalendarTimelineDeleteTarget: Equatable {
     let rect: CGRect
 }
 
+private enum TaskCalendarVisibilitySelection {
+    static func resolvedIdentifiers(from rawValue: String, availableCalendars: [TodayMdCalendarSummary]) -> Set<String> {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard !availableIdentifiers.isEmpty else { return [] }
+
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return availableIdentifiers }
+
+        let selectedIdentifiers = Set(trimmedValue.split(separator: ",").map(String.init))
+            .intersection(availableIdentifiers)
+
+        return selectedIdentifiers.isEmpty ? availableIdentifiers : selectedIdentifiers
+    }
+
+    static func storedValue(for identifiers: Set<String>, availableCalendars: [TodayMdCalendarSummary]) -> String {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard !availableIdentifiers.isEmpty else { return "" }
+
+        let sanitizedIdentifiers = identifiers.intersection(availableIdentifiers)
+        guard !sanitizedIdentifiers.isEmpty, sanitizedIdentifiers.count < availableIdentifiers.count else {
+            return ""
+        }
+
+        return sanitizedIdentifiers.sorted().joined(separator: ",")
+    }
+}
+
+private extension TodayMdCalendarSummary {
+    var accentColor: Color {
+        Color(nsColor: nsColor)
+    }
+}
+
+private extension TodayMdCalendarEventSummary {
+    var accentColor: Color {
+        Color(nsColor: nsColor)
+    }
+}
+
 struct TaskCalendarPlannerView: View {
     @EnvironmentObject private var calendarService: TodayMdCalendarService
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
+    @AppStorage(TodayMdPreferenceKey.calendarVisibleIdentifiers) private var calendarVisibleIdentifiersRaw = ""
 
     let task: TaskItem
     @Binding var isInteractingWithCalendar: Bool
@@ -83,6 +123,13 @@ struct TaskCalendarPlannerView: View {
 
     private var destinationTitle: String {
         calendarService.selectedDestinationCalendar(preferredIdentifier: preferredIdentifier)?.displayTitle ?? "No writable calendar"
+    }
+
+    private var visibleCalendarIdentifiers: Set<String> {
+        TaskCalendarVisibilitySelection.resolvedIdentifiers(
+            from: calendarVisibleIdentifiersRaw,
+            availableCalendars: calendarService.calendars
+        )
     }
 
     private var allDayEvents: [TodayMdCalendarEventSummary] {
@@ -140,6 +187,9 @@ struct TaskCalendarPlannerView: View {
         }
         .onChange(of: calendarService.refreshRevision, initial: true) { _, _ in
             syncCalendarState(resetDraft: draftInterval == nil)
+        }
+        .onChange(of: calendarVisibleIdentifiersRaw, initial: true) { _, _ in
+            reloadTodayEvents()
         }
         .confirmationDialog(
             "Delete Calendar Entry?",
@@ -358,11 +408,11 @@ struct TaskCalendarPlannerView: View {
         .padding(.vertical, 7)
         .background(
             Capsule()
-                .fill(Color.blue.opacity(0.12))
+                .fill(event.accentColor.opacity(0.14))
         )
         .overlay(
             Capsule()
-                .stroke(Color.blue.opacity(0.22), lineWidth: 1)
+                .stroke(event.accentColor.opacity(0.24), lineWidth: 1)
         )
     }
 
@@ -403,11 +453,11 @@ struct TaskCalendarPlannerView: View {
         .frame(width: laneWidth - 12, height: max(metrics.height, 34), alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(Color.blue.opacity(0.15))
+                .fill(event.accentColor.opacity(event.canDelete ? 0.20 : 0.14))
         )
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(Color.blue.opacity(0.26), lineWidth: 1)
+                .stroke(event.accentColor.opacity(event.canDelete ? 0.34 : 0.24), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .offset(x: 6, y: metrics.y)
@@ -614,7 +664,7 @@ struct TaskCalendarPlannerView: View {
             return
         }
 
-        dayEvents = calendarService.eventsForDay(Date())
+        dayEvents = calendarService.eventsForDay(Date(), visibleCalendarIdentifiers: visibleCalendarIdentifiers)
     }
 
     private func saveDraftInterval() {
@@ -941,7 +991,7 @@ private enum WeekCalendarPanelStyle {
     static let dayEndHour = 22
     static let hourHeight: CGFloat = 60
     static let hourLabelWidth: CGFloat = 52
-    static let dayColumnWidth: CGFloat = 138
+    static let minimumDayColumnWidth: CGFloat = 138
     static let dayColumnSpacing: CGFloat = 8
     static let snapMinutes = 15
     static let minimumDurationMinutes = 15
@@ -964,6 +1014,7 @@ private enum WeekCalendarEventLayout {
         for events: [TodayMdCalendarEventSummary],
         on day: Date,
         timelineHeight: CGFloat,
+        dayColumnWidth: CGFloat,
         calendar: Calendar = .current
     ) -> [String: CGRect] {
         let sortedEvents = events.sorted {
@@ -979,7 +1030,14 @@ private enum WeekCalendarEventLayout {
 
         for event in sortedEvents {
             if let currentClusterEnd = activeClusterEnd, event.startDate >= currentClusterEnd, !cluster.isEmpty {
-                assignFrames(for: cluster, on: day, timelineHeight: timelineHeight, calendar: calendar, into: &frames)
+                assignFrames(
+                    for: cluster,
+                    on: day,
+                    timelineHeight: timelineHeight,
+                    dayColumnWidth: dayColumnWidth,
+                    calendar: calendar,
+                    into: &frames
+                )
                 cluster.removeAll(keepingCapacity: true)
                 activeClusterEnd = nil
             }
@@ -993,7 +1051,14 @@ private enum WeekCalendarEventLayout {
         }
 
         if !cluster.isEmpty {
-            assignFrames(for: cluster, on: day, timelineHeight: timelineHeight, calendar: calendar, into: &frames)
+            assignFrames(
+                for: cluster,
+                on: day,
+                timelineHeight: timelineHeight,
+                dayColumnWidth: dayColumnWidth,
+                calendar: calendar,
+                into: &frames
+            )
         }
 
         return frames
@@ -1003,6 +1068,7 @@ private enum WeekCalendarEventLayout {
         for cluster: [TodayMdCalendarEventSummary],
         on day: Date,
         timelineHeight: CGFloat,
+        dayColumnWidth: CGFloat,
         calendar: Calendar,
         into frames: inout [String: CGRect]
     ) {
@@ -1022,7 +1088,7 @@ private enum WeekCalendarEventLayout {
             laneCount = max(laneCount, laneEnds.count)
         }
 
-        let usableWidth = WeekCalendarPanelStyle.dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2)
+        let usableWidth = dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2)
         let totalGap = CGFloat(max(laneCount - 1, 0)) * columnGap
         let cardWidth = max((usableWidth - totalGap) / CGFloat(max(laneCount, 1)), 44)
 
@@ -1066,6 +1132,7 @@ struct WeekCalendarPanelView: View {
     @EnvironmentObject private var calendarService: TodayMdCalendarService
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
+    @AppStorage(TodayMdPreferenceKey.calendarVisibleIdentifiers) private var calendarVisibleIdentifiersRaw = ""
 
     @State private var visibleWeekStart = WeekCalendarPanelView.defaultWeekStart()
     @State private var weekEventsByDay: [Date: [TodayMdCalendarEventSummary]] = [:]
@@ -1099,22 +1166,6 @@ struct WeekCalendarPanelView: View {
         Double(WeekCalendarPanelStyle.dayEndHour - WeekCalendarPanelStyle.dayStartHour) * 60
     }
 
-    private var columnsWidth: CGFloat {
-        (CGFloat(weekDays.count) * WeekCalendarPanelStyle.dayColumnWidth)
-        + (CGFloat(max(weekDays.count - 1, 0)) * WeekCalendarPanelStyle.dayColumnSpacing)
-    }
-
-    private var dayColumnFrames: [CGRect] {
-        weekDays.indices.map { index in
-            CGRect(
-                x: CGFloat(index) * (WeekCalendarPanelStyle.dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing),
-                y: 0,
-                width: WeekCalendarPanelStyle.dayColumnWidth,
-                height: timelineHeight
-            )
-        }
-    }
-
     private var weekDays: [Date] {
         (0..<7).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: visibleWeekStart)
@@ -1128,6 +1179,21 @@ struct WeekCalendarPanelView: View {
 
     private var destinationTitle: String {
         calendarService.selectedDestinationCalendar(preferredIdentifier: preferredIdentifier)?.displayTitle ?? "No writable calendar"
+    }
+
+    private var availableCalendars: [TodayMdCalendarSummary] {
+        calendarService.calendars
+    }
+
+    private var visibleCalendarIdentifiers: Set<String> {
+        TaskCalendarVisibilitySelection.resolvedIdentifiers(
+            from: calendarVisibleIdentifiersRaw,
+            availableCalendars: availableCalendars
+        )
+    }
+
+    private var allCalendarsVisible: Bool {
+        availableCalendars.isEmpty || visibleCalendarIdentifiers.count >= availableCalendars.count
     }
 
     private var weekRangeText: String {
@@ -1163,6 +1229,9 @@ struct WeekCalendarPanelView: View {
         .onChange(of: calendarService.refreshRevision, initial: true) { _, _ in
             reloadWeekEvents()
         }
+        .onChange(of: calendarVisibleIdentifiersRaw, initial: true) { _, _ in
+            reloadWeekEvents()
+        }
         .confirmationDialog(
             "Delete Calendar Entry?",
             isPresented: Binding(
@@ -1188,7 +1257,7 @@ struct WeekCalendarPanelView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Week Planner")
+                Text("Calendar")
                     .font(.title3.weight(.semibold))
                 Text(destinationTitle)
                     .font(.caption)
@@ -1225,7 +1294,7 @@ struct WeekCalendarPanelView: View {
             Text(weekRangeText)
                 .font(.subheadline.weight(.semibold))
 
-            Text("Drag a task from the board into a day column to place a \(effectiveDefaultDuration) minute blocker. Click any entry to inspect its details in a calendar-style popup, and orange blockers created here can be moved or deleted directly in the week view.")
+            Text("Drag tasks from the board into any day column to place a \(effectiveDefaultDuration) minute blocker. Click an entry to inspect it, and move or delete calendar-colored blockers directly in the weekly view.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1235,39 +1304,207 @@ struct WeekCalendarPanelView: View {
     @ViewBuilder
     private var plannerContent: some View {
         if !calendarService.authorizationStatus.canReadEvents {
-            Button("Connect Calendar") {
-                calendarService.requestFullAccess()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            unavailableState(
+                title: "Connect Calendar",
+                message: "Grant calendar access to drag tasks into the week, inspect availability, and place time blocks without leaving this workspace.",
+                actionTitle: "Connect Calendar",
+                action: {
+                    calendarService.requestFullAccess()
+                }
+            )
         } else if calendarService.selectedDestinationCalendar(preferredIdentifier: preferredIdentifier) == nil {
-            Text("No writable calendar is available yet. Add an account in Calendar or choose a writable calendar in Settings.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            unavailableState(
+                title: "No Writable Calendar",
+                message: "Add an iCloud, Google, Outlook, or Exchange calendar in the macOS Calendar app, then come back here to drop tasks straight onto your week.",
+                actionTitle: nil,
+                action: nil
+            )
         } else {
-            weekGrid
+            VStack(alignment: .leading, spacing: 14) {
+                if availableCalendars.count > 1 {
+                    calendarVisibilityRow
+                }
+
+                weekGrid
+            }
         }
     }
 
-    private var weekGrid: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 8) {
-                    Color.clear
-                        .frame(width: WeekCalendarPanelStyle.hourLabelWidth, height: 1)
+    private var calendarVisibilityRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(
+                    allCalendarsVisible
+                        ? "Showing all calendars"
+                        : "Showing \(visibleCalendarIdentifiers.count) of \(availableCalendars.count) calendars"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
 
-                    ForEach(weekDays, id: \.self) { day in
-                        dayHeader(for: day)
-                            .frame(width: WeekCalendarPanelStyle.dayColumnWidth, alignment: .topLeading)
+                Spacer(minLength: 12)
+
+                if !allCalendarsVisible {
+                    Button("Show All") {
+                        calendarVisibleIdentifiersRaw = ""
                     }
-                }
-
-                HStack(alignment: .top, spacing: 8) {
-                    hourLabelColumn
-                    weekColumnsSection
+                    .buttonStyle(.plain)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
                 }
             }
-            .padding(16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableCalendars) { calendar in
+                        calendarVisibilityChip(calendar)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func calendarVisibilityChip(_ calendar: TodayMdCalendarSummary) -> some View {
+        let isSelected = visibleCalendarIdentifiers.contains(calendar.id)
+
+        return Button {
+            toggleCalendarVisibility(calendar)
+        } label: {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(calendar.accentColor)
+                    .frame(width: 9, height: 9)
+
+                Text(calendar.displayTitle)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(
+                        isSelected
+                            ? calendar.accentColor.opacity(0.18)
+                            : Color.secondary.opacity(0.08)
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isSelected
+                            ? calendar.accentColor.opacity(0.34)
+                            : Color.secondary.opacity(0.14),
+                        lineWidth: 1
+                    )
+            )
+            .foregroundStyle(isSelected ? .primary : .secondary)
+            .opacity(isSelected ? 1 : 0.74)
+        }
+        .buttonStyle(.plain)
+        .help("\(calendar.displayTitle)\n\(calendar.subtitle)")
+    }
+
+    private func unavailableState(
+        title: String,
+        message: String,
+        actionTitle: String?,
+        action: (() -> Void)?
+    ) -> some View {
+        VStack {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 18) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.orange.opacity(0.22),
+                                    Color.orange.opacity(0.10)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+                .frame(width: 58, height: 58)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 28, weight: .bold))
+
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 12) {
+                    if let actionTitle, let action {
+                        Button(actionTitle, action: action)
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                    }
+
+                    Text(weekRangeText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.secondary.opacity(0.10))
+                        )
+                }
+            }
+            .frame(maxWidth: 520, alignment: .leading)
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.88))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(Color.orange.opacity(0.14), lineWidth: 1)
+            )
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: timelineHeight + 140, alignment: .center)
+    }
+
+    private var weekGrid: some View {
+        GeometryReader { geometry in
+            let dayColumnWidth = resolvedDayColumnWidth(containerWidth: geometry.size.width)
+
+            ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Color.clear
+                            .frame(width: WeekCalendarPanelStyle.hourLabelWidth, height: 1)
+
+                        ForEach(weekDays, id: \.self) { day in
+                            dayHeader(for: day)
+                                .frame(width: dayColumnWidth, alignment: .topLeading)
+                        }
+                    }
+
+                    HStack(alignment: .top, spacing: 8) {
+                        hourLabelColumn
+                        weekColumnsSection(dayColumnWidth: dayColumnWidth)
+                    }
+                }
+                .padding(16)
+                .frame(
+                    minWidth: max(geometry.size.width - 2, requiredGridWidth(for: dayColumnWidth)),
+                    alignment: .leading
+                )
+            }
         }
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -1279,7 +1516,7 @@ struct WeekCalendarPanelView: View {
         )
     }
 
-    private var weekColumnsSection: some View {
+    private func weekColumnsSection(dayColumnWidth: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             WeekCalendarCanvasView(
                 days: weekDays,
@@ -1287,6 +1524,7 @@ struct WeekCalendarPanelView: View {
                     (calendar.startOfDay(for: day), timedEvents(for: day))
                 }),
                 timelineHeight: timelineHeight,
+                dayColumnWidth: dayColumnWidth,
                 defaultDurationMinutes: effectiveDefaultDuration,
                 isInteractionEnabled: !(isScheduling || isDeleting),
                 selectedEventID: selectedEvent?.id,
@@ -1306,10 +1544,10 @@ struct WeekCalendarPanelView: View {
             )
 
             if let selectedEvent {
-                anchoredSelectedEventPopup(selectedEvent)
+                anchoredSelectedEventPopup(selectedEvent, dayColumnWidth: dayColumnWidth)
             }
         }
-        .frame(width: columnsWidth, height: timelineHeight)
+        .frame(width: columnsWidth(for: dayColumnWidth), height: timelineHeight)
     }
 
     private func dayHeader(for day: Date) -> some View {
@@ -1382,11 +1620,11 @@ struct WeekCalendarPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             Capsule()
-                .fill(isSelected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.12))
+                .fill(event.accentColor.opacity(isSelected ? 0.20 : 0.14))
         )
         .overlay(
             Capsule()
-                .stroke(isSelected ? Color.orange.opacity(0.28) : Color.blue.opacity(0.18), lineWidth: 1)
+                .stroke(event.accentColor.opacity(isSelected ? 0.34 : 0.22), lineWidth: 1)
         )
         .contentShape(Capsule())
         .onTapGesture {
@@ -1407,8 +1645,8 @@ struct WeekCalendarPanelView: View {
         .frame(width: WeekCalendarPanelStyle.hourLabelWidth)
     }
 
-    private func anchoredSelectedEventPopup(_ event: TodayMdCalendarEventSummary) -> some View {
-        let metrics = popoverMetrics(for: event)
+    private func anchoredSelectedEventPopup(_ event: TodayMdCalendarEventSummary, dayColumnWidth: CGFloat) -> some View {
+        let metrics = popoverMetrics(for: event, dayColumnWidth: dayColumnWidth)
         let popupWidth: CGFloat = 432
         let popupHeight: CGFloat = 320
         let arrowSize: CGFloat = 18
@@ -1477,7 +1715,7 @@ struct WeekCalendarPanelView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 14) {
                 Circle()
-                    .fill(event.isTodayMdBlock ? Color.orange : Color.blue)
+                    .fill(event.accentColor)
                     .frame(width: 18, height: 18)
                     .padding(.top, 6)
 
@@ -1553,23 +1791,24 @@ struct WeekCalendarPanelView: View {
         }
     }
 
-    private func popoverMetrics(for event: TodayMdCalendarEventSummary) -> (origin: CGPoint, arrowY: CGFloat, arrowEdge: Alignment) {
+    private func popoverMetrics(for event: TodayMdCalendarEventSummary, dayColumnWidth: CGFloat) -> (origin: CGPoint, arrowY: CGFloat, arrowEdge: Alignment) {
         let popupWidth: CGFloat = 432
         let popupHeight: CGFloat = 320
         let margin: CGFloat = 14
 
         let anchor = selectedEventFrame ?? CGRect(
-            x: columnsWidth * 0.35,
+            x: columnsWidth(for: dayColumnWidth) * 0.35,
             y: 96,
-            width: WeekCalendarPanelStyle.dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2),
+            width: dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2),
             height: 44
         )
 
-        let preferRight = anchor.maxX + 28 + popupWidth <= columnsWidth - margin
+        let totalColumnsWidth = columnsWidth(for: dayColumnWidth)
+        let preferRight = anchor.maxX + 28 + popupWidth <= totalColumnsWidth - margin
         let x: CGFloat
         let arrowEdge: Alignment
         if preferRight {
-            x = min(anchor.maxX + 20, columnsWidth - popupWidth - margin)
+            x = min(anchor.maxX + 20, totalColumnsWidth - popupWidth - margin)
             arrowEdge = .leading
         } else {
             x = max(anchor.minX - popupWidth - 20, margin)
@@ -1616,7 +1855,7 @@ struct WeekCalendarPanelView: View {
             return
         }
 
-        let groupedEvents = Dictionary(grouping: calendarService.events(in: weekInterval)) { event in
+        let groupedEvents = Dictionary(grouping: calendarService.events(in: weekInterval, visibleCalendarIdentifiers: visibleCalendarIdentifiers)) { event in
             calendar.startOfDay(for: event.startDate)
         }
         weekEventsByDay = groupedEvents
@@ -1703,7 +1942,7 @@ struct WeekCalendarPanelView: View {
     }
 
     private func clampedColumnIndex(for x: CGFloat) -> Int {
-        let band = WeekCalendarPanelStyle.dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing
+        let band = WeekCalendarPanelStyle.minimumDayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing
         let rawIndex = Int((max(x, 0) / band).rounded(.down))
         return min(max(rawIndex, 0), weekDays.count - 1)
     }
@@ -1945,6 +2184,7 @@ struct WeekCalendarPanelView: View {
 
     private func dragPreviewCard(_ preview: WeekCalendarDragPreview) -> some View {
         let metrics = metrics(for: preview.interval, on: weekDays[preview.columnIndex])
+        let previewFrames = dayColumnFrames(for: WeekCalendarPanelStyle.minimumDayColumnWidth)
 
         return VStack(alignment: .leading, spacing: 4) {
             Text(preview.title)
@@ -1961,7 +2201,7 @@ struct WeekCalendarPanelView: View {
         }
         .padding(8)
         .frame(
-            width: WeekCalendarPanelStyle.dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2),
+            width: WeekCalendarPanelStyle.minimumDayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2),
             height: max(metrics.height, 34),
             alignment: .topLeading
         )
@@ -1974,9 +2214,40 @@ struct WeekCalendarPanelView: View {
                 .stroke(Color.orange.opacity(0.34), lineWidth: 1)
         )
         .offset(
-            x: dayColumnFrames[preview.columnIndex].minX + WeekCalendarPanelStyle.eventHorizontalInset,
+            x: previewFrames[preview.columnIndex].minX + WeekCalendarPanelStyle.eventHorizontalInset,
             y: metrics.y
         )
+    }
+
+    private func resolvedDayColumnWidth(containerWidth: CGFloat) -> CGFloat {
+        let totalSpacing = CGFloat(max(weekDays.count - 1, 0)) * WeekCalendarPanelStyle.dayColumnSpacing
+        let availableColumnsWidth = containerWidth
+            - WeekCalendarPanelStyle.hourLabelWidth
+            - 8
+            - 32
+            - totalSpacing
+        let stretchedWidth = availableColumnsWidth / CGFloat(max(weekDays.count, 1))
+        return max(WeekCalendarPanelStyle.minimumDayColumnWidth, stretchedWidth.rounded(.down))
+    }
+
+    private func columnsWidth(for dayColumnWidth: CGFloat) -> CGFloat {
+        (CGFloat(weekDays.count) * dayColumnWidth)
+        + (CGFloat(max(weekDays.count - 1, 0)) * WeekCalendarPanelStyle.dayColumnSpacing)
+    }
+
+    private func dayColumnFrames(for dayColumnWidth: CGFloat) -> [CGRect] {
+        weekDays.indices.map { index in
+            CGRect(
+                x: CGFloat(index) * (dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing),
+                y: 0,
+                width: dayColumnWidth,
+                height: timelineHeight
+            )
+        }
+    }
+
+    private func requiredGridWidth(for dayColumnWidth: CGFloat) -> CGFloat {
+        WeekCalendarPanelStyle.hourLabelWidth + 8 + columnsWidth(for: dayColumnWidth) + 32
     }
 
     private static func defaultWeekStart(calendar: Calendar = .current) -> Date {
@@ -1985,6 +2256,27 @@ struct WeekCalendarPanelView: View {
 
     private static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
         calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
+    }
+
+    private func toggleCalendarVisibility(_ calendar: TodayMdCalendarSummary) {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard availableIdentifiers.contains(calendar.id) else { return }
+
+        var updatedSelection = visibleCalendarIdentifiers
+
+        if allCalendarsVisible {
+            updatedSelection = availableIdentifiers.subtracting([calendar.id])
+        } else if updatedSelection.contains(calendar.id) {
+            guard updatedSelection.count > 1 else { return }
+            updatedSelection.remove(calendar.id)
+        } else {
+            updatedSelection.insert(calendar.id)
+        }
+
+        calendarVisibleIdentifiersRaw = TaskCalendarVisibilitySelection.storedValue(
+            for: updatedSelection,
+            availableCalendars: availableCalendars
+        )
     }
 }
 
@@ -2013,7 +2305,7 @@ private struct WeekCalendarDayColumn: View {
                 }
             }
         }
-        .frame(width: WeekCalendarPanelStyle.dayColumnWidth, height: timelineHeight)
+        .frame(width: WeekCalendarPanelStyle.minimumDayColumnWidth, height: timelineHeight)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -2081,11 +2373,11 @@ private struct WeekCalendarDayColumn: View {
         )
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(event.canDelete ? Color.orange.opacity(0.18) : Color.blue.opacity(0.14))
+                .fill(event.accentColor.opacity(event.canDelete ? 0.20 : 0.14))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(event.canEdit ? Color.orange.opacity(0.30) : Color.blue.opacity(0.22), lineWidth: 1)
+                .stroke(event.accentColor.opacity(event.canEdit ? 0.36 : 0.24), lineWidth: 1)
         )
         .offset(x: frame.minX, y: frame.minY)
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -2117,6 +2409,7 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
     let days: [Date]
     let eventsByDay: [Date: [TodayMdCalendarEventSummary]]
     let timelineHeight: CGFloat
+    let dayColumnWidth: CGFloat
     let defaultDurationMinutes: Int
     let isInteractionEnabled: Bool
     let selectedEventID: String?
@@ -2134,6 +2427,7 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
             days: days,
             eventsByDay: eventsByDay,
             timelineHeight: timelineHeight,
+            dayColumnWidth: dayColumnWidth,
             defaultDurationMinutes: defaultDurationMinutes,
             isInteractionEnabled: isInteractionEnabled,
             selectedEventID: selectedEventID,
@@ -2172,6 +2466,7 @@ private final class WeekCalendarCanvasNSView: NSView {
     private var days: [Date] = []
     private var eventsByDay: [Date: [TodayMdCalendarEventSummary]] = [:]
     private var timelineHeight: CGFloat = 0
+    private var dayColumnWidth: CGFloat = WeekCalendarPanelStyle.minimumDayColumnWidth
     private var defaultDurationMinutes = 60
     private var isInteractionEnabled = true
     private var selectedEventID: String?
@@ -2206,6 +2501,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         days: [Date],
         eventsByDay: [Date: [TodayMdCalendarEventSummary]],
         timelineHeight: CGFloat,
+        dayColumnWidth: CGFloat,
         defaultDurationMinutes: Int,
         isInteractionEnabled: Bool,
         selectedEventID: String?,
@@ -2217,6 +2513,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         self.days = days
         self.eventsByDay = eventsByDay
         self.timelineHeight = timelineHeight
+        self.dayColumnWidth = dayColumnWidth
         self.defaultDurationMinutes = defaultDurationMinutes
         self.isInteractionEnabled = isInteractionEnabled
         self.selectedEventID = selectedEventID
@@ -2392,9 +2689,9 @@ private final class WeekCalendarCanvasNSView: NSView {
     private func rebuildLayout() {
         dayColumnFrames = days.indices.map { index in
             CGRect(
-                x: CGFloat(index) * (WeekCalendarPanelStyle.dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing),
+                x: CGFloat(index) * (dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing),
                 y: 0,
-                width: WeekCalendarPanelStyle.dayColumnWidth,
+                width: dayColumnWidth,
                 height: timelineHeight
             )
         }
@@ -2407,6 +2704,7 @@ private final class WeekCalendarCanvasNSView: NSView {
                 for: events,
                 on: dayKey,
                 timelineHeight: timelineHeight,
+                dayColumnWidth: dayColumnWidth,
                 calendar: calendar
             )
 
@@ -2477,12 +2775,13 @@ private final class WeekCalendarCanvasNSView: NSView {
 
     private func drawEventCard(_ geometry: WeekCalendarCanvasEventGeometry) {
         let isSelected = selectedEventID == geometry.event.id
-        let fillColor = geometry.event.canEdit
-            ? NSColor.systemOrange.withAlphaComponent(isSelected ? 0.26 : 0.18)
-            : NSColor.systemBlue.withAlphaComponent(isSelected ? 0.20 : 0.14)
-        let strokeColor = geometry.event.canEdit
-            ? NSColor.systemOrange.withAlphaComponent(isSelected ? 0.54 : 0.30)
-            : NSColor.systemBlue.withAlphaComponent(isSelected ? 0.42 : 0.22)
+        let baseColor = geometry.event.nsColor
+        let fillColor = baseColor.withAlphaComponent(
+            geometry.event.canEdit
+                ? (isSelected ? 0.28 : 0.20)
+                : (isSelected ? 0.18 : 0.14)
+        )
+        let strokeColor = baseColor.withAlphaComponent(isSelected ? 0.56 : (geometry.event.canEdit ? 0.36 : 0.24))
 
         drawCard(
             title: geometry.event.title,
@@ -2673,7 +2972,7 @@ private final class WeekCalendarCanvasNSView: NSView {
     }
 
     private func clampedColumnIndex(for x: CGFloat) -> Int {
-        let band = WeekCalendarPanelStyle.dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing
+        let band = dayColumnWidth + WeekCalendarPanelStyle.dayColumnSpacing
         let rawIndex = Int((max(x, 0) / band).rounded(.down))
         return min(max(rawIndex, 0), max(days.count - 1, 0))
     }

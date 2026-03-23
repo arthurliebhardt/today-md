@@ -23,6 +23,22 @@ private enum AuxiliaryPanelMode: String, CaseIterable, Identifiable {
     }
 }
 
+private enum WorkspaceMode: String, CaseIterable, Identifiable {
+    case board
+    case planner
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .board:
+            return "Board"
+        case .planner:
+            return "Planner"
+        }
+    }
+}
+
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
@@ -230,6 +246,69 @@ struct ShortcutSequenceView: View {
     }
 }
 
+@MainActor
+private struct WindowChromeInsetReader: NSViewRepresentable {
+    let onTopInsetChange: (CGFloat) -> Void
+
+    final class TrackingView: NSView {
+        var onTopInsetChange: ((CGFloat) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            reportTopInset()
+        }
+
+        override func layout() {
+            super.layout()
+            reportTopInset()
+        }
+
+        override func viewDidEndLiveResize() {
+            super.viewDidEndLiveResize()
+            reportTopInset()
+        }
+
+        private func reportTopInset() {
+            guard let window else { return }
+            let topInset = max(0, window.frame.height - window.contentLayoutRect.maxY)
+            onTopInsetChange?(topInset)
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        private var lastReportedInset: CGFloat = -1
+
+        func update(topInset: CGFloat, onTopInsetChange: @escaping (CGFloat) -> Void) {
+            guard abs(topInset - lastReportedInset) > 0.5 else { return }
+            lastReportedInset = topInset
+
+            DispatchQueue.main.async {
+                onTopInsetChange(topInset)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onTopInsetChange = { topInset in
+            context.coordinator.update(topInset: topInset, onTopInsetChange: onTopInsetChange)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        nsView.onTopInsetChange = { topInset in
+            context.coordinator.update(topInset: topInset, onTopInsetChange: onTopInsetChange)
+        }
+        nsView.layoutSubtreeIfNeeded()
+    }
+}
+
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var calendarService: TodayMdCalendarService
@@ -238,6 +317,7 @@ struct ContentView: View {
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
     @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
+    @AppStorage(TodayMdPreferenceKey.workspaceMode) private var workspaceModeRawValue = WorkspaceMode.board.rawValue
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
 
@@ -251,6 +331,7 @@ struct ContentView: View {
     @State private var auxiliaryPanelMode: AuxiliaryPanelMode = .details
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowIsNarrow = false
+    @State private var windowChromeTopInset: CGFloat = 0
     @State private var showOverlaySidebar = false
     @State private var showingSettingsSheet = false
     @State private var selectedSettingsSection: SettingsSection = .interface
@@ -267,7 +348,7 @@ struct ContentView: View {
     }
 
     private var isBoardLayoutActive: Bool {
-        !store.hasActiveSearch
+        workspaceMode == .board && !store.hasActiveSearch
     }
 
     private var isListBoardSelectionActive: Bool {
@@ -278,10 +359,21 @@ struct ContentView: View {
         AppAppearanceMode(rawValue: appearanceModeRawValue) ?? .system
     }
 
+    private var workspaceMode: WorkspaceMode {
+        WorkspaceMode(rawValue: workspaceModeRawValue) ?? .board
+    }
+
     private var appearanceModeSelection: Binding<AppAppearanceMode> {
         Binding(
             get: { appearanceMode },
             set: { appearanceModeRawValue = $0.rawValue }
+        )
+    }
+
+    private var workspaceModeSelection: Binding<WorkspaceMode> {
+        Binding(
+            get: { workspaceMode },
+            set: { workspaceModeRawValue = $0.rawValue }
         )
     }
 
@@ -604,6 +696,18 @@ struct ContentView: View {
         }
 
         return "No writable calendar found"
+    }
+
+    private var plannerShelfPhaseKey: String {
+        if !calendarService.authorizationStatus.canReadEvents {
+            return "authorization-\(calendarService.authorizationStatus.label)"
+        }
+
+        if calendarService.selectedDestinationCalendar(preferredIdentifier: calendarPreferredIdentifier) == nil {
+            return "no-writable-calendar"
+        }
+
+        return "calendar-ready"
     }
 
     private func calendarSuggestedSlotText(durationMinutes: Int) -> String {
@@ -1428,6 +1532,247 @@ struct ContentView: View {
         }
     }
 
+    private var plannerWorkspaceView: some View {
+        HStack(alignment: .top, spacing: 0) {
+            plannerTaskShelf
+                .id(plannerShelfPhaseKey)
+                .frame(minWidth: 280, idealWidth: 320, maxWidth: 380, maxHeight: .infinity, alignment: .top)
+
+            Divider()
+
+            WeekCalendarPanelView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .layoutPriority(1)
+
+            if !windowIsNarrow && hasDetailContent {
+                Divider()
+
+                plannerInspectorColumn
+                    .frame(minWidth: 340, idealWidth: 420, maxWidth: 520, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .ignoresSafeArea(edges: .top)
+        .padding(.top, max(windowChromeTopInset + 8, 52))
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .padding(.bottom, 8)
+    }
+
+    private var plannerTaskShelf: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 18)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Tasks")
+                                .font(.title3.weight(.semibold))
+
+                            Text(plannerShelfSubtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Button {
+                            addTask(title: "New Task", block: plannerDefaultNewTaskBlock)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(width: 30, height: 30)
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Create a new task")
+                    }
+
+                    if currentSelectionTaskIDs.count > 1 {
+                        selectionActionBar
+                    }
+
+                    if plannerTaskSections.isEmpty {
+                        ContentUnavailableView(
+                            "No Active Tasks",
+                            systemImage: "checkmark.circle",
+                            description: Text("Change the current list or search to surface tasks you can drag onto the calendar.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                    } else {
+                        ForEach(plannerTaskSections, id: \.block.id) { section in
+                            plannerTaskSection(block: section.block, tasks: section.tasks)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
+            }
+        }
+    }
+
+    private var plannerInspectorColumn: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(hasMultipleSelectedTasks ? "Selection" : "Inspector")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(plannerInspectorSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            if hasDetailContent {
+                detailPanel
+            } else {
+                ContentUnavailableView(
+                    "Select a Task",
+                    systemImage: "checkmark.circle",
+                    description: Text("Choose a task from the shelf, then drag it into the calendar or edit it here.")
+                )
+            }
+        }
+    }
+
+    private var plannerShelfSubtitle: String {
+        if store.hasActiveSearch {
+            return "Filtered tasks stay beside the calendar so you can schedule them without switching back."
+        }
+
+        if let selectedList {
+            return "Drag tasks from \(selectedList.name) directly into the calendar."
+        }
+
+        return "Keep the task shelf open while you block time on the calendar."
+    }
+
+    private var plannerInspectorSubtitle: String {
+        if hasMultipleSelectedTasks {
+            return "Review the current selection while the calendar stays centered."
+        }
+
+        return "The selected task stays editable without taking the calendar off screen."
+    }
+
+    private var plannerDefaultNewTaskBlock: TimeBlock {
+        selectedTask?.block ?? .today
+    }
+
+    private var plannerTaskSections: [(block: TimeBlock, tasks: [TaskItem])] {
+        TimeBlock.allCases.compactMap { block in
+            let tasks = preferredVisibleTasks.filter { !$0.isDone && $0.block == block }
+            return tasks.isEmpty ? nil : (block, tasks)
+        }
+    }
+
+    private func plannerTaskSection(block: TimeBlock, tasks: [TaskItem]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label(block.label, systemImage: block.icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text("\(tasks.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.10))
+                    )
+            }
+
+            VStack(spacing: 8) {
+                ForEach(tasks) { task in
+                    plannerTaskRow(task)
+                }
+            }
+        }
+    }
+
+    private func plannerTaskRow(_ task: TaskItem) -> some View {
+        let isSelected = selectedTaskIDs.contains(task.id)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Button(action: { toggleTask(task) }) {
+                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(task.isDone ? .green : .secondary)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    let extendingRange = NSEvent.modifierFlags.contains(.shift)
+                    selectTask(task, extendingRange: extendingRange)
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(task.title.isEmpty ? "Untitled" : task.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
+
+                        HStack(spacing: 10) {
+                            if let list = task.list {
+                                Label(list.name, systemImage: list.icon)
+                                    .font(.caption)
+                                    .foregroundStyle(list.listColor.color)
+                            }
+
+                            if task.checkboxTotal > 0 {
+                                Label("\(task.checkboxDone)/\(task.checkboxTotal)", systemImage: "checklist")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            if task.note != nil {
+                                Image(systemName: "note.text")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color.orange.opacity(0.12)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.84)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    isSelected
+                        ? Color.orange.opacity(0.32)
+                        : Color(nsColor: .separatorColor).opacity(0.14),
+                    lineWidth: 1
+                )
+        )
+        .draggable(TaskItemTransfer(id: task.id))
+    }
+
     private var selectionActionBar: some View {
         HStack(spacing: 12) {
             Text(selectionSummaryText)
@@ -1658,50 +2003,23 @@ struct ContentView: View {
         }
     }
 
-    var body: some View {
-        ZStack(alignment: .leading) {
+    @ViewBuilder
+    private var mainWorkspaceSurface: some View {
+        if workspaceMode == .planner {
+            plannerWorkspaceView
+        } else {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 SidebarView(selection: $selection)
             } detail: {
                 inlineContentWithDetail
             }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    toolbarSearchField
-                }
-
-                ToolbarItemGroup {
-                    Button {
-                        undoController.undo()
-                    } label: {
-                        Label("Undo", systemImage: "arrow.uturn.backward")
-                    }
-                    .help("Undo the last change")
-
-                    Button {
-                        undoController.redo()
-                    } label: {
-                        Label("Redo", systemImage: "arrow.uturn.forward")
-                    }
-                    .help("Redo the last undone change")
-
-                    Button {
-                        openShortcutCheatsheet()
-                    } label: {
-                        Label("Keyboard Shortcuts", systemImage: "command")
-                    }
-                    .help("Open the keyboard shortcuts cheatsheet")
-
-                    Button {
-                        selectedSettingsSection = .interface
-                        showingSettingsSheet = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .help("Open settings and app actions")
-                }
-            }
             .navigationSplitViewStyle(.prominentDetail)
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            mainWorkspaceSurface
             .frame(minWidth: 900, minHeight: 500)
             .background(
                 GeometryReader { geo in
@@ -1710,9 +2028,12 @@ struct ContentView: View {
                             let narrow = newWidth < 1200
                             if narrow != windowIsNarrow {
                                 windowIsNarrow = narrow
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    columnVisibility = narrow ? .detailOnly : .all
-                                    if !narrow { showOverlaySidebar = false }
+                            }
+
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                columnVisibility = resolvedColumnVisibility(forNarrowWindow: narrow)
+                                if workspaceMode == .planner || !narrow {
+                                    showOverlaySidebar = false
                                 }
                             }
                         }
@@ -1726,9 +2047,15 @@ struct ContentView: View {
                 WindowTitleSyncView(title: boardTitle)
                     .allowsHitTesting(false)
             )
+            .background(
+                WindowChromeInsetReader { topInset in
+                    windowChromeTopInset = max(windowChromeTopInset, topInset)
+                }
+                .allowsHitTesting(false)
+            )
 
             // Floating sidebar overlay for narrow windows
-            if showOverlaySidebar {
+            if workspaceMode == .board && showOverlaySidebar {
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
                     .onTapGesture {
@@ -1749,7 +2076,7 @@ struct ContentView: View {
             }
 
             // Floating detail overlay for narrow windows
-            if windowIsNarrow && hasDetailContent {
+            if workspaceMode == .board && windowIsNarrow && hasDetailContent {
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
                     .onTapGesture {
@@ -1771,6 +2098,53 @@ struct ContentView: View {
                         .padding(.trailing, 6)
                 }
                 .transition(.move(edge: .trailing))
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                toolbarSearchField
+            }
+
+            ToolbarItem {
+                Picker("View", selection: workspaceModeSelection) {
+                    Text("Board")
+                        .tag(WorkspaceMode.board)
+                    Text("Planner")
+                        .tag(WorkspaceMode.planner)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 170)
+            }
+
+            ToolbarItemGroup {
+                Button {
+                    undoController.undo()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .help("Undo the last change")
+
+                Button {
+                    undoController.redo()
+                } label: {
+                    Label("Redo", systemImage: "arrow.uturn.forward")
+                }
+                .help("Redo the last undone change")
+
+                Button {
+                    openShortcutCheatsheet()
+                } label: {
+                    Label("Keyboard Shortcuts", systemImage: "command")
+                }
+                .help("Open the keyboard shortcuts cheatsheet")
+
+                Button {
+                    selectedSettingsSection = .interface
+                    showingSettingsSheet = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open settings and app actions")
             }
         }
         .sheet(isPresented: $showingSettingsSheet) {
@@ -1822,13 +2196,29 @@ struct ContentView: View {
             deleteSelectedTasks()
         }
         .onChange(of: columnVisibility) { _, newValue in
-            if windowIsNarrow && newValue != .detailOnly {
+            if workspaceMode == .board && windowIsNarrow && newValue != .detailOnly {
                 columnVisibility = .detailOnly
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showOverlaySidebar.toggle()
                 }
             }
         }
+        .onChange(of: workspaceMode) { _, _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                columnVisibility = resolvedColumnVisibility(forNarrowWindow: windowIsNarrow)
+                if workspaceMode == .planner {
+                    showOverlaySidebar = false
+                }
+            }
+        }
+    }
+
+    private func resolvedColumnVisibility(forNarrowWindow narrow: Bool) -> NavigationSplitViewVisibility {
+        if narrow || workspaceMode == .planner {
+            return .detailOnly
+        }
+
+        return .all
     }
 
     private var toolbarSearchField: some View {
