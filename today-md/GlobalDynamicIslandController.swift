@@ -6,13 +6,6 @@ private final class FloatingDynamicIslandPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-struct DynamicIslandListOption: Identifiable, Equatable {
-    let id: UUID
-    let name: String
-    let icon: String
-    let color: Color
-}
-
 @MainActor
 final class GlobalDynamicIslandController: ObservableObject {
     static let isEnabledDefaultsKey = "TodayMdGlobalDynamicIslandEnabled"
@@ -66,7 +59,6 @@ final class GlobalDynamicIslandController: ObservableObject {
 
     func attach(store: TodayMdStore) {
         self.store = store
-        viewModel.syncLists(store.lists)
         ensurePanel()
         if isEnabled {
             startMonitorsIfNeeded()
@@ -213,9 +205,6 @@ final class GlobalDynamicIslandController: ObservableObject {
 
     private func show(on screen: NSScreen) {
         guard isEnabled else { return }
-        if let store {
-            viewModel.syncLists(store.lists)
-        }
         ensurePanel()
         cancelDismiss()
         positionPanel(on: screen)
@@ -274,7 +263,7 @@ final class GlobalDynamicIslandController: ObservableObject {
             return
         }
 
-        _ = store.quickAddTask(title: viewModel.draftTitle, to: .today, listID: viewModel.selectedListID)
+        _ = store.quickAddTask(title: viewModel.draftTitle, to: .today, listID: nil)
         hide()
     }
 }
@@ -282,38 +271,14 @@ final class GlobalDynamicIslandController: ObservableObject {
 @MainActor
 final class GlobalDynamicIslandViewModel: ObservableObject {
     @Published var draftTitle = ""
-    @Published var listOptions: [DynamicIslandListOption] = []
-    @Published var selectedListID: UUID?
     @Published private(set) var focusNonce = 0
 
     var onSubmit: (() -> Void)?
     var onCancel: (() -> Void)?
     var onHoverChanged: ((Bool) -> Void)?
 
-    var selectedList: DynamicIslandListOption? {
-        guard let selectedListID else { return nil }
-        return listOptions.first { $0.id == selectedListID }
-    }
-
     func requestFocus() {
         focusNonce += 1
-    }
-
-    func syncLists(_ lists: [TaskList]) {
-        listOptions = lists
-            .sorted { $0.sortOrder < $1.sortOrder }
-            .map {
-                DynamicIslandListOption(
-                    id: $0.id,
-                    name: $0.name,
-                    icon: $0.icon,
-                    color: $0.listColor.color
-                )
-            }
-
-        if let selectedListID, !listOptions.contains(where: { $0.id == selectedListID }) {
-            self.selectedListID = nil
-        }
     }
 
     func reset() {
@@ -365,7 +330,6 @@ private struct DynamicIslandNotchShape: Shape {
 private struct GlobalDynamicIslandView: View {
     @ObservedObject var viewModel: GlobalDynamicIslandViewModel
     @FocusState private var isTextFieldFocused: Bool
-    @State private var isListPickerPresented = false
 
     private let notchWidth: CGFloat = 640
     private let notchHeight: CGFloat = 92
@@ -378,38 +342,6 @@ private struct GlobalDynamicIslandView: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-
-    private var selectedListLabel: String {
-        viewModel.selectedList?.name ?? "Unassigned"
-    }
-
-    private var selectedListIcon: String {
-        viewModel.selectedList?.icon ?? "tray.fill"
-    }
-
-    private var selectedListColor: Color {
-        viewModel.selectedList?.color ?? .secondary.opacity(0.95)
-    }
-
-    private var selectedListIconTint: Color {
-        .white
-    }
-
-    private var selectedListIconBadgeFill: Color {
-        viewModel.selectedList?.color ?? accentStart
-    }
-
-    private var listSelectorTextColor: Color {
-        .white.opacity(0.96)
-    }
-
-    private var listSelectorBackground: Color {
-        Color.white.opacity(0.08)
-    }
-
-    private var listSelectorBorder: Color {
-        selectedListColor.opacity(0.45)
     }
 
     var body: some View {
@@ -476,9 +408,6 @@ private struct GlobalDynamicIslandView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
 
-                listSelector
-                    .fixedSize(horizontal: true, vertical: false)
-
                 Text("Today")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(accentGradient)
@@ -511,134 +440,6 @@ private struct GlobalDynamicIslandView: View {
             DispatchQueue.main.async {
                 isTextFieldFocused = true
             }
-        }
-    }
-
-    private var listSelector: some View {
-        Button {
-            isListPickerPresented = true
-        } label: {
-            HStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(selectedListIconBadgeFill)
-
-                    Circle()
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
-
-                    Image(systemName: selectedListIcon)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(selectedListIconTint)
-                }
-                .frame(width: 20, height: 20)
-
-                Text(selectedListLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(listSelectorTextColor)
-                    .lineLimit(1)
-                    .frame(maxWidth: 92, alignment: .leading)
-
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(listSelectorTextColor.opacity(0.82))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(listSelectorBackground)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(listSelectorBorder, lineWidth: 1)
-            )
-            .shadow(color: selectedListColor.opacity(0.16), radius: 8, y: 2)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $isListPickerPresented, arrowEdge: .bottom) {
-            listPickerContent
-        }
-    }
-
-    private var listPickerContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            listPickerRow(
-                title: "Unassigned",
-                icon: "tray.fill",
-                color: accentStart,
-                isSelected: viewModel.selectedListID == nil,
-                action: { selectList(nil) }
-            )
-
-            if !viewModel.listOptions.isEmpty {
-                Divider()
-                    .padding(.vertical, 2)
-            }
-
-            ForEach(viewModel.listOptions) { list in
-                listPickerRow(
-                    title: list.name,
-                    icon: list.icon,
-                    color: list.color,
-                    isSelected: viewModel.selectedListID == list.id,
-                    action: { selectList(list.id) }
-                )
-            }
-        }
-        .padding(10)
-        .frame(minWidth: 190, alignment: .leading)
-    }
-
-    private func listMenuItem(
-        title: String,
-        icon: String,
-        color: Color,
-        isSelected: Bool
-    ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundStyle(color)
-
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(color)
-
-            Spacer(minLength: 12)
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(color)
-            }
-        }
-    }
-
-    private func listPickerRow(
-        title: String,
-        icon: String,
-        color: Color,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            listMenuItem(title: title, icon: icon, color: color, isSelected: isSelected)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isSelected ? color.opacity(0.14) : Color.clear)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func selectList(_ id: UUID?) {
-        viewModel.selectedListID = id
-        isListPickerPresented = false
-        DispatchQueue.main.async {
-            isTextFieldFocused = true
         }
     }
 }
