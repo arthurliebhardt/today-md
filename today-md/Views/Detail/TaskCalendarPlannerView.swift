@@ -1071,6 +1071,8 @@ struct WeekCalendarPanelView: View {
     @State private var weekEventsByDay: [Date: [TodayMdCalendarEventSummary]] = [:]
     @State private var activeDraggedEvent: TodayMdCalendarEventSummary?
     @State private var dragPreview: WeekCalendarDragPreview?
+    @State private var selectedEvent: TodayMdCalendarEventSummary?
+    @State private var selectedEventFrame: CGRect?
     @State private var pendingDeletionEvent: TodayMdCalendarEventSummary?
     @State private var isScheduling = false
     @State private var isDeleting = false
@@ -1223,7 +1225,7 @@ struct WeekCalendarPanelView: View {
             Text(weekRangeText)
                 .font(.subheadline.weight(.semibold))
 
-            Text("Drag a task from the board into a day column to place a \(effectiveDefaultDuration) minute blocker. Orange blockers created here can then be moved around or deleted directly in the week view.")
+            Text("Drag a task from the board into a day column to place a \(effectiveDefaultDuration) minute blocker. Click any entry to inspect its details in a calendar-style popup, and orange blockers created here can be moved or deleted directly in the week view.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1278,38 +1280,51 @@ struct WeekCalendarPanelView: View {
     }
 
     private var weekColumnsSection: some View {
-        WeekCalendarCanvasView(
-            days: weekDays,
-            eventsByDay: Dictionary(uniqueKeysWithValues: weekDays.map { day in
-                (calendar.startOfDay(for: day), timedEvents(for: day))
-            }),
-            timelineHeight: timelineHeight,
-            defaultDurationMinutes: effectiveDefaultDuration,
-            isInteractionEnabled: !(isScheduling || isDeleting),
-            onDropTask: { taskID, interval in
-                scheduleDroppedTask(taskID, interval: interval)
-            },
-            onDeleteEvent: { event in
-                pendingDeletionEvent = event
-            },
-            onMoveEvent: { event, interval in
-                moveEvent(event, to: interval)
+        ZStack(alignment: .topLeading) {
+            WeekCalendarCanvasView(
+                days: weekDays,
+                eventsByDay: Dictionary(uniqueKeysWithValues: weekDays.map { day in
+                    (calendar.startOfDay(for: day), timedEvents(for: day))
+                }),
+                timelineHeight: timelineHeight,
+                defaultDurationMinutes: effectiveDefaultDuration,
+                isInteractionEnabled: !(isScheduling || isDeleting),
+                selectedEventID: selectedEvent?.id,
+                onDropTask: { taskID, interval in
+                    scheduleDroppedTask(taskID, interval: interval)
+                },
+                onSelectEvent: { event, frame in
+                    selectedEvent = event
+                    selectedEventFrame = frame
+                },
+                onDeleteEvent: { event in
+                    pendingDeletionEvent = event
+                },
+                onMoveEvent: { event, interval in
+                    moveEvent(event, to: interval)
+                }
+            )
+
+            if let selectedEvent {
+                anchoredSelectedEventPopup(selectedEvent)
             }
-        )
+        }
         .frame(width: columnsWidth, height: timelineHeight)
     }
 
     private func dayHeader(for day: Date) -> some View {
         let isToday = calendar.isDateInToday(day)
         let allDayEvents = allDayEvents(for: day)
+        let weekdayText = day.formatted(.dateTime.weekday(.abbreviated))
+        let dayNumberText = day.formatted(.dateTime.day())
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(day.formatted(.dateTime.weekday(.abbreviated)))
+                Text(weekdayText)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Text(day.formatted(.dateTime.day()))
+                Text(dayNumberText)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(isToday ? .orange : .primary)
             }
@@ -1321,29 +1336,7 @@ struct WeekCalendarPanelView: View {
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(allDayEvents.prefix(2)) { event in
-                        HStack(spacing: 6) {
-                            Text(event.title)
-                                .font(.caption2.weight(.medium))
-                                .lineLimit(1)
-
-                            if event.canDelete {
-                                Button {
-                                    pendingDeletionEvent = event
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.red.opacity(0.92), Color.white.opacity(0.95))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            Capsule()
-                                .fill(Color.blue.opacity(0.12))
-                        )
+                        allDayEventPreview(event)
                     }
 
                     if allDayEvents.count > 2 {
@@ -1365,6 +1358,43 @@ struct WeekCalendarPanelView: View {
         )
     }
 
+    private func allDayEventPreview(_ event: TodayMdCalendarEventSummary) -> some View {
+        let isSelected = selectedEvent?.id == event.id
+
+        return HStack(spacing: 6) {
+            Text(event.title)
+                .font(.caption2.weight(.medium))
+                .lineLimit(1)
+
+            if event.canDelete {
+                Button {
+                    pendingDeletionEvent = event
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.red.opacity(0.92), Color.white.opacity(0.95))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Capsule()
+                .fill(isSelected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.12))
+        )
+        .overlay(
+            Capsule()
+                .stroke(isSelected ? Color.orange.opacity(0.28) : Color.blue.opacity(0.18), lineWidth: 1)
+        )
+        .contentShape(Capsule())
+        .onTapGesture {
+            selectedEvent = event
+            selectedEventFrame = nil
+        }
+    }
+
     private var hourLabelColumn: some View {
         VStack(alignment: .trailing, spacing: 0) {
             ForEach(WeekCalendarPanelStyle.dayStartHour..<WeekCalendarPanelStyle.dayEndHour + 1, id: \.self) { hour in
@@ -1375,6 +1405,183 @@ struct WeekCalendarPanelView: View {
             }
         }
         .frame(width: WeekCalendarPanelStyle.hourLabelWidth)
+    }
+
+    private func anchoredSelectedEventPopup(_ event: TodayMdCalendarEventSummary) -> some View {
+        let metrics = popoverMetrics(for: event)
+        let popupWidth: CGFloat = 432
+        let popupHeight: CGFloat = 320
+        let arrowSize: CGFloat = 18
+        let cardX = metrics.origin.x
+        let cardY = metrics.origin.y
+        let arrowOffset = min(max(metrics.arrowY - cardY - 28, 46), popupHeight - 46)
+
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .shadow(color: Color.black.opacity(0.16), radius: 16, x: 0, y: 10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+                .frame(width: popupWidth, height: popupHeight)
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        selectedEvent = nil
+                        selectedEventFrame = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(Color.secondary.opacity(0.12))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(18)
+                }
+                .overlay {
+                    ScrollView {
+                        popupBody(for: event)
+                            .padding(26)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(width: popupWidth, height: popupHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                }
+                .overlay(alignment: metrics.arrowEdge) {
+                    Rectangle()
+                        .fill(Color(nsColor: .windowBackgroundColor))
+                        .frame(width: arrowSize, height: arrowSize)
+                        .rotationEffect(.degrees(45))
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                                .frame(width: arrowSize, height: arrowSize)
+                                .rotationEffect(.degrees(45))
+                        )
+                        .offset(
+                            x: metrics.arrowEdge == .leading ? -arrowSize / 2 : arrowSize / 2,
+                            y: arrowOffset - popupHeight / 2
+                        )
+                }
+        }
+        .frame(width: popupWidth, height: popupHeight)
+        .offset(x: cardX, y: cardY)
+        .zIndex(20)
+    }
+
+    private func popupBody(for event: TodayMdCalendarEventSummary) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 14) {
+                Circle()
+                    .fill(event.isTodayMdBlock ? Color.orange : Color.blue)
+                    .frame(width: 18, height: 18)
+                    .padding(.top, 6)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(event.title)
+                        .font(.system(size: 24, weight: .semibold))
+                        .lineLimit(3)
+
+                    Text(scheduleText(for: event))
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+
+                    if event.isTodayMdBlock {
+                        Text("Created from today-md")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.orange.opacity(0.12))
+                            )
+                    }
+                }
+            }
+
+            Divider()
+
+            detailRow(label: "Calendar", value: event.calendarTitle)
+
+            if let location = event.location {
+                detailRow(label: "Location", value: location)
+            }
+
+            if let url = event.url {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Link")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Link(url.absoluteString, destination: url)
+                        .font(.subheadline)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+            }
+
+            if let notes = event.notes {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Notes")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(notes)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+            }
+
+            if event.canDelete {
+                Divider()
+
+                HStack(spacing: 12) {
+                    Button("Delete Event", role: .destructive) {
+                        pendingDeletionEvent = event
+                    }
+                    .buttonStyle(.bordered)
+
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private func popoverMetrics(for event: TodayMdCalendarEventSummary) -> (origin: CGPoint, arrowY: CGFloat, arrowEdge: Alignment) {
+        let popupWidth: CGFloat = 432
+        let popupHeight: CGFloat = 320
+        let margin: CGFloat = 14
+
+        let anchor = selectedEventFrame ?? CGRect(
+            x: columnsWidth * 0.35,
+            y: 96,
+            width: WeekCalendarPanelStyle.dayColumnWidth - (WeekCalendarPanelStyle.eventHorizontalInset * 2),
+            height: 44
+        )
+
+        let preferRight = anchor.maxX + 28 + popupWidth <= columnsWidth - margin
+        let x: CGFloat
+        let arrowEdge: Alignment
+        if preferRight {
+            x = min(anchor.maxX + 20, columnsWidth - popupWidth - margin)
+            arrowEdge = .leading
+        } else {
+            x = max(anchor.minX - popupWidth - 20, margin)
+            arrowEdge = .trailing
+        }
+
+        let y = min(
+            max(anchor.midY - (popupHeight * 0.36), margin),
+            max(timelineHeight - popupHeight - margin, margin)
+        )
+
+        return (CGPoint(x: x, y: y), anchor.midY, arrowEdge)
     }
 
     @ViewBuilder
@@ -1404,6 +1611,8 @@ struct WeekCalendarPanelView: View {
     private func reloadWeekEvents() {
         guard calendarService.authorizationStatus.canReadEvents else {
             weekEventsByDay = [:]
+            selectedEvent = nil
+            selectedEventFrame = nil
             return
         }
 
@@ -1411,6 +1620,14 @@ struct WeekCalendarPanelView: View {
             calendar.startOfDay(for: event.startDate)
         }
         weekEventsByDay = groupedEvents
+
+        if let selectedEvent {
+            let refreshedEvents = groupedEvents.values.flatMap { $0 }
+            self.selectedEvent = refreshedEvents.first(where: { $0.id == selectedEvent.id })
+            if self.selectedEvent == nil {
+                selectedEventFrame = nil
+            }
+        }
     }
 
     private func timedEvents(for day: Date) -> [TodayMdCalendarEventSummary] {
@@ -1500,6 +1717,43 @@ struct WeekCalendarPanelView: View {
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter.string(from: interval.start, to: interval.end)
+    }
+
+    private func scheduleText(for event: TodayMdCalendarEventSummary) -> String {
+        if event.isAllDay {
+            let startDay = calendar.startOfDay(for: event.startDate)
+            let endDay = calendar.startOfDay(for: event.endDate)
+            let spanDays = calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0
+
+            if spanDays <= 1 {
+                return "\(startDay.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) • All day"
+            }
+
+            let displayEndDay = calendar.date(byAdding: .day, value: -1, to: endDay) ?? event.endDate
+
+            let formatter = DateIntervalFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .none
+            return "\(formatter.string(from: startDay, to: displayEndDay)) • All day"
+        }
+
+        let formatter = DateIntervalFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: event.startDate, to: event.endDate)
+    }
+
+    private func detailRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
     }
 
     private func scheduleDroppedTask(_ taskID: UUID, interval: DateInterval) -> Bool {
@@ -1865,7 +2119,9 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
     let timelineHeight: CGFloat
     let defaultDurationMinutes: Int
     let isInteractionEnabled: Bool
+    let selectedEventID: String?
     let onDropTask: (UUID, DateInterval) -> Bool
+    let onSelectEvent: (TodayMdCalendarEventSummary?, CGRect?) -> Void
     let onDeleteEvent: (TodayMdCalendarEventSummary) -> Void
     let onMoveEvent: (TodayMdCalendarEventSummary, DateInterval) -> Void
 
@@ -1880,7 +2136,9 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
             timelineHeight: timelineHeight,
             defaultDurationMinutes: defaultDurationMinutes,
             isInteractionEnabled: isInteractionEnabled,
+            selectedEventID: selectedEventID,
             onDropTask: onDropTask,
+            onSelectEvent: onSelectEvent,
             onDeleteEvent: onDeleteEvent,
             onMoveEvent: onMoveEvent
         )
@@ -1916,7 +2174,9 @@ private final class WeekCalendarCanvasNSView: NSView {
     private var timelineHeight: CGFloat = 0
     private var defaultDurationMinutes = 60
     private var isInteractionEnabled = true
+    private var selectedEventID: String?
     private var onDropTask: ((UUID, DateInterval) -> Bool)?
+    private var onSelectEvent: ((TodayMdCalendarEventSummary?, CGRect?) -> Void)?
     private var onDeleteEvent: ((TodayMdCalendarEventSummary) -> Void)?
     private var onMoveEvent: ((TodayMdCalendarEventSummary, DateInterval) -> Void)?
 
@@ -1948,7 +2208,9 @@ private final class WeekCalendarCanvasNSView: NSView {
         timelineHeight: CGFloat,
         defaultDurationMinutes: Int,
         isInteractionEnabled: Bool,
+        selectedEventID: String?,
         onDropTask: @escaping (UUID, DateInterval) -> Bool,
+        onSelectEvent: @escaping (TodayMdCalendarEventSummary?, CGRect?) -> Void,
         onDeleteEvent: @escaping (TodayMdCalendarEventSummary) -> Void,
         onMoveEvent: @escaping (TodayMdCalendarEventSummary, DateInterval) -> Void
     ) {
@@ -1957,7 +2219,9 @@ private final class WeekCalendarCanvasNSView: NSView {
         self.timelineHeight = timelineHeight
         self.defaultDurationMinutes = defaultDurationMinutes
         self.isInteractionEnabled = isInteractionEnabled
+        self.selectedEventID = selectedEventID
         self.onDropTask = onDropTask
+        self.onSelectEvent = onSelectEvent
         self.onDeleteEvent = onDeleteEvent
         self.onMoveEvent = onMoveEvent
         rebuildLayout()
@@ -2010,13 +2274,16 @@ private final class WeekCalendarCanvasNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard isInteractionEnabled else { return }
-
         let point = convert(event.locationInWindow, from: nil)
 
         guard let geometry = eventGeometry(at: point) else {
+            onSelectEvent?(nil, nil)
             return
         }
+
+        onSelectEvent?(geometry.event, geometry.frame)
+
+        guard isInteractionEnabled else { return }
 
         if let deleteFrame = geometry.deleteFrame,
            deleteFrame.contains(point),
@@ -2209,12 +2476,13 @@ private final class WeekCalendarCanvasNSView: NSView {
     }
 
     private func drawEventCard(_ geometry: WeekCalendarCanvasEventGeometry) {
+        let isSelected = selectedEventID == geometry.event.id
         let fillColor = geometry.event.canEdit
-            ? NSColor.systemOrange.withAlphaComponent(0.18)
-            : NSColor.systemBlue.withAlphaComponent(0.14)
+            ? NSColor.systemOrange.withAlphaComponent(isSelected ? 0.26 : 0.18)
+            : NSColor.systemBlue.withAlphaComponent(isSelected ? 0.20 : 0.14)
         let strokeColor = geometry.event.canEdit
-            ? NSColor.systemOrange.withAlphaComponent(0.30)
-            : NSColor.systemBlue.withAlphaComponent(0.22)
+            ? NSColor.systemOrange.withAlphaComponent(isSelected ? 0.54 : 0.30)
+            : NSColor.systemBlue.withAlphaComponent(isSelected ? 0.42 : 0.22)
 
         drawCard(
             title: geometry.event.title,
@@ -2222,7 +2490,8 @@ private final class WeekCalendarCanvasNSView: NSView {
             frame: geometry.frame,
             fillColor: fillColor,
             strokeColor: strokeColor,
-            deleteFrame: geometry.deleteFrame
+            deleteFrame: geometry.deleteFrame,
+            strokeWidth: isSelected ? 2 : 1
         )
     }
 
@@ -2235,7 +2504,8 @@ private final class WeekCalendarCanvasNSView: NSView {
             frame: frame,
             fillColor: NSColor.systemOrange.withAlphaComponent(alpha),
             strokeColor: NSColor.systemOrange.withAlphaComponent(0.38),
-            deleteFrame: nil
+            deleteFrame: nil,
+            strokeWidth: 1
         )
     }
 
@@ -2245,7 +2515,8 @@ private final class WeekCalendarCanvasNSView: NSView {
         frame: CGRect,
         fillColor: NSColor,
         strokeColor: NSColor,
-        deleteFrame: CGRect?
+        deleteFrame: CGRect?,
+        strokeWidth: CGFloat
     ) {
         let cornerRadius: CGFloat = 14
         let cardPath = NSBezierPath(roundedRect: frame, xRadius: cornerRadius, yRadius: cornerRadius)
@@ -2253,7 +2524,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         cardPath.fill()
 
         strokeColor.setStroke()
-        cardPath.lineWidth = 1
+        cardPath.lineWidth = strokeWidth
         cardPath.stroke()
 
         let contentInset: CGFloat = 8
