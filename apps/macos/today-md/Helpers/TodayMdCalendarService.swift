@@ -101,6 +101,9 @@ struct TodayMdCalendarEventSummary: Identifiable, Hashable {
     let endDate: Date
     let isAllDay: Bool
     let calendarTitle: String
+    let location: String?
+    let notes: String?
+    let url: URL?
     let allowsContentModifications: Bool
     let isTodayMdBlock: Bool
 
@@ -628,6 +631,8 @@ final class TodayMdCalendarService: ObservableObject {
             ISO8601DateFormatter().string(from: event.startDate)
         ].joined(separator: "::")
 
+        let isTodayMdBlock = Self.isTodayMdManaged(event)
+
         return TodayMdCalendarEventSummary(
             id: identifier,
             eventIdentifier: eventIdentifier,
@@ -636,8 +641,11 @@ final class TodayMdCalendarService: ObservableObject {
             endDate: event.endDate,
             isAllDay: event.isAllDay,
             calendarTitle: event.calendar.title,
+            location: Self.normalizedOptionalString(event.location),
+            notes: Self.displayNotes(event.notes, isTodayMdBlock: isTodayMdBlock),
+            url: event.url,
             allowsContentModifications: event.calendar.allowsContentModifications,
-            isTodayMdBlock: Self.isTodayMdManaged(event)
+            isTodayMdBlock: isTodayMdBlock
         )
     }
 
@@ -704,6 +712,32 @@ final class TodayMdCalendarService: ObservableObject {
         }
 
         return parts.joined(separator: "\n\n")
+    }
+
+    private static func normalizedOptionalString(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+
+        return trimmed
+    }
+
+    private static func displayNotes(_ rawNotes: String?, isTodayMdBlock: Bool) -> String? {
+        guard let rawNotes = normalizedOptionalString(rawNotes) else {
+            return nil
+        }
+
+        guard isTodayMdBlock else {
+            return rawNotes
+        }
+
+        let sections = rawNotes
+            .components(separatedBy: "\n\n")
+            .compactMap { normalizedOptionalString($0) }
+            .filter { $0 != todayMdBlockMarker }
+
+        return normalizedOptionalString(sections.joined(separator: "\n\n"))
     }
 
     private static func isTodayMdManaged(_ event: EKEvent) -> Bool {
