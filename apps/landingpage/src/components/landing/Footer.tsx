@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ScrollReveal } from "./ScrollReveal";
 
 export function Footer() {
