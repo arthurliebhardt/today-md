@@ -15,41 +15,49 @@ export default function Impressum() {
 
           <div className="space-y-6 text-[15px] leading-relaxed text-muted-foreground">
             <section>
-              <h2 className="text-foreground font-semibold text-lg mb-2">Angaben gemäß § 5 TMG</h2>
+              <p>
+                liebhardt.io UG (haftungsbeschränkt)<br />
+                Nußbaumstr. 29<br />
+                66121 Saarbrücken<br />
+                Germany
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-foreground font-semibold text-lg mb-2">Commercial Register</h2>
+              <p>
+                Registered at the Local Court (Amtsgericht) Saarbrücken<br />
+                Registration Number: HRB 106575
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-foreground font-semibold text-lg mb-2">VAT ID</h2>
+              <p>
+                Value Added Tax Identification Number in accordance with §27 a VAT Act:<br />
+                DE366044881
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-foreground font-semibold text-lg mb-2">Contact</h2>
+              <p>
+                Email: <a href="mailto:support@todaymd.app" className="text-foreground hover:text-primary transition-colors">support@todaymd.app</a>
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-foreground font-semibold text-lg mb-2">Represented by</h2>
+              <p>Managing Director: Arthur Liebhardt</p>
+            </section>
+
+            <section>
+              <h2 className="text-foreground font-semibold text-lg mb-2">Responsible for content according to § 55 Abs. 2 RStV</h2>
               <p>
                 Arthur Liebhardt<br />
-                [Straße und Hausnummer]<br />
-                [PLZ Ort]<br />
-                Deutschland
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-foreground font-semibold text-lg mb-2">Kontakt</h2>
-              <p>
-                E-Mail: [deine@email.de]<br />
-                Telefon: [optional]
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-foreground font-semibold text-lg mb-2">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
-              <p>
-                Arthur Liebhardt<br />
-                [Straße und Hausnummer]<br />
-                [PLZ Ort]
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-foreground font-semibold text-lg mb-2">Haftungsausschluss</h2>
-              <h3 className="text-foreground font-medium mb-1">Haftung für Inhalte</h3>
-              <p className="mb-3">
-                Die Inhalte unserer Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen.
-              </p>
-              <h3 className="text-foreground font-medium mb-1">Haftung für Links</h3>
-              <p>
-                Unser Angebot enthält Links zu externen Webseiten Dritter, auf deren Inhalte wir keinen Einfluss haben. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.
+                Nußbaumstr. 29<br />
+                66121 Saarbrücken<br />
+                Germany
               </p>
             </section>
           </div>
