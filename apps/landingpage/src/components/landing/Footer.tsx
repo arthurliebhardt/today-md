@@ -21,13 +21,13 @@ export function Footer() {
         </ScrollReveal>
 
         {/* Logo */}
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" width="48" height="44">
             <rect x="14" y="8" width="104" height="104" rx="31" fill="#5A462C"/>
             <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06"/>
             <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <Link to="/impressum" className="block mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors">Impressum</Link>
+          <Link to="/impressum" className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors">Impressum</Link>
         </div>
       </div>
     </footer>
