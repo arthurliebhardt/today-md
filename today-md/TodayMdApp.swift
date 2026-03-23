@@ -7,8 +7,10 @@ enum TodayMdSceneID {
 
 enum TodayMdPreferenceKey {
     static let appearanceMode = "TodayMdAppearanceMode"
+    static let workspaceMode = "TodayMdWorkspaceMode"
     static let calendarDefaultDurationMinutes = "TodayMdCalendarDefaultDurationMinutes"
     static let calendarDefaultIdentifier = "TodayMdCalendarDefaultIdentifier"
+    static let calendarVisibleIdentifiers = "TodayMdCalendarVisibleIdentifiers"
 }
 
 enum AppAppearanceMode: String, CaseIterable, Identifiable {

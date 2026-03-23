@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import EventKit
 import Foundation
@@ -55,6 +56,19 @@ struct TodayMdCalendarSummary: Identifiable, Hashable {
     let sourceType: EKSourceType
     let calendarType: EKCalendarType
     let allowsContentModifications: Bool
+    let colorRed: Double
+    let colorGreen: Double
+    let colorBlue: Double
+    let colorAlpha: Double
+
+    var nsColor: NSColor {
+        NSColor(
+            calibratedRed: CGFloat(colorRed),
+            green: CGFloat(colorGreen),
+            blue: CGFloat(colorBlue),
+            alpha: CGFloat(colorAlpha)
+        )
+    }
 
     var displayTitle: String {
         guard !sourceTitle.isEmpty, sourceTitle.caseInsensitiveCompare(title) != .orderedSame else {
@@ -100,12 +114,26 @@ struct TodayMdCalendarEventSummary: Identifiable, Hashable {
     let startDate: Date
     let endDate: Date
     let isAllDay: Bool
+    let calendarID: String
     let calendarTitle: String
     let location: String?
     let notes: String?
     let url: URL?
     let allowsContentModifications: Bool
     let isTodayMdBlock: Bool
+    let colorRed: Double
+    let colorGreen: Double
+    let colorBlue: Double
+    let colorAlpha: Double
+
+    var nsColor: NSColor {
+        NSColor(
+            calibratedRed: CGFloat(colorRed),
+            green: CGFloat(colorGreen),
+            blue: CGFloat(colorBlue),
+            alpha: CGFloat(colorAlpha)
+        )
+    }
 
     var canEdit: Bool {
         allowsContentModifications && eventIdentifier != nil && isTodayMdBlock
@@ -415,20 +443,20 @@ final class TodayMdCalendarService: ObservableObject {
         )
     }
 
-    func eventsForDay(_ date: Date) -> [TodayMdCalendarEventSummary] {
+    func eventsForDay(_ date: Date, visibleCalendarIdentifiers: Set<String>? = nil) -> [TodayMdCalendarEventSummary] {
         guard authorizationStatus.canReadEvents else { return [] }
 
         let dayInterval = Self.dayInterval(for: date)
-        return events(in: dayInterval)
+        return events(in: dayInterval, visibleCalendarIdentifiers: visibleCalendarIdentifiers)
     }
 
-    func events(in interval: DateInterval) -> [TodayMdCalendarEventSummary] {
+    func events(in interval: DateInterval, visibleCalendarIdentifiers: Set<String>? = nil) -> [TodayMdCalendarEventSummary] {
         guard authorizationStatus.canReadEvents else { return [] }
 
         let events = fetchEvents(
             from: interval.start,
             end: interval.end,
-            calendars: eventStore.calendars(for: .event).filter(Self.shouldUseForAvailability)
+            calendars: calendarsForDisplay(matching: visibleCalendarIdentifiers)
         )
 
         return events
@@ -577,6 +605,17 @@ final class TodayMdCalendarService: ObservableObject {
         refreshRevision += 1
     }
 
+    private func calendarsForDisplay(matching visibleCalendarIdentifiers: Set<String>?) -> [EKCalendar] {
+        let allCalendars = eventStore.calendars(for: .event)
+
+        guard let visibleCalendarIdentifiers, !visibleCalendarIdentifiers.isEmpty else {
+            return allCalendars
+        }
+
+        let filteredCalendars = allCalendars.filter { visibleCalendarIdentifiers.contains($0.calendarIdentifier) }
+        return filteredCalendars.isEmpty ? allCalendars : filteredCalendars
+    }
+
     private func fetchEvents(from startDate: Date, end endDate: Date, calendars: [EKCalendar]) -> [EKEvent] {
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
         return eventStore.events(matching: predicate)
@@ -613,13 +652,19 @@ final class TodayMdCalendarService: ObservableObject {
     }
 
     private static func makeCalendarSummary(calendar: EKCalendar) -> TodayMdCalendarSummary {
-        TodayMdCalendarSummary(
+        let color = normalizedColor(for: calendar.cgColor)
+
+        return TodayMdCalendarSummary(
             id: calendar.calendarIdentifier,
             title: calendar.title,
             sourceTitle: calendar.source.title,
             sourceType: calendar.source.sourceType,
             calendarType: calendar.type,
-            allowsContentModifications: calendar.allowsContentModifications
+            allowsContentModifications: calendar.allowsContentModifications,
+            colorRed: Double(color.redComponent),
+            colorGreen: Double(color.greenComponent),
+            colorBlue: Double(color.blueComponent),
+            colorAlpha: Double(color.alphaComponent)
         )
     }
 
@@ -632,6 +677,7 @@ final class TodayMdCalendarService: ObservableObject {
         ].joined(separator: "::")
 
         let isTodayMdBlock = Self.isTodayMdManaged(event)
+        let color = normalizedColor(for: event.calendar.cgColor)
 
         return TodayMdCalendarEventSummary(
             id: identifier,
@@ -640,12 +686,17 @@ final class TodayMdCalendarService: ObservableObject {
             startDate: event.startDate,
             endDate: event.endDate,
             isAllDay: event.isAllDay,
+            calendarID: event.calendar.calendarIdentifier,
             calendarTitle: event.calendar.title,
             location: Self.normalizedOptionalString(event.location),
             notes: Self.displayNotes(event.notes, isTodayMdBlock: isTodayMdBlock),
             url: event.url,
             allowsContentModifications: event.calendar.allowsContentModifications,
-            isTodayMdBlock: isTodayMdBlock
+            isTodayMdBlock: isTodayMdBlock,
+            colorRed: Double(color.redComponent),
+            colorGreen: Double(color.greenComponent),
+            colorBlue: Double(color.blueComponent),
+            colorAlpha: Double(color.alphaComponent)
         )
     }
 
@@ -665,6 +716,17 @@ final class TodayMdCalendarService: ObservableObject {
         default:
             return true
         }
+    }
+
+    private static func normalizedColor(for cgColor: CGColor?) -> NSColor {
+        let fallbackColor = NSColor.systemBlue.usingColorSpace(.deviceRGB) ?? .systemBlue
+
+        guard let cgColor,
+              let nsColor = NSColor(cgColor: cgColor)?.usingColorSpace(.deviceRGB) else {
+            return fallbackColor
+        }
+
+        return nsColor
     }
 
     private static func sortCalendarSummaries(lhs: TodayMdCalendarSummary, rhs: TodayMdCalendarSummary) -> Bool {
