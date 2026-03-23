@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import appMockup from "@/assets/app-mockup.png";
 
 export function Hero() {
   return (
