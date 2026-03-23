@@ -54,7 +54,7 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}>
           
-          <div className="rounded-3xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.06)]">
+          <div className="rounded-xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.06)]">
             <video
               src="/videos/hero-demo.mp4"
               autoPlay
