@@ -710,6 +710,10 @@ struct ContentView: View {
         return "calendar-ready"
     }
 
+    private var plannerShowsTaskColumns: Bool {
+        calendarService.authorizationStatus.canReadEvents
+    }
+
     private func calendarSuggestedSlotText(durationMinutes: Int) -> String {
         guard let interval = calendarService.suggestedBlockInterval(durationMinutes: durationMinutes) else {
             return "No open slot found in the next two weeks."
@@ -1534,26 +1538,27 @@ struct ContentView: View {
 
     private var plannerWorkspaceView: some View {
         HStack(alignment: .top, spacing: 0) {
-            plannerTaskShelf
-                .id(plannerShelfPhaseKey)
-                .frame(minWidth: 280, idealWidth: 320, maxWidth: 380, maxHeight: .infinity, alignment: .top)
+            if plannerShowsTaskColumns {
+                plannerTaskShelf
+                    .id(plannerShelfPhaseKey)
+                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 380, maxHeight: .infinity, alignment: .top)
 
-            Divider()
+                Divider()
+            }
 
-            WeekCalendarPanelView()
+            WeekCalendarPanelView(displayMode: .week)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .layoutPriority(1)
 
-            if !windowIsNarrow && hasDetailContent {
+            if plannerShowsTaskColumns && !windowIsNarrow && hasDetailContent {
                 Divider()
 
                 plannerInspectorColumn
                     .frame(minWidth: 340, idealWidth: 420, maxWidth: 520, maxHeight: .infinity, alignment: .top)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .ignoresSafeArea(edges: .top)
-        .padding(.top, max(windowChromeTopInset + 8, 52))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 8)
         .padding(.leading, 16)
         .padding(.trailing, 8)
         .padding(.bottom, 8)
@@ -1765,9 +1770,9 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
                     isSelected
-                        ? Color.orange.opacity(0.32)
-                        : Color(nsColor: .separatorColor).opacity(0.14),
-                    lineWidth: 1
+                        ? Color.orange.opacity(0.42)
+                        : Color(nsColor: .separatorColor).opacity(0.24),
+                    lineWidth: 1.2
                 )
         )
         .draggable(TaskItemTransfer(id: task.id))
@@ -1990,7 +1995,7 @@ struct ContentView: View {
             Divider()
 
             if auxiliaryPanelMode == .week {
-                WeekCalendarPanelView()
+                WeekCalendarPanelView(displayMode: .todayAndTomorrow)
             } else if hasDetailContent {
                 detailPanel
             } else {
