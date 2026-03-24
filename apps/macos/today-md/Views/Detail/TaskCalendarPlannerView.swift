@@ -1000,6 +1000,29 @@ private enum WeekCalendarPanelStyle {
     static let deleteBadgeInset: CGFloat = 8
 }
 
+enum WeekCalendarPanelDisplayMode {
+    case week
+    case todayAndTomorrow
+
+    var visibleDayCount: Int {
+        switch self {
+        case .week:
+            return 7
+        case .todayAndTomorrow:
+            return 2
+        }
+    }
+
+    var resetButtonTitle: String {
+        switch self {
+        case .week:
+            return "This Week"
+        case .todayAndTomorrow:
+            return "Today"
+        }
+    }
+}
+
 private struct WeekCalendarDragPreview: Equatable {
     let eventIdentifier: String
     let title: String
@@ -1128,13 +1151,15 @@ private enum WeekCalendarEventLayout {
 }
 
 struct WeekCalendarPanelView: View {
+    let displayMode: WeekCalendarPanelDisplayMode
+
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var calendarService: TodayMdCalendarService
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
     @AppStorage(TodayMdPreferenceKey.calendarVisibleIdentifiers) private var calendarVisibleIdentifiersRaw = ""
 
-    @State private var visibleWeekStart = WeekCalendarPanelView.defaultWeekStart()
+    @State private var visibleWeekStart: Date
     @State private var weekEventsByDay: [Date: [TodayMdCalendarEventSummary]] = [:]
     @State private var activeDraggedEvent: TodayMdCalendarEventSummary?
     @State private var dragPreview: WeekCalendarDragPreview?
@@ -1145,6 +1170,11 @@ struct WeekCalendarPanelView: View {
     @State private var isDeleting = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
+
+    init(displayMode: WeekCalendarPanelDisplayMode = .week) {
+        self.displayMode = displayMode
+        _visibleWeekStart = State(initialValue: Self.defaultVisibleStart(for: displayMode))
+    }
 
     private var calendar: Calendar {
         Calendar.current
@@ -1167,13 +1197,15 @@ struct WeekCalendarPanelView: View {
     }
 
     private var weekDays: [Date] {
-        (0..<7).compactMap { offset in
+        (0..<displayMode.visibleDayCount).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: visibleWeekStart)
         }
     }
 
     private var weekInterval: DateInterval {
-        let end = calendar.date(byAdding: .day, value: 7, to: visibleWeekStart) ?? visibleWeekStart.addingTimeInterval(7 * 24 * 60 * 60)
+        let visibleDays = displayMode.visibleDayCount
+        let end = calendar.date(byAdding: .day, value: visibleDays, to: visibleWeekStart)
+            ?? visibleWeekStart.addingTimeInterval(TimeInterval(visibleDays * 24 * 60 * 60))
         return DateInterval(start: visibleWeekStart, end: end)
     }
 
@@ -1197,7 +1229,8 @@ struct WeekCalendarPanelView: View {
     }
 
     private var weekRangeText: String {
-        guard let lastDay = calendar.date(byAdding: .day, value: 6, to: visibleWeekStart) else {
+        let trailingDayCount = max(displayMode.visibleDayCount - 1, 0)
+        guard let lastDay = calendar.date(byAdding: .day, value: trailingDayCount, to: visibleWeekStart) else {
             return visibleWeekStart.formatted(date: .abbreviated, time: .omitted)
         }
 
@@ -1274,8 +1307,8 @@ struct WeekCalendarPanelView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button("This Week") {
-                    visibleWeekStart = Self.defaultWeekStart()
+                Button(displayMode.resetButtonTitle) {
+                    visibleWeekStart = Self.defaultVisibleStart(for: displayMode)
                 }
                 .buttonStyle(.bordered)
 
@@ -1475,7 +1508,7 @@ struct WeekCalendarPanelView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: timelineHeight + 140, alignment: .center)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private var weekGrid: some View {
@@ -1647,19 +1680,19 @@ struct WeekCalendarPanelView: View {
 
     private func anchoredSelectedEventPopup(_ event: TodayMdCalendarEventSummary, dayColumnWidth: CGFloat) -> some View {
         let metrics = popoverMetrics(for: event, dayColumnWidth: dayColumnWidth)
-        let popupWidth: CGFloat = 432
-        let popupHeight: CGFloat = 320
-        let arrowSize: CGFloat = 18
+        let popupWidth: CGFloat = 388
+        let popupHeight: CGFloat = 272
+        let arrowSize: CGFloat = 16
         let cardX = metrics.origin.x
         let cardY = metrics.origin.y
-        let arrowOffset = min(max(metrics.arrowY - cardY - 28, 46), popupHeight - 46)
+        let arrowOffset = min(max(metrics.arrowY - cardY - 24, 40), popupHeight - 40)
 
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .shadow(color: Color.black.opacity(0.16), radius: 16, x: 0, y: 10)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 )
                 .frame(width: popupWidth, height: popupHeight)
@@ -1678,16 +1711,16 @@ struct WeekCalendarPanelView: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .padding(18)
+                    .padding(14)
                 }
                 .overlay {
                     ScrollView {
                         popupBody(for: event)
-                            .padding(26)
+                            .padding(20)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(width: popupWidth, height: popupHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 }
                 .overlay(alignment: metrics.arrowEdge) {
                     Rectangle()
@@ -1712,28 +1745,28 @@ struct WeekCalendarPanelView: View {
     }
 
     private func popupBody(for event: TodayMdCalendarEventSummary) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
                 Circle()
                     .fill(event.accentColor)
-                    .frame(width: 18, height: 18)
-                    .padding(.top, 6)
+                    .frame(width: 16, height: 16)
+                    .padding(.top, 4)
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(event.title)
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .lineLimit(3)
 
                     Text(scheduleText(for: event))
-                        .font(.title3)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
 
                     if event.isTodayMdBlock {
                         Text("Created from today-md")
-                            .font(.caption.weight(.semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.orange)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
                             .background(
                                 Capsule()
                                     .fill(Color.orange.opacity(0.12))
@@ -1757,22 +1790,9 @@ struct WeekCalendarPanelView: View {
                         .foregroundStyle(.secondary)
 
                     Link(url.absoluteString, destination: url)
-                        .font(.subheadline)
+                        .font(.caption)
                         .lineLimit(2)
                         .truncationMode(.middle)
-                }
-            }
-
-            if let notes = event.notes {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Notes")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Text(notes)
-                        .font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
                 }
             }
 
@@ -1843,8 +1863,9 @@ struct WeekCalendarPanelView: View {
     }
 
     private func shiftWeek(by delta: Int) {
-        guard let nextWeek = calendar.date(byAdding: .day, value: delta * 7, to: visibleWeekStart) else { return }
-        visibleWeekStart = Self.startOfWeek(for: nextWeek, calendar: calendar)
+        let visibleDays = displayMode.visibleDayCount
+        guard let nextRange = calendar.date(byAdding: .day, value: delta * visibleDays, to: visibleWeekStart) else { return }
+        visibleWeekStart = Self.normalizedVisibleStart(for: nextRange, displayMode: displayMode, calendar: calendar)
     }
 
     private func reloadWeekEvents() {
@@ -1985,11 +2006,11 @@ struct WeekCalendarPanelView: View {
     private func detailRow(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.subheadline)
+                .font(.system(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
@@ -2250,8 +2271,24 @@ struct WeekCalendarPanelView: View {
         WeekCalendarPanelStyle.hourLabelWidth + 8 + columnsWidth(for: dayColumnWidth) + 32
     }
 
-    private static func defaultWeekStart(calendar: Calendar = .current) -> Date {
-        startOfWeek(for: Date(), calendar: calendar)
+    private static func defaultVisibleStart(
+        for displayMode: WeekCalendarPanelDisplayMode,
+        calendar: Calendar = .current
+    ) -> Date {
+        normalizedVisibleStart(for: Date(), displayMode: displayMode, calendar: calendar)
+    }
+
+    private static func normalizedVisibleStart(
+        for date: Date,
+        displayMode: WeekCalendarPanelDisplayMode,
+        calendar: Calendar
+    ) -> Date {
+        switch displayMode {
+        case .week:
+            return startOfWeek(for: date, calendar: calendar)
+        case .todayAndTomorrow:
+            return calendar.startOfDay(for: date)
+        }
     }
 
     private static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
