@@ -1444,71 +1444,31 @@ struct WeekCalendarPanelView: View {
         actionTitle: String?,
         action: (() -> Void)?
     ) -> some View {
-        VStack {
-            Spacer(minLength: 0)
-
-            VStack(alignment: .leading, spacing: 18) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.orange.opacity(0.22),
-                                    Color.orange.opacity(0.10)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(.orange)
-                }
-                .frame(width: 58, height: 58)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title)
-                        .font(.system(size: 28, weight: .bold))
-
-                    Text(message)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack(spacing: 12) {
-                    if let actionTitle, let action {
-                        Button(actionTitle, action: action)
-                            .buttonStyle(.borderedProminent)
-                            .tint(.orange)
-                    }
-
-                    Text(weekRangeText)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.secondary.opacity(0.10))
-                        )
+        VStack(alignment: .leading, spacing: 18) {
+            ContentUnavailableView {
+                Label(title, systemImage: "calendar.badge.plus")
+            } description: {
+                Text(message)
+            } actions: {
+                if let actionTitle, let action {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
                 }
             }
-            .frame(maxWidth: 520, alignment: .leading)
-            .padding(28)
-            .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.88))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .stroke(Color.orange.opacity(0.14), lineWidth: 1)
-            )
 
-            Spacer(minLength: 0)
+            Text(weekRangeText)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.10))
+                )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.top, 44)
     }
 
     private var weekGrid: some View {
