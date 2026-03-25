@@ -184,6 +184,25 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(afterIndex, beforeIndex)
     }
 
+    func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: Date())
+
+        XCTAssertEqual(task.block, .today)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForFutureDate() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: tomorrow)
+
+        XCTAssertEqual(task.block, .thisWeek)
+    }
+
     func testMarkdownAutoContinuationCreatesChecklistFromInitialEmptyItem() {
         XCTAssertEqual(
             MarkdownAutoContinuation.edit(old: "- [ ]", new: "- [ ]\n"),
