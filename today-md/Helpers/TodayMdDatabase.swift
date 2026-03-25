@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-final class TodayMdDatabase {
+final class TodayMdDatabase: @unchecked Sendable {
     private let db: OpaquePointer
 
     init(url: URL) throws {
@@ -109,9 +109,16 @@ final class TodayMdDatabase {
                 is_done INTEGER NOT NULL,
                 block_raw TEXT NOT NULL,
                 sort_order INTEGER NOT NULL,
-                creation_date REAL NOT NULL
+                creation_date REAL NOT NULL,
+                scheduling_state_raw TEXT NOT NULL DEFAULT 'unscheduled'
             );
             """
+        )
+
+        try ensureColumn(
+            named: "scheduling_state_raw",
+            in: "tasks",
+            definition: "TEXT NOT NULL DEFAULT 'unscheduled'"
         )
 
         try execute(
@@ -194,7 +201,7 @@ final class TodayMdDatabase {
         if listID == nil {
             sql =
                 """
-                SELECT id, title, is_done, block_raw, sort_order, creation_date
+                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw
                 FROM tasks
                 WHERE list_id IS NULL
                 ORDER BY
@@ -210,7 +217,7 @@ final class TodayMdDatabase {
         } else {
             sql =
                 """
-                SELECT id, title, is_done, block_raw, sort_order, creation_date
+                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw
                 FROM tasks
                 WHERE list_id = ?
                 ORDER BY
@@ -246,6 +253,7 @@ final class TodayMdDatabase {
             let isDone = sqlite3_column_int(statement, 2) != 0
             let sortOrder = Int(sqlite3_column_int64(statement, 4))
             let creationDate = Date(timeIntervalSince1970: sqlite3_column_double(statement, 5))
+            let schedulingStateRaw = columnText(statement, index: 6) ?? TaskSchedulingState.unscheduled.rawValue
 
             tasks.append(
                 TodayMdArchive.TaskArchive(
@@ -253,6 +261,7 @@ final class TodayMdDatabase {
                     title: title,
                     isDone: isDone,
                     blockRaw: blockRaw,
+                    schedulingStateRaw: schedulingStateRaw,
                     sortOrder: sortOrder,
                     creationDate: creationDate,
                     note: try fetchNote(taskID: id),
@@ -350,8 +359,8 @@ final class TodayMdDatabase {
     ) throws {
         let taskStatement = try prepare(
             """
-            INSERT INTO tasks (id, list_id, title, is_done, block_raw, sort_order, creation_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO tasks (id, list_id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """
         )
         defer { sqlite3_finalize(taskStatement) }
@@ -395,6 +404,7 @@ final class TodayMdDatabase {
             try bind(task.blockRaw, at: 5, in: taskStatement)
             try bind(Int64(task.sortOrder), at: 6, in: taskStatement)
             try bind(task.creationDate.timeIntervalSince1970, at: 7, in: taskStatement)
+            try bind(task.schedulingStateRaw, at: 8, in: taskStatement)
             try stepDone(taskStatement)
 
             if let note = task.note {
@@ -432,6 +442,19 @@ final class TodayMdDatabase {
         guard result == SQLITE_OK else {
             throw DatabaseError.executeFailed(message: String(cString: sqlite3_errmsg(db)), sql: sql)
         }
+    }
+
+    private func ensureColumn(named column: String, in table: String, definition: String) throws {
+        let statement = try prepare("PRAGMA table_info(\(table));")
+        defer { sqlite3_finalize(statement) }
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if columnText(statement, index: 1) == column {
+                return
+            }
+        }
+
+        try execute("ALTER TABLE \(table) ADD COLUMN \(column) \(definition);")
     }
 
     private func prepare(_ sql: String) throws -> OpaquePointer? {

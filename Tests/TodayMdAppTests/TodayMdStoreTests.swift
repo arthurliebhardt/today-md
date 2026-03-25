@@ -112,6 +112,20 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(task.list?.id, list.id)
     }
 
+    func testTaskVisibilityScopeFiltersTasksToSelectedList() throws {
+        let store = try makeStore()
+        let work = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let personal = store.addList(name: "Personal", icon: "person", color: .green)
+
+        let workTask = try XCTUnwrap(store.addTask(title: "Work task", block: .today, listID: work.id))
+        _ = try XCTUnwrap(store.addTask(title: "Personal task", block: .today, listID: personal.id))
+        _ = store.addUnassignedTask(title: "Inbox task", block: .today)
+
+        let visibleTasks = TaskVisibilityScope.tasks(for: .list(work.id), store: store)
+
+        XCTAssertEqual(visibleTasks.map(\.id), [workTask.id])
+    }
+
     func testAssignTaskPreservesPositionWhenMovingIntoList() throws {
         let store = try makeStore()
         let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
@@ -184,6 +198,51 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(afterIndex, beforeIndex)
     }
 
+    func testMoveActiveTaskOnBoardMovesTaskIntoTargetLaneBeforeDroppedTask() throws {
+        let store = try makeStore()
+
+        let todayBottom = store.addUnassignedTask(title: "Today bottom", block: .today)
+        _ = store.addUnassignedTask(title: "Today top", block: .today)
+        let moveMe = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveActiveTaskOnBoard(moveMe.id, to: .today, before: todayBottom.id)
+
+        XCTAssertEqual(moveMe.block, .today)
+        let todayTasks = store.allTasks
+            .filter { $0.block == .today && !$0.isDone }
+            .sorted(by: taskSort)
+        XCTAssertEqual(todayTasks.map(\.title), ["Today top", "Move me", "Today bottom"])
+    }
+
+    func testMoveActiveTaskOnBoardAppendsTaskToTargetLaneWhenDroppedPastLastCard() throws {
+        let store = try makeStore()
+
+        _ = store.addUnassignedTask(title: "Today bottom", block: .today)
+        _ = store.addUnassignedTask(title: "Today top", block: .today)
+        let moveMe = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveActiveTaskOnBoard(moveMe.id, to: .today, before: nil)
+
+        XCTAssertEqual(moveMe.block, .today)
+        let todayTasks = store.allTasks
+            .filter { $0.block == .today && !$0.isDone }
+            .sorted(by: taskSort)
+        XCTAssertEqual(todayTasks.map(\.title), ["Today top", "Today bottom", "Move me"])
+    }
+
+    func testFlushPendingPersistencePersistsDeferredMove() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveTask(id: task.id, to: .today)
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let persistedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+        XCTAssertEqual(persistedTask.block, .today)
+    }
+
     func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
@@ -191,16 +250,56 @@ final class TodayMdStoreTests: XCTestCase {
         store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: Date())
 
         XCTAssertEqual(task.block, .today)
+        XCTAssertTrue(task.isScheduled)
     }
 
-    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForFutureDate() throws {
+    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForDateInCurrentWeek() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .today)
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+        let calendar = Calendar.current
+        let currentWeek = try XCTUnwrap(calendar.dateInterval(of: .weekOfYear, for: Date()))
+        let dateInCurrentWeek = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: currentWeek.start))
 
-        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: tomorrow)
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: dateInCurrentWeek, calendar: calendar)
 
         XCTAssertEqual(task.block, .thisWeek)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToBacklogForDateInNextWeek() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        let calendar = Calendar.current
+        let currentWeek = try XCTUnwrap(calendar.dateInterval(of: .weekOfYear, for: Date()))
+        let dateInNextWeek = currentWeek.end
+
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: dateInNextWeek, calendar: calendar)
+
+        XCTAssertEqual(task.block, .backlog)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSetTaskSchedulingStatePersistsScheduledFlag() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let persistedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+        XCTAssertTrue(persistedTask.isScheduled)
+    }
+
+    func testSetTaskSchedulingStateClearsScheduledFlag() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+        store.setTaskSchedulingState(id: task.id, isScheduled: false)
+
+        XCTAssertFalse(task.isScheduled)
     }
 
     func testMarkdownAutoContinuationCreatesChecklistFromInitialEmptyItem() {
@@ -648,10 +747,14 @@ final class TodayMdStoreTests: XCTestCase {
 
     private func makeStore() throws -> TodayMdStore {
         let databaseURL = try makeDatabaseURL()
-        return TodayMdStore(
+        let store = TodayMdStore(
             databaseURL: databaseURL,
             shouldSeedShowcaseData: false
         )
+        addTeardownBlock {
+            store.flushPendingPersistence()
+        }
+        return store
     }
 
     private func makeDatabaseURL() throws -> URL {

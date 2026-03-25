@@ -729,6 +729,9 @@ struct TaskCalendarPlannerView: View {
 
             do {
                 try calendarService.deleteEvent(identifier: eventIdentifier)
+                if let taskID = event.taskID {
+                    store.setTaskSchedulingState(id: taskID, isScheduled: false)
+                }
                 reloadTodayEvents()
                 successMessage = "Deleted \(event.title)."
             } catch {
@@ -1642,14 +1645,18 @@ struct WeekCalendarPanelView: View {
         .frame(width: WeekCalendarPanelStyle.hourLabelWidth)
     }
 
+    private var selectedEventPopupWidth: CGFloat { 344 }
+
+    private var selectedEventPopupHeight: CGFloat { 236 }
+
     private func anchoredSelectedEventPopup(_ event: TodayMdCalendarEventSummary, dayColumnWidth: CGFloat) -> some View {
         let metrics = popoverMetrics(for: event, dayColumnWidth: dayColumnWidth)
-        let popupWidth: CGFloat = 388
-        let popupHeight: CGFloat = 272
+        let popupWidth = selectedEventPopupWidth
+        let popupHeight = selectedEventPopupHeight
         let arrowSize: CGFloat = 16
         let cardX = metrics.origin.x
         let cardY = metrics.origin.y
-        let arrowOffset = min(max(metrics.arrowY - cardY - 24, 40), popupHeight - 40)
+        let arrowOffset = min(max(metrics.arrowY - cardY - 24, 36), popupHeight - 36)
 
         return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -1660,27 +1667,10 @@ struct WeekCalendarPanelView: View {
                         .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 )
                 .frame(width: popupWidth, height: popupHeight)
-                .overlay(alignment: .topTrailing) {
-                    Button {
-                        selectedEvent = nil
-                        selectedEventFrame = nil
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                Circle()
-                                    .fill(Color.secondary.opacity(0.12))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(14)
-                }
                 .overlay {
                     ScrollView {
                         popupBody(for: event)
-                            .padding(20)
+                            .padding(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(width: popupWidth, height: popupHeight)
@@ -1718,16 +1708,16 @@ struct WeekCalendarPanelView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(event.title)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .lineLimit(3)
 
                     Text(scheduleText(for: event))
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
 
                     if event.isTodayMdBlock {
                         Text("Created from today-md")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
@@ -1737,6 +1727,23 @@ struct WeekCalendarPanelView: View {
                             )
                     }
                 }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    selectedEvent = nil
+                    selectedEventFrame = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            Circle()
+                                .fill(Color.secondary.opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
             }
 
             Divider()
@@ -1750,11 +1757,11 @@ struct WeekCalendarPanelView: View {
             if let url = event.url {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Link")
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
 
                     Link(url.absoluteString, destination: url)
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .lineLimit(2)
                         .truncationMode(.middle)
                 }
@@ -1767,6 +1774,7 @@ struct WeekCalendarPanelView: View {
                     Button("Delete Event", role: .destructive) {
                         pendingDeletionEvent = event
                     }
+                    .font(.system(size: 12, weight: .medium))
                     .buttonStyle(.bordered)
 
                     Spacer(minLength: 0)
@@ -1776,8 +1784,8 @@ struct WeekCalendarPanelView: View {
     }
 
     private func popoverMetrics(for event: TodayMdCalendarEventSummary, dayColumnWidth: CGFloat) -> (origin: CGPoint, arrowY: CGFloat, arrowEdge: Alignment) {
-        let popupWidth: CGFloat = 432
-        let popupHeight: CGFloat = 320
+        let popupWidth = selectedEventPopupWidth
+        let popupHeight = selectedEventPopupHeight
         let margin: CGFloat = 14
 
         let anchor = selectedEventFrame ?? CGRect(
@@ -2091,6 +2099,9 @@ struct WeekCalendarPanelView: View {
 
             do {
                 try calendarService.deleteEvent(identifier: eventIdentifier)
+                if let taskID = event.taskID {
+                    store.setTaskSchedulingState(id: taskID, isScheduled: false)
+                }
                 reloadWeekEvents()
                 successMessage = "Deleted \(event.title)."
             } catch {

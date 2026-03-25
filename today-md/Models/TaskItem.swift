@@ -29,12 +29,18 @@ struct MarkdownChecklistItem: Identifiable, Hashable {
     }
 }
 
+enum TaskSchedulingState: String, Codable {
+    case unscheduled
+    case scheduled
+}
+
 @Observable
 final class TaskItem: Identifiable, Hashable {
     let id: UUID
     var title: String
     var isDone: Bool
     var blockRaw: String
+    var schedulingStateRaw: String
     var sortOrder: Int
     var creationDate: Date
     weak var list: TaskList?
@@ -44,6 +50,15 @@ final class TaskItem: Identifiable, Hashable {
     var block: TimeBlock {
         get { TimeBlock(rawValue: blockRaw) ?? .backlog }
         set { blockRaw = newValue.rawValue }
+    }
+
+    var schedulingState: TaskSchedulingState {
+        get { TaskSchedulingState(rawValue: schedulingStateRaw) ?? .unscheduled }
+        set { schedulingStateRaw = newValue.rawValue }
+    }
+
+    var isScheduled: Bool {
+        schedulingState == .scheduled
     }
 
     var completedSubtaskCount: Int {
@@ -111,6 +126,7 @@ final class TaskItem: Identifiable, Hashable {
         id: UUID = UUID(),
         title: String,
         block: TimeBlock = .backlog,
+        schedulingState: TaskSchedulingState = .unscheduled,
         sortOrder: Int = 0,
         creationDate: Date = Date(),
         isDone: Bool = false,
@@ -121,6 +137,7 @@ final class TaskItem: Identifiable, Hashable {
         self.title = title
         self.isDone = isDone
         self.blockRaw = block.rawValue
+        self.schedulingStateRaw = schedulingState.rawValue
         self.sortOrder = sortOrder
         self.creationDate = creationDate
         self.subtasks = subtasks

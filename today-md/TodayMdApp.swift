@@ -401,11 +401,17 @@ struct TodayMdApp: App {
         }
         .defaultSize(width: 1500, height: 920)
         .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active else { return }
-            calendarService.refreshIfNeeded()
+            switch newPhase {
+            case .active:
+                calendarService.refreshIfNeeded()
 
-            guard shouldRunSyncLifecycle else { return }
-            syncService.handleAppDidBecomeActive()
+                guard shouldRunSyncLifecycle else { return }
+                syncService.handleAppDidBecomeActive()
+            case .inactive, .background:
+                store.flushPendingPersistence()
+            @unknown default:
+                break
+            }
         }
         .commands {
             CommandGroup(after: .saveItem) {
@@ -498,6 +504,13 @@ struct TodayMdApp: App {
 @MainActor
 @Observable
 final class TodayMdStore {
+    private enum PersistenceMode {
+        case immediate
+        case deferred
+    }
+
+    private static let deferredPersistenceDelay: DispatchTimeInterval = .milliseconds(150)
+
     private let database: TodayMdDatabase
     private(set) var lists: [TaskList] = []
     private(set) var unassignedTasks: [TaskItem] = []
@@ -512,6 +525,18 @@ final class TodayMdStore {
 
     @ObservationIgnored
     private var syncHandler: (() -> Void)?
+
+    @ObservationIgnored
+    private let persistenceQueue = DispatchQueue(label: "com.todaymd.persistence", qos: .utility)
+
+    @ObservationIgnored
+    private var pendingPersistWorkItem: DispatchWorkItem?
+
+    @ObservationIgnored
+    private var pendingPersistToken = 0
+
+    @ObservationIgnored
+    private var hasPendingSyncNotification = false
 
     init(
         databaseURL: URL? = nil,
@@ -685,7 +710,7 @@ final class TodayMdStore {
         let nextDoneState = markDone ?? task.isDone
         guard previousBlock != block || task.isDone != nextDoneState else { return }
 
-        performMutation(actionName: "Move Task") {
+        performMutation(actionName: "Move Task", persistenceMode: .deferred) {
             task.block = block
             task.isDone = nextDoneState
             task.sortOrder = nextSortOrder(for: task.list, in: block)
@@ -724,7 +749,10 @@ final class TodayMdStore {
             }
         )
 
-        performMutation(actionName: tasksToMove.count == 1 ? "Move Task" : "Move Tasks") {
+        performMutation(
+            actionName: tasksToMove.count == 1 ? "Move Task" : "Move Tasks",
+            persistenceMode: .deferred
+        ) {
             for task in tasksToMove {
                 task.block = block
                 task.isDone = markDone ?? task.isDone
@@ -748,9 +776,50 @@ final class TodayMdStore {
         moveTasks(ids: taskIDsToPromote, to: .today, markDone: false)
     }
 
+    func setTaskSchedulingState(id: UUID, isScheduled: Bool) {
+        guard let task = task(id: id) else { return }
+
+        let targetState: TaskSchedulingState = isScheduled ? .scheduled : .unscheduled
+        guard task.schedulingState != targetState else { return }
+
+        performMutation(
+            actionName: isScheduled ? "Schedule Task" : "Unschedule Task",
+            persistenceMode: .deferred
+        ) {
+            task.schedulingState = targetState
+        }
+    }
+
     func syncTaskBlockWithScheduledDate(id: UUID, scheduledDate: Date, calendar: Calendar = .current) {
-        let targetBlock: TimeBlock = calendar.isDateInToday(scheduledDate) ? .today : .thisWeek
-        moveTask(id: id, to: targetBlock)
+        guard let task = task(id: id) else { return }
+
+        let targetBlock: TimeBlock
+
+        if calendar.isDateInToday(scheduledDate) {
+            targetBlock = .today
+        } else if let currentWeek = calendar.dateInterval(of: .weekOfYear, for: Date()),
+                  scheduledDate >= currentWeek.start,
+                  scheduledDate < currentWeek.end {
+            targetBlock = .thisWeek
+        } else {
+            targetBlock = .backlog
+        }
+
+        let previousBlock = task.block
+        let shouldUpdateBlock = previousBlock != targetBlock
+        let shouldUpdateSchedulingState = !task.isScheduled
+
+        guard shouldUpdateBlock || shouldUpdateSchedulingState else { return }
+
+        performMutation(actionName: "Schedule Task", persistenceMode: .deferred) {
+            task.schedulingState = .scheduled
+
+            guard shouldUpdateBlock else { return }
+
+            task.block = targetBlock
+            task.sortOrder = nextSortOrder(for: task.list, in: targetBlock)
+            normalizeSortOrder(for: task.list, in: previousBlock)
+        }
     }
 
     func deleteTask(id: UUID) {
@@ -851,7 +920,7 @@ final class TodayMdStore {
     func reorderAllActiveTask(_ draggedID: UUID, before beforeID: UUID?) {
         if beforeID == draggedID { return }
 
-        performMutation(actionName: "Reorder Tasks") {
+        performMutation(actionName: "Reorder Tasks", persistenceMode: .deferred) {
             guard let draggedTask = task(id: draggedID) else { return }
 
             if draggedTask.isDone {
@@ -877,6 +946,44 @@ final class TodayMdStore {
         }
     }
 
+    func moveActiveTaskOnBoard(_ draggedID: UUID, to block: TimeBlock, before beforeID: UUID?) {
+        guard let draggedTask = task(id: draggedID) else { return }
+        if beforeID == draggedID, draggedTask.block == block, !draggedTask.isDone { return }
+
+        performMutation(actionName: "Move Task", persistenceMode: .deferred) {
+            let previousBlock = draggedTask.block
+
+            if draggedTask.block != block {
+                draggedTask.block = block
+            }
+
+            if draggedTask.isDone {
+                draggedTask.isDone = false
+            }
+
+            var active = allTasks.filter { !$0.isDone }.sorted(by: taskSort)
+            let done = allTasks.filter(\.isDone).sorted(by: taskSort)
+
+            guard let draggedIndex = active.firstIndex(where: { $0.id == draggedID }) else { return }
+            let moving = active.remove(at: draggedIndex)
+
+            let insertIndex: Int
+            if let beforeID,
+               let targetIndex = active.firstIndex(where: { $0.id == beforeID }) {
+                insertIndex = targetIndex
+            } else {
+                insertIndex = active.count
+            }
+
+            active.insert(moving, at: insertIndex)
+            applyGlobalSortOrder(active + done)
+
+            if previousBlock != block {
+                normalizeSortOrder(for: draggedTask.list, in: previousBlock)
+            }
+        }
+    }
+
     func reorderTaskInListBlock(listID: UUID, draggedID: UUID, block: TimeBlock, before beforeID: UUID?) {
         if beforeID == draggedID { return }
         guard let list = list(id: listID),
@@ -885,7 +992,7 @@ final class TodayMdStore {
             return
         }
 
-        performMutation(actionName: "Move Task") {
+        performMutation(actionName: "Move Task", persistenceMode: .deferred) {
             let previousBlock = draggedTask.block
 
             if draggedTask.block != block {
@@ -1263,10 +1370,15 @@ final class TodayMdStore {
         return removedLegacySubtasks || normalizedLegacyNotes
     }
 
-    private func performMutation(actionName: String, registersUndo: Bool = true, _ change: () -> Void) {
+    private func performMutation(
+        actionName: String,
+        registersUndo: Bool = true,
+        persistenceMode: PersistenceMode = .immediate,
+        _ change: () -> Void
+    ) {
         let previous = registersUndo ? makeArchive() : nil
         change()
-        persist()
+        persist(using: persistenceMode)
         refreshSearch()
         dataRevision += 1
 
@@ -1280,7 +1392,7 @@ final class TodayMdStore {
     private func restore(from archive: TodayMdArchive, actionName: String) {
         let current = makeArchive()
         applyArchive(archive, refreshSearch: true)
-        persist()
+        persist(using: .immediate)
         undoManager?.registerUndo(withTarget: self) { target in
             target.restore(from: current, actionName: actionName)
         }
@@ -1302,14 +1414,86 @@ final class TodayMdStore {
         return didSanitize
     }
 
+    func flushPendingPersistence() {
+        pendingPersistToken += 1
+        let shouldNotifySync = hasPendingSyncNotification
+        hasPendingSyncNotification = false
+        pendingPersistWorkItem?.cancel()
+        pendingPersistWorkItem = nil
+        persistArchive(makeArchive(), notifySync: shouldNotifySync)
+    }
+
     private func persist(notifySync: Bool = true) {
+        persist(using: .immediate, notifySync: notifySync)
+    }
+
+    private func persist(using mode: PersistenceMode, notifySync: Bool = true) {
+        let archive = makeArchive()
+
+        switch mode {
+        case .immediate:
+            pendingPersistToken += 1
+            hasPendingSyncNotification = false
+            pendingPersistWorkItem?.cancel()
+            pendingPersistWorkItem = nil
+            persistArchive(archive, notifySync: notifySync)
+        case .deferred:
+            scheduleDeferredPersist(archive, notifySync: notifySync)
+        }
+    }
+
+    private func persistArchive(_ archive: TodayMdArchive, notifySync: Bool) {
         do {
-            try database.replaceAll(with: makeArchive())
+            try database.replaceAll(with: archive)
             if notifySync {
                 syncHandler?()
             }
         } catch {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
+        }
+    }
+
+    private func scheduleDeferredPersist(_ archive: TodayMdArchive, notifySync: Bool) {
+        hasPendingSyncNotification = hasPendingSyncNotification || notifySync
+        pendingPersistToken += 1
+        let token = pendingPersistToken
+
+        pendingPersistWorkItem?.cancel()
+
+        var workItem: DispatchWorkItem?
+        workItem = DispatchWorkItem { [database] in
+            guard let workItem, !workItem.isCancelled else { return }
+
+            do {
+                try database.replaceAll(with: archive)
+                Task { @MainActor [weak self] in
+                    self?.completeDeferredPersistence(token: token, error: nil)
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.completeDeferredPersistence(token: token, error: error)
+                }
+            }
+        }
+
+        pendingPersistWorkItem = workItem
+        persistenceQueue.asyncAfter(deadline: .now() + Self.deferredPersistenceDelay, execute: workItem!)
+    }
+
+    private func completeDeferredPersistence(token: Int, error: Error?) {
+        guard token == pendingPersistToken else { return }
+
+        pendingPersistWorkItem = nil
+        let shouldNotifySync = hasPendingSyncNotification
+        hasPendingSyncNotification = false
+
+        if let error {
+            assertionFailure("Failed to persist store: \(error.localizedDescription)")
+            return
+        }
+
+        if shouldNotifySync {
+            syncHandler?()
         }
     }
 

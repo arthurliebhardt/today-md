@@ -39,6 +39,19 @@ enum WorkspaceMode: String, CaseIterable, Identifiable {
     }
 }
 
+@MainActor
+enum TaskVisibilityScope {
+    static func tasks(for selection: SidebarSelection, store: TodayMdStore) -> [TaskItem] {
+        switch selection {
+        case .all:
+            return store.allTasks
+        case .list(let listID):
+            guard let list = store.list(id: listID) else { return [] }
+            return list.items.sorted(by: taskSort)
+        }
+    }
+}
+
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
@@ -408,14 +421,7 @@ struct ContentView: View {
             return store.rankedTasks(store.allTasks)
         }
 
-        let tasks: [TaskItem]
-
-        switch selection {
-        case .all:
-            tasks = store.allTasks
-        case .list:
-            tasks = TimeBlock.allCases.flatMap(listTasks)
-        }
+        let tasks = TaskVisibilityScope.tasks(for: selection, store: store)
 
         let activeTasks = tasks.filter { !$0.isDone }
         let doneTasks = tasks.filter(\.isDone)
@@ -428,7 +434,7 @@ struct ContentView: View {
         if store.hasActiveSearch {
             tasks = store.rankedTasks(store.allTasks)
         } else {
-            tasks = store.allTasks
+            tasks = TaskVisibilityScope.tasks(for: selection, store: store)
         }
 
         let activeTasks = tasks.filter { !$0.isDone }
@@ -1691,7 +1697,7 @@ struct ContentView: View {
         }
 
         if selectedList != nil {
-            return "All tasks stay visible here, so you can drag work from any list directly into the calendar."
+            return "This list stays beside the calendar so you can schedule it without switching back."
         }
 
         return "Keep the task shelf open while you block time on the calendar."
@@ -1869,6 +1875,12 @@ struct ContentView: View {
                     .multilineTextAlignment(.leading)
 
                 HStack(spacing: 10) {
+                    if task.isScheduled {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+
                     if let list = task.list {
                         Label(list.name, systemImage: list.icon)
                             .font(.caption)
@@ -2746,7 +2758,7 @@ struct ContentView: View {
         if case .list = selection {
             reorderTaskInCurrentListBlock(draggedID, block, beforeID)
         } else {
-            reorderActiveTask(draggedID, beforeID)
+            store.moveActiveTaskOnBoard(draggedID, to: block, before: beforeID)
         }
     }
 
