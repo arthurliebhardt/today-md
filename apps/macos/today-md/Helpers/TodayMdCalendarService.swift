@@ -3,6 +3,15 @@ import Combine
 import EventKit
 import Foundation
 
+private enum TodayMdCalendarStyle {
+    static let accentColor = NSColor(
+        srgbRed: 0.851,
+        green: 0.467,
+        blue: 0.024,
+        alpha: 1
+    )
+}
+
 enum TodayMdCalendarAuthorizationState: Equatable {
     case notDetermined
     case denied
@@ -110,6 +119,7 @@ struct TodayMdCalendarSummary: Identifiable, Hashable {
 struct TodayMdCalendarEventSummary: Identifiable, Hashable {
     let id: String
     let eventIdentifier: String?
+    let taskID: UUID?
     let title: String
     let startDate: Date
     let endDate: Date
@@ -127,7 +137,11 @@ struct TodayMdCalendarEventSummary: Identifiable, Hashable {
     let colorAlpha: Double
 
     var nsColor: NSColor {
-        NSColor(
+        if isTodayMdBlock {
+            return TodayMdCalendarStyle.accentColor
+        }
+
+        return NSColor(
             calibratedRed: CGFloat(colorRed),
             green: CGFloat(colorGreen),
             blue: CGFloat(colorBlue),
@@ -709,6 +723,7 @@ final class TodayMdCalendarService: ObservableObject {
         return TodayMdCalendarEventSummary(
             id: identifier,
             eventIdentifier: eventIdentifier,
+            taskID: Self.taskID(from: event.notes),
             title: event.title?.isEmpty == false ? event.title : "Untitled Event",
             startDate: event.startDate,
             endDate: event.endDate,
