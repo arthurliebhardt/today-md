@@ -149,6 +149,7 @@ struct TodayMdCalendarBlockResult: Equatable {
     let calendarTitle: String
     let startDate: Date
     let endDate: Date
+    let taskID: UUID?
 }
 
 enum TodayMdCalendarError: LocalizedError {
@@ -545,7 +546,8 @@ final class TodayMdCalendarService: ObservableObject {
             eventIdentifier: event.eventIdentifier ?? UUID().uuidString,
             calendarTitle: destinationSummary.title,
             startDate: interval.start,
-            endDate: interval.end
+            endDate: interval.end,
+            taskID: task.id
         )
 
         lastCreatedBlock = result
@@ -614,7 +616,8 @@ final class TodayMdCalendarService: ObservableObject {
             eventIdentifier: event.eventIdentifier ?? identifier,
             calendarTitle: event.calendar.title,
             startDate: interval.start,
-            endDate: interval.end
+            endDate: interval.end,
+            taskID: Self.taskID(from: event.notes)
         )
 
         lastCreatedBlock = result

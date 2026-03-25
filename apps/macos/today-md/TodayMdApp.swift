@@ -748,6 +748,11 @@ final class TodayMdStore {
         moveTasks(ids: taskIDsToPromote, to: .today, markDone: false)
     }
 
+    func syncTaskBlockWithScheduledDate(id: UUID, scheduledDate: Date, calendar: Calendar = .current) {
+        let targetBlock: TimeBlock = calendar.isDateInToday(scheduledDate) ? .today : .thisWeek
+        moveTask(id: id, to: targetBlock)
+    }
+
     func deleteTask(id: UUID) {
         guard let task = task(id: id) else { return }
 

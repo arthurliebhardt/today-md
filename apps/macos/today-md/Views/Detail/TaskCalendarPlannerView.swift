@@ -74,6 +74,7 @@ private extension TodayMdCalendarEventSummary {
 }
 
 struct TaskCalendarPlannerView: View {
+    @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var calendarService: TodayMdCalendarService
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
@@ -684,6 +685,9 @@ struct TaskCalendarPlannerView: View {
                     preferredCalendarIdentifier: preferredIdentifier
                 )
 
+                if let taskID = result.taskID {
+                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
+                }
                 self.draftInterval = DateInterval(start: result.startDate, end: result.endDate)
                 successMessage = "Placed blocker in \(result.calendarTitle): \(eventTimeText(result.startDate, result.endDate))"
             } catch {
@@ -1444,7 +1448,7 @@ struct WeekCalendarPanelView: View {
         actionTitle: String?,
         action: (() -> Void)?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 18) {
             ContentUnavailableView {
                 Label(title, systemImage: "calendar.badge.plus")
             } description: {
@@ -1467,8 +1471,8 @@ struct WeekCalendarPanelView: View {
                         .fill(Color.secondary.opacity(0.10))
                 )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.top, 44)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private var weekGrid: some View {
@@ -1993,8 +1997,9 @@ struct WeekCalendarPanelView: View {
                     preferredCalendarIdentifier: preferredIdentifier
                 )
 
-                let targetBlock: TimeBlock = calendar.isDateInToday(result.startDate) ? .today : .thisWeek
-                store.moveTask(id: task.id, to: targetBlock)
+                if let taskID = result.taskID {
+                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
+                }
                 successMessage = "Scheduled \(task.title) for \(result.startDate.formatted(date: .omitted, time: .shortened))."
                 reloadWeekEvents()
             } catch {
@@ -2024,6 +2029,9 @@ struct WeekCalendarPanelView: View {
 
             do {
                 let result = try calendarService.moveEvent(identifier: eventIdentifier, to: interval)
+                if let taskID = result.taskID {
+                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
+                }
                 successMessage = "Moved \(event.title) to \(result.startDate.formatted(date: .abbreviated, time: .shortened))."
                 reloadWeekEvents()
             } catch {
@@ -2051,8 +2059,9 @@ struct WeekCalendarPanelView: View {
                     preferredCalendarIdentifier: preferredIdentifier
                 )
 
-                let targetBlock: TimeBlock = calendar.isDateInToday(result.startDate) ? .today : .thisWeek
-                store.moveTask(id: task.id, to: targetBlock)
+                if let taskID = result.taskID {
+                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
+                }
                 successMessage = "Scheduled \(task.title) for \(result.startDate.formatted(date: .omitted, time: .shortened))."
                 reloadWeekEvents()
             } catch {
@@ -2155,6 +2164,9 @@ struct WeekCalendarPanelView: View {
 
             do {
                 let result = try calendarService.moveEvent(identifier: eventIdentifier, to: dragPreview.interval)
+                if let taskID = result.taskID {
+                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
+                }
                 successMessage = "Moved blocker to \(result.startDate.formatted(date: .abbreviated, time: .shortened))."
                 reloadWeekEvents()
             } catch {
