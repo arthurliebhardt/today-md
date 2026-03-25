@@ -308,6 +308,7 @@ enum CalendarTimeBlocking {
 @MainActor
 final class TodayMdCalendarService: ObservableObject {
     private static let todayMdBlockMarker = "Created from today-md"
+    private static let taskIDMarkerPrefix = "Task ID: "
 
     @Published private(set) var authorizationStatus: TodayMdCalendarAuthorizationState
     @Published private(set) var calendars: [TodayMdCalendarSummary] = []
@@ -462,6 +463,29 @@ final class TodayMdCalendarService: ObservableObject {
         return events
             .filter { $0.endDate > interval.start && $0.startDate < interval.end }
             .map(Self.makeEventSummary)
+    }
+
+    func managedTaskIDs(forDay date: Date) -> Set<UUID> {
+        guard authorizationStatus.canReadEvents else { return [] }
+
+        let dayInterval = Self.dayInterval(for: date)
+        let events = fetchEvents(
+            from: dayInterval.start,
+            end: dayInterval.end,
+            calendars: eventStore.calendars(for: .event)
+        )
+
+        return Set(
+            events.compactMap { event -> UUID? in
+                guard event.endDate > dayInterval.start,
+                      event.startDate < dayInterval.end,
+                      Self.isTodayMdManaged(event) else {
+                    return nil
+                }
+
+                return Self.taskID(from: event.notes)
+            }
+        )
     }
 
     func createBlock(
@@ -761,6 +785,7 @@ final class TodayMdCalendarService: ObservableObject {
 
     private static func blockNotes(for task: TaskItem) -> String {
         var parts = [todayMdBlockMarker]
+        parts.append("\(taskIDMarkerPrefix)\(task.id.uuidString)")
 
         if let listName = task.list?.name {
             parts.append("List: \(listName)")
@@ -797,9 +822,30 @@ final class TodayMdCalendarService: ObservableObject {
         let sections = rawNotes
             .components(separatedBy: "\n\n")
             .compactMap { normalizedOptionalString($0) }
-            .filter { $0 != todayMdBlockMarker }
+            .filter {
+                $0 != todayMdBlockMarker
+                && !$0.hasPrefix(taskIDMarkerPrefix)
+            }
 
         return normalizedOptionalString(sections.joined(separator: "\n\n"))
+    }
+
+    private static func taskID(from rawNotes: String?) -> UUID? {
+        guard let rawNotes = normalizedOptionalString(rawNotes) else {
+            return nil
+        }
+
+        let sections = rawNotes
+            .components(separatedBy: "\n\n")
+            .compactMap(normalizedOptionalString)
+
+        guard let marker = sections.first(where: { $0.hasPrefix(taskIDMarkerPrefix) }) else {
+            return nil
+        }
+
+        let rawValue = String(marker.dropFirst(taskIDMarkerPrefix.count))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return UUID(uuidString: rawValue)
     }
 
     private static func isTodayMdManaged(_ event: EKEvent) -> Bool {

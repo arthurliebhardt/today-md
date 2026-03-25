@@ -76,11 +76,8 @@ struct TaskDetailView: View {
             }
 
             HStack(spacing: 12) {
-                if let list = task.list {
-                    Label(list.name, systemImage: list.icon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                TaskListBadgePicker(task: task)
+
                 Text("Created \(task.creationDate.formatted(date: .abbreviated, time: .shortened))")
                     .font(.caption)
                     .foregroundStyle(.secondary)

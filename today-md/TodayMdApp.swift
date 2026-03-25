@@ -737,6 +737,17 @@ final class TodayMdStore {
         }
     }
 
+    func promoteScheduledTasksToToday(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+
+        let taskIDsToPromote = allTasks
+            .filter { ids.contains($0.id) && !$0.isDone && $0.block != .today }
+            .map(\.id)
+
+        guard !taskIDsToPromote.isEmpty else { return }
+        moveTasks(ids: taskIDsToPromote, to: .today, markDone: false)
+    }
+
     func deleteTask(id: UUID) {
         guard let task = task(id: id) else { return }
 
