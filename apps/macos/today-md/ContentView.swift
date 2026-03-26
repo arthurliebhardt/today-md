@@ -52,6 +52,33 @@ enum TaskVisibilityScope {
     }
 }
 
+private enum ContentCalendarVisibilitySelection {
+    static func resolvedIdentifiers(from rawValue: String, availableCalendars: [TodayMdCalendarSummary]) -> Set<String> {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard !availableIdentifiers.isEmpty else { return [] }
+
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return availableIdentifiers }
+
+        let selectedIdentifiers = Set(trimmedValue.split(separator: ",").map(String.init))
+            .intersection(availableIdentifiers)
+
+        return selectedIdentifiers.isEmpty ? availableIdentifiers : selectedIdentifiers
+    }
+
+    static func storedValue(for identifiers: Set<String>, availableCalendars: [TodayMdCalendarSummary]) -> String {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard !availableIdentifiers.isEmpty else { return "" }
+
+        let sanitizedIdentifiers = identifiers.intersection(availableIdentifiers)
+        guard !sanitizedIdentifiers.isEmpty, sanitizedIdentifiers.count < availableIdentifiers.count else {
+            return ""
+        }
+
+        return sanitizedIdentifiers.sorted().joined(separator: ",")
+    }
+}
+
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
@@ -333,6 +360,7 @@ struct ContentView: View {
     @AppStorage(TodayMdPreferenceKey.workspaceMode) private var workspaceModeRawValue = WorkspaceMode.board.rawValue
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
+    @AppStorage(TodayMdPreferenceKey.calendarVisibleIdentifiers) private var calendarVisibleIdentifiersRaw = ""
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
@@ -771,6 +799,21 @@ struct ContentView: View {
         return "No writable calendar found"
     }
 
+    private var availableCalendars: [TodayMdCalendarSummary] {
+        calendarService.calendars
+    }
+
+    private var activeCalendarIdentifiers: Set<String> {
+        ContentCalendarVisibilitySelection.resolvedIdentifiers(
+            from: calendarVisibleIdentifiersRaw,
+            availableCalendars: availableCalendars
+        )
+    }
+
+    private var allCalendarsActive: Bool {
+        availableCalendars.isEmpty || activeCalendarIdentifiers.count >= availableCalendars.count
+    }
+
     private var plannerShelfPhaseKey: String {
         if !calendarService.authorizationStatus.canReadEvents {
             return "authorization-\(calendarService.authorizationStatus.label)"
@@ -798,15 +841,25 @@ struct ContentView: View {
         return formatter.string(from: interval.start, to: interval.end)
     }
 
-    private func calendarEventTimeText(_ event: TodayMdCalendarEventSummary) -> String {
-        if event.isAllDay {
-            return "All day"
+    private func toggleActiveCalendar(_ calendar: TodayMdCalendarSummary) {
+        let availableIdentifiers = Set(availableCalendars.map(\.id))
+        guard availableIdentifiers.contains(calendar.id) else { return }
+
+        var updatedSelection = activeCalendarIdentifiers
+
+        if allCalendarsActive {
+            updatedSelection = availableIdentifiers.subtracting([calendar.id])
+        } else if updatedSelection.contains(calendar.id) {
+            guard updatedSelection.count > 1 else { return }
+            updatedSelection.remove(calendar.id)
+        } else {
+            updatedSelection.insert(calendar.id)
         }
 
-        let intervalFormatter = DateIntervalFormatter()
-        intervalFormatter.dateStyle = Calendar.current.isDate(event.startDate, inSameDayAs: Date()) ? .none : .medium
-        intervalFormatter.timeStyle = .short
-        return intervalFormatter.string(from: event.startDate, to: event.endDate)
+        calendarVisibleIdentifiersRaw = ContentCalendarVisibilitySelection.storedValue(
+            for: updatedSelection,
+            availableCalendars: availableCalendars
+        )
     }
 
     private var syncStatusColor: Color {
@@ -1156,45 +1209,101 @@ struct ContentView: View {
                         )
 
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Upcoming events")
-                                .font(.headline)
+                            HStack(alignment: .center, spacing: 12) {
+                                Text("Active calendars")
+                                    .font(.headline)
 
-                            if calendarService.upcomingEvents.isEmpty {
-                                Text("No events found in the next seven days.")
-                                    .font(.subheadline)
+                                Spacer(minLength: 12)
+
+                                if !allCalendarsActive, !availableCalendars.isEmpty {
+                                    Button("Show All") {
+                                        calendarVisibleIdentifiersRaw = ""
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                                }
+                            }
+
+                            Text(
+                                availableCalendars.isEmpty
+                                    ? "No calendars are available yet."
+                                    : allCalendarsActive
+                                        ? "All calendars are active across the planner views."
+                                        : "\(activeCalendarIdentifiers.count) of \(availableCalendars.count) calendars are active across the planner views."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                            if availableCalendars.isEmpty {
+                                Text("Add an account in the macOS Calendar app, then refresh here.")
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             } else {
-                                ForEach(Array(calendarService.upcomingEvents.prefix(6)), id: \.id) { event in
-                                    HStack(alignment: .top, spacing: 12) {
-                                        Image(systemName: event.isAllDay ? "sun.max" : "calendar")
-                                            .foregroundStyle(.orange)
-                                            .frame(width: 18)
+                                LazyVGrid(
+                                    columns: [GridItem(.adaptive(minimum: 180), spacing: 10, alignment: .leading)],
+                                    alignment: .leading,
+                                    spacing: 10
+                                ) {
+                                    ForEach(availableCalendars) { calendar in
+                                        let isActive = activeCalendarIdentifiers.contains(calendar.id)
 
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(event.title)
-                                                .font(.subheadline.weight(.semibold))
-                                            Text(calendarEventTimeText(event))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                            Text(event.calendarTitle)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                        Button {
+                                            toggleActiveCalendar(calendar)
+                                        } label: {
+                                            HStack(alignment: .center, spacing: 10) {
+                                                Circle()
+                                                    .fill(Color(nsColor: calendar.nsColor))
+                                                    .frame(width: 10, height: 10)
+
+                                                VStack(alignment: .leading, spacing: 3) {
+                                                    Text(calendar.title)
+                                                        .font(.subheadline.weight(.semibold))
+                                                        .lineLimit(1)
+
+                                                    Text(calendar.subtitle)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+
+                                                Spacer(minLength: 8)
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 10)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                    .fill(
+                                                        isActive
+                                                            ? Color(nsColor: calendar.nsColor).opacity(0.16)
+                                                            : Color.secondary.opacity(0.08)
+                                                    )
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                    .stroke(
+                                                        isActive
+                                                            ? Color(nsColor: calendar.nsColor).opacity(0.32)
+                                                            : Color.secondary.opacity(0.14),
+                                                        lineWidth: 1
+                                                    )
+                                            )
                                         }
-
-                                        Spacer(minLength: 0)
+                                        .buttonStyle(.plain)
+                                        .help("\(calendar.displayTitle)\n\(calendar.subtitle)")
                                     }
-                                    .padding(.vertical, 4)
                                 }
                             }
                         }
                         .padding(18)
                         .background(
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
                         )
                     }
                 }
