@@ -110,16 +110,30 @@ struct TodayMdArchive: Codable {
         let title: String
         let isDone: Bool
         let blockRaw: String
+        let schedulingStateRaw: String
         let sortOrder: Int
         let creationDate: Date
         let note: NoteArchive?
         let subtasks: [SubTaskArchive]
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case title
+            case isDone
+            case blockRaw
+            case schedulingStateRaw
+            case sortOrder
+            case creationDate
+            case note
+            case subtasks
+        }
 
         init(
             id: UUID,
             title: String,
             isDone: Bool,
             blockRaw: String,
+            schedulingStateRaw: String = TaskSchedulingState.unscheduled.rawValue,
             sortOrder: Int,
             creationDate: Date,
             note: NoteArchive?,
@@ -129,10 +143,25 @@ struct TodayMdArchive: Codable {
             self.title = title
             self.isDone = isDone
             self.blockRaw = blockRaw
+            self.schedulingStateRaw = schedulingStateRaw
             self.sortOrder = sortOrder
             self.creationDate = creationDate
             self.note = note
             self.subtasks = subtasks
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            title = try container.decode(String.self, forKey: .title)
+            isDone = try container.decode(Bool.self, forKey: .isDone)
+            blockRaw = try container.decode(String.self, forKey: .blockRaw)
+            schedulingStateRaw = try container.decodeIfPresent(String.self, forKey: .schedulingStateRaw)
+                ?? TaskSchedulingState.unscheduled.rawValue
+            sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+            creationDate = try container.decode(Date.self, forKey: .creationDate)
+            note = try container.decodeIfPresent(NoteArchive.self, forKey: .note)
+            subtasks = try container.decode([SubTaskArchive].self, forKey: .subtasks)
         }
 
         init(task: TaskItem) {
@@ -140,6 +169,7 @@ struct TodayMdArchive: Codable {
             self.title = task.title
             self.isDone = task.isDone
             self.blockRaw = task.blockRaw
+            self.schedulingStateRaw = task.schedulingStateRaw
             self.sortOrder = task.sortOrder
             self.creationDate = task.creationDate
             self.note = task.note.map(NoteArchive.init(note:))
@@ -153,6 +183,7 @@ struct TodayMdArchive: Codable {
                 id: id,
                 title: title,
                 block: TimeBlock(rawValue: blockRaw) ?? .backlog,
+                schedulingState: TaskSchedulingState(rawValue: schedulingStateRaw) ?? .unscheduled,
                 sortOrder: sortOrder,
                 creationDate: creationDate,
                 isDone: isDone,

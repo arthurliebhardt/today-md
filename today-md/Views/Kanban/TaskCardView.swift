@@ -172,6 +172,11 @@ struct TaskCardView: View {
                     if showsListBadge {
                         TaskListBadgePicker(task: task)
                     }
+                    if task.isScheduled {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
                     if metadata.checkboxTotal > 0 {
                         HStack(spacing: 2) {
                             Image(systemName: "checklist")
