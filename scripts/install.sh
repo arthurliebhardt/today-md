@@ -7,6 +7,18 @@ BUNDLE_ID="com.today-md.app"
 LEGACY_DATA_DIR="$HOME/Library/Application Support/$APP_NAME"
 SANDBOX_DATA_DIR="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/$APP_NAME"
 SHOWCASE_TITLE_SQL="'Book dentist appointment','Buy groceries for dinner party','Plan weekend trip to Hamburg','Declutter photo library','Review onboarding polish PR','Draft release notes for v1.2','Prepare Q2 roadmap outline','Evaluate new analytics vendor'"
+ENTITLEMENTS_TEMPLATE='<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+</dict>
+</plist>'
 
 sqlite_scalar() {
     local database_path="$1"
@@ -102,6 +114,21 @@ migrate_existing_data_if_needed() {
     ditto "$LEGACY_DATA_DIR" "$SANDBOX_DATA_DIR"
 }
 
+repair_app_signature() {
+    local installed_app_path="$1"
+    local entitlements_path="$TMPDIR/today-md.entitlements"
+
+    if ! command -v codesign >/dev/null 2>&1; then
+        echo "Warning: codesign is unavailable, so calendar access may not work in this build."
+        return
+    fi
+
+    printf '%s\n' "$ENTITLEMENTS_TEMPLATE" > "$entitlements_path"
+
+    echo "Repairing app signature for Calendar access..."
+    codesign --force --deep --sign - --entitlements "$entitlements_path" "$installed_app_path"
+}
+
 download_latest_zip() {
     local api_url="https://api.github.com/repos/$REPO/releases/latest"
     local latest_url
@@ -175,5 +202,6 @@ fi
 migrate_existing_data_if_needed
 
 mv "$APP_PATH" "$INSTALL_DIR/"
+repair_app_signature "$INSTALL_DIR/$APP_NAME.app"
 echo "✓ $APP_NAME installed to $INSTALL_DIR"
 echo "  Open it from your Applications folder or Spotlight."
