@@ -1037,6 +1037,9 @@ private enum WeekCalendarPanelStyle {
     static let eventHorizontalInset: CGFloat = 6
     static let deleteBadgeSize: CGFloat = 20
     static let deleteBadgeInset: CGFloat = 8
+    static let resizeHandleHitHeight: CGFloat = 22
+    static let resizeHandleWidth: CGFloat = 34
+    static let resizeHandleThickness: CGFloat = 4
 }
 
 enum WeekCalendarPanelDisplayMode {
@@ -1363,7 +1366,7 @@ struct WeekCalendarPanelView: View {
             Text(weekRangeText)
                 .font(.subheadline.weight(.semibold))
 
-            Text("Drag tasks from the board into any day column to place a \(effectiveDefaultDuration) minute blocker. Click an entry to inspect it, and move or delete calendar-colored blockers directly in the weekly view.")
+            Text("Drag tasks from the board into any day column to place a \(effectiveDefaultDuration) minute blocker. Click an entry to inspect it, drag the body to move it, drag the top or bottom edge to resize it, and use the delete badge to remove calendar-colored blockers directly in the weekly view.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1562,7 +1565,9 @@ struct WeekCalendarPanelView: View {
                     scheduleDroppedTask(taskID, interval: interval)
                 },
                 onSelectEvent: { event, frame in
-                    pendingDeletionEvent = nil
+                    if pendingDeletionEvent?.id != event?.id {
+                        pendingDeletionEvent = nil
+                    }
                     selectedEvent = event
                     selectedEventFrame = frame
                 },
@@ -2078,7 +2083,10 @@ struct WeekCalendarPanelView: View {
                 if let taskID = result.taskID {
                     store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
                 }
-                successMessage = "Moved \(event.title) to \(result.startDate.formatted(date: .abbreviated, time: .shortened))."
+                let formatter = DateIntervalFormatter()
+                formatter.dateStyle = .medium
+                formatter.timeStyle = .short
+                successMessage = "Updated \(event.title): \(formatter.string(from: result.startDate, to: result.endDate))"
                 reloadWeekEvents()
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -2543,6 +2551,8 @@ private struct WeekCalendarCanvasEventGeometry {
     let event: TodayMdCalendarEventSummary
     let frame: CGRect
     let deleteFrame: CGRect?
+    let resizeStartFrame: CGRect?
+    let resizeEndFrame: CGRect?
 }
 
 private struct WeekCalendarCanvasPreview {
@@ -2551,8 +2561,16 @@ private struct WeekCalendarCanvasPreview {
     let columnIndex: Int
 }
 
+private enum WeekCalendarCanvasInteractionMode {
+    case move
+    case resizeStart
+    case resizeEnd
+}
+
 private struct WeekCalendarCanvasDragState {
     let event: TodayMdCalendarEventSummary
+    let mode: WeekCalendarCanvasInteractionMode
+    let frame: CGRect
     let originalInterval: DateInterval
     let initialPoint: CGPoint
     let verticalGrabOffset: CGFloat
@@ -2665,6 +2683,12 @@ private final class WeekCalendarCanvasNSView: NSView {
         for geometry in eventGeometries {
             if geometry.event.canEdit {
                 addCursorRect(geometry.frame, cursor: .openHand)
+                if let resizeStartFrame = geometry.resizeStartFrame {
+                    addCursorRect(resizeStartFrame, cursor: .resizeUpDown)
+                }
+                if let resizeEndFrame = geometry.resizeEndFrame {
+                    addCursorRect(resizeEndFrame, cursor: .resizeUpDown)
+                }
             }
 
             if let deleteFrame = geometry.deleteFrame, geometry.event.canDelete {
@@ -2681,8 +2705,6 @@ private final class WeekCalendarCanvasNSView: NSView {
             return
         }
 
-        onSelectEvent?(geometry.event, geometry.frame)
-
         guard isInteractionEnabled else { return }
 
         if let deleteFrame = geometry.deleteFrame,
@@ -2693,14 +2715,18 @@ private final class WeekCalendarCanvasNSView: NSView {
         }
 
         guard geometry.event.canEdit else {
+            onSelectEvent?(geometry.event, geometry.frame)
             return
         }
 
+        let interactionMode = interactionMode(for: point, in: geometry)
         activeDragState = WeekCalendarCanvasDragState(
             event: geometry.event,
+            mode: interactionMode,
+            frame: geometry.frame,
             originalInterval: DateInterval(start: geometry.event.startDate, end: geometry.event.endDate),
             initialPoint: point,
-            verticalGrabOffset: point.y - geometry.frame.minY,
+            verticalGrabOffset: verticalGrabOffset(for: interactionMode, point: point, in: geometry.frame),
             preview: nil
         )
 
@@ -2715,7 +2741,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         let distance = hypot(point.x - activeDragState.initialPoint.x, point.y - activeDragState.initialPoint.y)
         guard distance >= 2 else { return }
 
-        activeDragState.preview = previewForDraggedEvent(activeDragState.event, point: point, verticalGrabOffset: activeDragState.verticalGrabOffset)
+        activeDragState.preview = preview(for: activeDragState, point: point)
         self.activeDragState = activeDragState
         needsDisplay = true
     }
@@ -2732,8 +2758,14 @@ private final class WeekCalendarCanvasNSView: NSView {
         }
 
         guard isInteractionEnabled,
-              let activeDragState,
-              let preview = activeDragState.preview else {
+              let activeDragState else {
+            return
+        }
+
+        guard let preview = activeDragState.preview else {
+            if activeDragState.mode == .move {
+                onSelectEvent?(activeDragState.event, activeDragState.frame)
+            }
             return
         }
 
@@ -2815,6 +2847,7 @@ private final class WeekCalendarCanvasNSView: NSView {
                 guard let localFrame = localFrames[event.id] else { continue }
 
                 let frame = localFrame.offsetBy(dx: dayColumnFrames[index].minX, dy: 0)
+                let resizeFrames = event.canEdit ? resizeHandleFrames(for: frame) : nil
                 let deleteFrame: CGRect?
                 if event.canDelete {
                     deleteFrame = CGRect(
@@ -2831,7 +2864,9 @@ private final class WeekCalendarCanvasNSView: NSView {
                     WeekCalendarCanvasEventGeometry(
                         event: event,
                         frame: frame,
-                        deleteFrame: deleteFrame
+                        deleteFrame: deleteFrame,
+                        resizeStartFrame: resizeFrames?.start,
+                        resizeEndFrame: resizeFrames?.end
                     )
                 )
             }
@@ -2894,6 +2929,7 @@ private final class WeekCalendarCanvasNSView: NSView {
             strokeColor: strokeColor,
             deleteFrame: geometry.deleteFrame,
             deleteBadgeArmed: pendingDeletionEventID == geometry.event.id,
+            showsResizeHandles: geometry.event.canEdit,
             strokeWidth: isSelected ? 2 : 1
         )
     }
@@ -2909,6 +2945,7 @@ private final class WeekCalendarCanvasNSView: NSView {
             strokeColor: NSColor.systemOrange.withAlphaComponent(0.38),
             deleteFrame: nil,
             deleteBadgeArmed: false,
+            showsResizeHandles: false,
             strokeWidth: 1
         )
     }
@@ -2921,6 +2958,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         strokeColor: NSColor,
         deleteFrame: CGRect?,
         deleteBadgeArmed: Bool,
+        showsResizeHandles: Bool,
         strokeWidth: CGFloat
     ) {
         let cornerRadius: CGFloat = 14
@@ -2978,6 +3016,10 @@ private final class WeekCalendarCanvasNSView: NSView {
         if let deleteFrame {
             drawDeleteBadge(in: deleteFrame, isArmed: deleteBadgeArmed)
         }
+
+        if showsResizeHandles {
+            drawResizeHandles(in: frame, color: strokeColor)
+        }
     }
 
     private func drawDeleteBadge(in frame: CGRect, isArmed: Bool) {
@@ -3004,13 +3046,72 @@ private final class WeekCalendarCanvasNSView: NSView {
         iconPath.stroke()
     }
 
+    private func drawResizeHandles(in frame: CGRect, color: NSColor) {
+        let thickness = WeekCalendarPanelStyle.resizeHandleThickness
+        guard frame.height >= (thickness * 2) + 10 else { return }
+
+        let handleWidth = min(
+            WeekCalendarPanelStyle.resizeHandleWidth,
+            max(frame.width - 28, 18)
+        )
+
+        let x = frame.midX - (handleWidth / 2)
+        let topFrame = CGRect(
+            x: x,
+            y: frame.minY + 2,
+            width: handleWidth,
+            height: thickness
+        )
+        let bottomFrame = CGRect(
+            x: x,
+            y: frame.maxY - thickness - 2,
+            width: handleWidth,
+            height: thickness
+        )
+
+        for handleFrame in [topFrame, bottomFrame] {
+            let path = NSBezierPath(
+                roundedRect: handleFrame,
+                xRadius: thickness / 2,
+                yRadius: thickness / 2
+            )
+            color.withAlphaComponent(0.9).setFill()
+            path.fill()
+        }
+    }
+
     private func eventGeometry(at point: CGPoint) -> WeekCalendarCanvasEventGeometry? {
         eventGeometries.reversed().first { geometry in
             geometry.frame.contains(point) || geometry.deleteFrame?.contains(point) == true
         }
     }
 
-    private func previewForDraggedEvent(
+    private func preview(for dragState: WeekCalendarCanvasDragState, point: CGPoint) -> WeekCalendarCanvasPreview {
+        switch dragState.mode {
+        case .move:
+            return previewForMovedEvent(
+                dragState.event,
+                point: point,
+                verticalGrabOffset: dragState.verticalGrabOffset
+            )
+        case .resizeStart:
+            return previewForResizedEventStart(
+                dragState.event,
+                originalInterval: dragState.originalInterval,
+                point: point,
+                topGrabOffset: dragState.verticalGrabOffset
+            )
+        case .resizeEnd:
+            return previewForResizedEventEnd(
+                dragState.event,
+                originalInterval: dragState.originalInterval,
+                point: point,
+                bottomGrabOffset: dragState.verticalGrabOffset
+            )
+        }
+    }
+
+    private func previewForMovedEvent(
         _ event: TodayMdCalendarEventSummary,
         point: CGPoint,
         verticalGrabOffset: CGFloat
@@ -3024,6 +3125,40 @@ private final class WeekCalendarCanvasNSView: NSView {
         let topY = point.y - verticalGrabOffset
         let start = snappedDate(forTopY: topY, on: day)
         let interval = clampedInterval(startingAt: start, durationMinutes: durationMinutes, on: day)
+        return WeekCalendarCanvasPreview(title: event.title, interval: interval, columnIndex: dayIndex)
+    }
+
+    private func previewForResizedEventStart(
+        _ event: TodayMdCalendarEventSummary,
+        originalInterval: DateInterval,
+        point: CGPoint,
+        topGrabOffset: CGFloat
+    ) -> WeekCalendarCanvasPreview {
+        let dayIndex = columnIndex(for: originalInterval.start) ?? clampedColumnIndex(for: point.x)
+        let day = days[dayIndex]
+        let proposedStart = snappedDate(forTopY: point.y - topGrabOffset, on: day)
+        let minimumEnd = originalInterval.end.addingTimeInterval(
+            TimeInterval(-WeekCalendarPanelStyle.minimumDurationMinutes * 60)
+        )
+        let clampedStart = min(max(proposedStart, displayDayStart(for: day)), minimumEnd)
+        let interval = DateInterval(start: clampedStart, end: originalInterval.end)
+        return WeekCalendarCanvasPreview(title: event.title, interval: interval, columnIndex: dayIndex)
+    }
+
+    private func previewForResizedEventEnd(
+        _ event: TodayMdCalendarEventSummary,
+        originalInterval: DateInterval,
+        point: CGPoint,
+        bottomGrabOffset: CGFloat
+    ) -> WeekCalendarCanvasPreview {
+        let dayIndex = columnIndex(for: originalInterval.start) ?? clampedColumnIndex(for: point.x)
+        let day = days[dayIndex]
+        let proposedEnd = snappedDate(forTopY: point.y + bottomGrabOffset, on: day)
+        let minimumEnd = originalInterval.start.addingTimeInterval(
+            TimeInterval(WeekCalendarPanelStyle.minimumDurationMinutes * 60)
+        )
+        let clampedEnd = max(min(proposedEnd, displayDayEnd(for: day)), minimumEnd)
+        let interval = DateInterval(start: originalInterval.start, end: clampedEnd)
         return WeekCalendarCanvasPreview(title: event.title, interval: interval, columnIndex: dayIndex)
     }
 
@@ -3090,6 +3225,10 @@ private final class WeekCalendarCanvasNSView: NSView {
         return min(max(rawIndex, 0), max(days.count - 1, 0))
     }
 
+    private func columnIndex(for date: Date) -> Int? {
+        days.firstIndex { calendar.isDate($0, inSameDayAs: date) }
+    }
+
     private func snappedDate(forTopY yPosition: CGFloat, on day: Date) -> Date {
         let clampedY = min(max(yPosition, 0), timelineHeight)
         let totalVisibleMinutes = Double(WeekCalendarPanelStyle.dayEndHour - WeekCalendarPanelStyle.dayStartHour) * 60
@@ -3124,6 +3263,58 @@ private final class WeekCalendarCanvasNSView: NSView {
         let y = CGFloat(startMinutes / totalVisibleMinutes) * timelineHeight
         let height = CGFloat((endMinutes - startMinutes) / totalVisibleMinutes) * timelineHeight
         return (y, max(height, 18))
+    }
+
+    private func interactionMode(
+        for point: CGPoint,
+        in geometry: WeekCalendarCanvasEventGeometry
+    ) -> WeekCalendarCanvasInteractionMode {
+        if let resizeStartFrame = geometry.resizeStartFrame,
+           resizeStartFrame.contains(point) {
+            return .resizeStart
+        }
+
+        if let resizeEndFrame = geometry.resizeEndFrame,
+           resizeEndFrame.contains(point) {
+            return .resizeEnd
+        }
+
+        return .move
+    }
+
+    private func verticalGrabOffset(
+        for mode: WeekCalendarCanvasInteractionMode,
+        point: CGPoint,
+        in frame: CGRect
+    ) -> CGFloat {
+        switch mode {
+        case .move, .resizeStart:
+            return point.y - frame.minY
+        case .resizeEnd:
+            return frame.maxY - point.y
+        }
+    }
+
+    private func resizeHandleFrames(for frame: CGRect) -> (start: CGRect, end: CGRect) {
+        let hitHeight = min(
+            WeekCalendarPanelStyle.resizeHandleHitHeight,
+            max((frame.height - 4) / 2, WeekCalendarPanelStyle.resizeHandleThickness)
+        )
+
+        return (
+            start: CGRect(
+                x: frame.minX,
+                y: frame.minY,
+                width: frame.width,
+                height: hitHeight
+            ),
+            end: CGRect(
+                x: frame.minX,
+                y: frame.maxY - hitHeight,
+                width: frame.width,
+                height: hitHeight
+            )
+        )
     }
 
     private func displayDayStart(for day: Date) -> Date {
