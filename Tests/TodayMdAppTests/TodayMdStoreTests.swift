@@ -243,6 +243,28 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(persistedTask.block, .today)
     }
 
+    func testMoveTaskUnschedulesTaskWhenChangingLane() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.moveTask(id: task.id, to: .today)
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertFalse(task.isScheduled)
+    }
+
+    func testMoveActiveTaskOnBoardUnschedulesTaskWhenChangingLane() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.moveActiveTaskOnBoard(task.id, to: .today, before: nil)
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertFalse(task.isScheduled)
+    }
+
     func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
@@ -266,6 +288,27 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertTrue(task.isScheduled)
     }
 
+    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForTomorrowAcrossWeekBoundary() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.firstWeekday = 2
+
+        let sunday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 29, hour: 10)))
+        let monday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 30, hour: 10)))
+
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: monday,
+            calendar: calendar,
+            referenceDate: sunday
+        )
+
+        XCTAssertEqual(task.block, .thisWeek)
+        XCTAssertTrue(task.isScheduled)
+    }
+
     func testSyncTaskBlockWithScheduledDateMovesTaskToBacklogForDateInNextWeek() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .today)
@@ -276,6 +319,17 @@ final class TodayMdStoreTests: XCTestCase {
         store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: dateInNextWeek, calendar: calendar)
 
         XCTAssertEqual(task.block, .backlog)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testPromoteScheduledTasksToTodayPreservesSchedulingState() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.promoteScheduledTasksToToday(ids: Set([task.id]))
+
+        XCTAssertEqual(task.block, .today)
         XCTAssertTrue(task.isScheduled)
     }
 

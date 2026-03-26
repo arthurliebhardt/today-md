@@ -209,26 +209,6 @@ struct TaskCalendarPlannerView: View {
         .onChange(of: calendarVisibleIdentifiersRaw, initial: true) { _, _ in
             reloadTodayEvents()
         }
-        .confirmationDialog(
-            "Delete Calendar Entry?",
-            isPresented: Binding(
-                get: { pendingDeletionEvent != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingDeletionEvent = nil
-                    }
-                }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingDeletionEvent
-        ) { event in
-            Button("Delete Entry", role: .destructive) {
-                deleteEvent(event)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { event in
-            Text("Remove \"\(event.title)\" from \(event.calendarTitle)?")
-        }
     }
 
     private var header: some View {
@@ -374,6 +354,9 @@ struct TaskCalendarPlannerView: View {
                     draftRect: draftFrame(laneWidth: geometry.size.width),
                     deleteTargets: deleteTargets(laneWidth: geometry.size.width),
                     resizeHandleHeight: TaskCalendarTimelineStyle.resizeHandleHeight,
+                    onBackgroundClick: {
+                        pendingDeletionEvent = nil
+                    },
                     onDoubleClick: { yPosition in
                         placeDraftByDoubleClick(at: yPosition)
                     },
@@ -418,19 +401,21 @@ struct TaskCalendarPlannerView: View {
 
             if event.canDelete {
                 Button {
-                    pendingDeletionEvent = event
+                    requestDeletion(for: event)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.red.opacity(0.92), Color.white.opacity(0.95))
+                    deleteEntryBadge(size: 16, isArmed: isDeletionPending(for: event))
                 }
                 .buttonStyle(.plain)
-                .help("Delete calendar entry")
+                .help(isDeletionPending(for: event) ? "Delete calendar entry" : "Arm calendar entry deletion")
                 .disabled(isDeleting)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
+        .contentShape(Capsule())
+        .onTapGesture {
+            pendingDeletionEvent = nil
+        }
         .background(
             Capsule()
                 .fill(event.accentColor.opacity(0.14))
@@ -471,7 +456,10 @@ struct TaskCalendarPlannerView: View {
             .padding(.trailing, event.canDelete ? deleteBadgeSize(for: density) + (TaskCalendarTimelineStyle.deleteBadgeInset * 1.5) : 0)
 
             if event.canDelete {
-                deleteEntryBadge(size: deleteBadgeSize(for: density))
+                deleteEntryBadge(
+                    size: deleteBadgeSize(for: density),
+                    isArmed: isDeletionPending(for: event)
+                )
                     .padding(TaskCalendarTimelineStyle.deleteBadgeInset)
             }
         }
@@ -547,19 +535,19 @@ struct TaskCalendarPlannerView: View {
             )
     }
 
-    private func deleteEntryBadge(size: CGFloat) -> some View {
+    private func deleteEntryBadge(size: CGFloat, isArmed: Bool = false) -> some View {
         ZStack {
             Circle()
                 .fill(Color.white.opacity(0.92))
 
-            Image(systemName: "xmark")
+            Image(systemName: isArmed ? "checkmark" : "xmark")
                 .font(.system(size: size * 0.45, weight: .bold))
-                .foregroundStyle(Color.red.opacity(0.88))
+                .foregroundStyle(isArmed ? Color.red.opacity(0.88) : Color.secondary.opacity(0.72))
         }
         .frame(width: size, height: size)
         .overlay(
             Circle()
-                .stroke(Color.blue.opacity(0.18), lineWidth: 1)
+                .stroke((isArmed ? Color.red : Color.secondary).opacity(0.18), lineWidth: 1)
         )
     }
 
@@ -625,6 +613,7 @@ struct TaskCalendarPlannerView: View {
     }
 
     private func placeDraftByDoubleClick(at yPosition: CGFloat) {
+        pendingDeletionEvent = nil
         let durationMinutes = draftDurationMinutes
         let startDate = snappedDate(for: yPosition)
         draftInterval = clampedInterval(startingAt: startDate, durationMinutes: durationMinutes)
@@ -635,6 +624,7 @@ struct TaskCalendarPlannerView: View {
     private func beginTimelineInteraction(_ mode: TaskCalendarTimelineInteractionMode) {
         guard let draftInterval else { return }
 
+        pendingDeletionEvent = nil
         successMessage = nil
         errorMessage = nil
         isInteractingWithCalendar = true
@@ -731,7 +721,21 @@ struct TaskCalendarPlannerView: View {
               let event = dayEvents.first(where: { $0.id == eventID }),
               event.canDelete else { return }
 
-        pendingDeletionEvent = event
+        requestDeletion(for: event)
+    }
+
+    private func requestDeletion(for event: TodayMdCalendarEventSummary) {
+        guard !isDeleting, event.canDelete else { return }
+
+        if isDeletionPending(for: event) {
+            deleteEvent(event)
+        } else {
+            pendingDeletionEvent = event
+        }
+    }
+
+    private func isDeletionPending(for event: TodayMdCalendarEventSummary) -> Bool {
+        pendingDeletionEvent?.id == event.id
     }
 
     private func deleteEvent(_ event: TodayMdCalendarEventSummary) {
@@ -923,6 +927,7 @@ private struct TaskCalendarTimelineInteractionLayer: NSViewRepresentable {
     let draftRect: CGRect?
     let deleteTargets: [TaskCalendarTimelineDeleteTarget]
     let resizeHandleHeight: CGFloat
+    let onBackgroundClick: () -> Void
     let onDoubleClick: (CGFloat) -> Void
     let onDeleteTarget: (String) -> Void
     let onInteractionStart: (TaskCalendarTimelineInteractionMode) -> Void
@@ -939,6 +944,7 @@ private struct TaskCalendarTimelineInteractionLayer: NSViewRepresentable {
         nsView.draftRect = draftRect
         nsView.deleteTargets = deleteTargets
         nsView.resizeHandleHeight = resizeHandleHeight
+        nsView.onBackgroundClick = onBackgroundClick
         nsView.onDoubleClick = onDoubleClick
         nsView.onDeleteTarget = onDeleteTarget
         nsView.onInteractionStart = onInteractionStart
@@ -951,6 +957,7 @@ private final class TimelineInteractionNSView: NSView {
     var draftRect: CGRect?
     var deleteTargets: [TaskCalendarTimelineDeleteTarget] = []
     var resizeHandleHeight: CGFloat = 22
+    var onBackgroundClick: (() -> Void)?
     var onDoubleClick: ((CGFloat) -> Void)?
     var onDeleteTarget: ((String) -> Void)?
     var onInteractionStart: ((TaskCalendarTimelineInteractionMode) -> Void)?
@@ -980,6 +987,7 @@ private final class TimelineInteractionNSView: NSView {
         }
 
         guard let mode = interactionMode(for: point) else {
+            onBackgroundClick?()
             return
         }
 
@@ -1313,26 +1321,6 @@ struct WeekCalendarPanelView: View {
         .onChange(of: calendarVisibleIdentifiersRaw, initial: true) { _, _ in
             reloadWeekEvents()
         }
-        .confirmationDialog(
-            "Delete Calendar Entry?",
-            isPresented: Binding(
-                get: { pendingDeletionEvent != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingDeletionEvent = nil
-                    }
-                }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingDeletionEvent
-        ) { event in
-            Button("Delete Entry", role: .destructive) {
-                deleteEvent(event)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { event in
-            Text("Remove \"\(event.title)\" from \(event.calendarTitle)?")
-        }
     }
 
     private var header: some View {
@@ -1569,15 +1557,17 @@ struct WeekCalendarPanelView: View {
                 defaultDurationMinutes: effectiveDefaultDuration,
                 isInteractionEnabled: !(isScheduling || isDeleting),
                 selectedEventID: selectedEvent?.id,
+                pendingDeletionEventID: pendingDeletionEvent?.id,
                 onDropTask: { taskID, interval in
                     scheduleDroppedTask(taskID, interval: interval)
                 },
                 onSelectEvent: { event, frame in
+                    pendingDeletionEvent = nil
                     selectedEvent = event
                     selectedEventFrame = frame
                 },
                 onDeleteEvent: { event in
-                    pendingDeletionEvent = event
+                    requestDeletion(for: event)
                 },
                 onMoveEvent: { event, interval in
                     moveEvent(event, to: interval)
@@ -1647,11 +1637,9 @@ struct WeekCalendarPanelView: View {
 
             if event.canDelete {
                 Button {
-                    pendingDeletionEvent = event
+                    requestDeletion(for: event)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.red.opacity(0.92), Color.white.opacity(0.95))
+                    inlineDeleteBadge(size: 14, isArmed: isDeletionPending(for: event))
                 }
                 .buttonStyle(.plain)
             }
@@ -1669,6 +1657,7 @@ struct WeekCalendarPanelView: View {
         )
         .contentShape(Capsule())
         .onTapGesture {
+            pendingDeletionEvent = nil
             selectedEvent = event
             selectedEventFrame = nil
         }
@@ -1772,6 +1761,7 @@ struct WeekCalendarPanelView: View {
                 Spacer(minLength: 8)
 
                 Button {
+                    pendingDeletionEvent = nil
                     selectedEvent = nil
                     selectedEventFrame = nil
                 } label: {
@@ -1812,11 +1802,18 @@ struct WeekCalendarPanelView: View {
                 Divider()
 
                 HStack(spacing: 12) {
-                    Button("Delete Event", role: .destructive) {
-                        pendingDeletionEvent = event
+                    let isArmed = isDeletionPending(for: event)
+                    Button {
+                        requestDeletion(for: event)
+                    } label: {
+                        Label(
+                            "Delete",
+                            systemImage: isArmed ? "checkmark" : "xmark"
+                        )
                     }
                     .font(.system(size: 12, weight: .medium))
                     .buttonStyle(.bordered)
+                    .tint(isArmed ? .red : .gray)
 
                     Spacer(minLength: 0)
                 }
@@ -2151,6 +2148,32 @@ struct WeekCalendarPanelView: View {
         }
     }
 
+    private func requestDeletion(for event: TodayMdCalendarEventSummary) {
+        guard !isDeleting, event.canDelete else { return }
+
+        if isDeletionPending(for: event) {
+            deleteEvent(event)
+        } else {
+            pendingDeletionEvent = event
+        }
+    }
+
+    private func isDeletionPending(for event: TodayMdCalendarEventSummary) -> Bool {
+        pendingDeletionEvent?.id == event.id
+    }
+
+    private func inlineDeleteBadge(size: CGFloat, isArmed: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.92))
+
+            Image(systemName: isArmed ? "checkmark" : "xmark")
+                .font(.system(size: size * 0.72, weight: .bold))
+                .foregroundStyle(isArmed ? Color.red.opacity(0.88) : Color.secondary.opacity(0.72))
+        }
+        .frame(width: size, height: size)
+    }
+
     private func hourLabel(for hour: Int) -> String {
         let date = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: visibleWeekStart) ?? visibleWeekStart
         return date.formatted(date: .omitted, time: .shortened)
@@ -2347,6 +2370,7 @@ private struct WeekCalendarDayColumn: View {
     let eventFrames: [String: CGRect]
     let timelineHeight: CGFloat
     let hiddenEventIdentifier: String?
+    let pendingDeletionEventID: String? = nil
     let onMoveEventStart: (TodayMdCalendarEventSummary) -> Void
     let onMoveEventChange: (TodayMdCalendarEventSummary, CGPoint) -> Void
     let onMoveEventEnd: (TodayMdCalendarEventSummary, CGPoint) -> Void
@@ -2419,9 +2443,10 @@ private struct WeekCalendarDayColumn: View {
                 Button {
                     onDeleteEvent(event)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.red.opacity(0.92), Color.white.opacity(0.95))
+                    inlineDeleteBadge(
+                        size: 16,
+                        isArmed: pendingDeletionEventID == event.id
+                    )
                 }
                 .buttonStyle(.plain)
                 .padding(8)
@@ -2452,6 +2477,18 @@ private struct WeekCalendarDayColumn: View {
         return formatter.string(from: event.startDate, to: event.endDate)
     }
 
+    private func inlineDeleteBadge(size: CGFloat, isArmed: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.92))
+
+            Image(systemName: isArmed ? "checkmark" : "xmark")
+                .font(.system(size: size * 0.72, weight: .bold))
+                .foregroundStyle(isArmed ? Color.red.opacity(0.88) : Color.secondary.opacity(0.72))
+        }
+        .frame(width: size, height: size)
+    }
+
     private func eventMoveGesture(for event: TodayMdCalendarEventSummary) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named("WeekCalendarColumns"))
             .onChanged { value in
@@ -2474,6 +2511,7 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
     let defaultDurationMinutes: Int
     let isInteractionEnabled: Bool
     let selectedEventID: String?
+    let pendingDeletionEventID: String?
     let onDropTask: (UUID, DateInterval) -> Bool
     let onSelectEvent: (TodayMdCalendarEventSummary?, CGRect?) -> Void
     let onDeleteEvent: (TodayMdCalendarEventSummary) -> Void
@@ -2492,6 +2530,7 @@ private struct WeekCalendarCanvasView: NSViewRepresentable {
             defaultDurationMinutes: defaultDurationMinutes,
             isInteractionEnabled: isInteractionEnabled,
             selectedEventID: selectedEventID,
+            pendingDeletionEventID: pendingDeletionEventID,
             onDropTask: onDropTask,
             onSelectEvent: onSelectEvent,
             onDeleteEvent: onDeleteEvent,
@@ -2531,6 +2570,7 @@ private final class WeekCalendarCanvasNSView: NSView {
     private var defaultDurationMinutes = 60
     private var isInteractionEnabled = true
     private var selectedEventID: String?
+    private var pendingDeletionEventID: String?
     private var onDropTask: ((UUID, DateInterval) -> Bool)?
     private var onSelectEvent: ((TodayMdCalendarEventSummary?, CGRect?) -> Void)?
     private var onDeleteEvent: ((TodayMdCalendarEventSummary) -> Void)?
@@ -2566,6 +2606,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         defaultDurationMinutes: Int,
         isInteractionEnabled: Bool,
         selectedEventID: String?,
+        pendingDeletionEventID: String?,
         onDropTask: @escaping (UUID, DateInterval) -> Bool,
         onSelectEvent: @escaping (TodayMdCalendarEventSummary?, CGRect?) -> Void,
         onDeleteEvent: @escaping (TodayMdCalendarEventSummary) -> Void,
@@ -2578,6 +2619,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         self.defaultDurationMinutes = defaultDurationMinutes
         self.isInteractionEnabled = isInteractionEnabled
         self.selectedEventID = selectedEventID
+        self.pendingDeletionEventID = pendingDeletionEventID
         self.onDropTask = onDropTask
         self.onSelectEvent = onSelectEvent
         self.onDeleteEvent = onDeleteEvent
@@ -2851,6 +2893,7 @@ private final class WeekCalendarCanvasNSView: NSView {
             fillColor: fillColor,
             strokeColor: strokeColor,
             deleteFrame: geometry.deleteFrame,
+            deleteBadgeArmed: pendingDeletionEventID == geometry.event.id,
             strokeWidth: isSelected ? 2 : 1
         )
     }
@@ -2865,6 +2908,7 @@ private final class WeekCalendarCanvasNSView: NSView {
             fillColor: NSColor.systemOrange.withAlphaComponent(alpha),
             strokeColor: NSColor.systemOrange.withAlphaComponent(0.38),
             deleteFrame: nil,
+            deleteBadgeArmed: false,
             strokeWidth: 1
         )
     }
@@ -2876,6 +2920,7 @@ private final class WeekCalendarCanvasNSView: NSView {
         fillColor: NSColor,
         strokeColor: NSColor,
         deleteFrame: CGRect?,
+        deleteBadgeArmed: Bool,
         strokeWidth: CGFloat
     ) {
         let cornerRadius: CGFloat = 14
@@ -2931,25 +2976,32 @@ private final class WeekCalendarCanvasNSView: NSView {
         }
 
         if let deleteFrame {
-            drawDeleteBadge(in: deleteFrame)
+            drawDeleteBadge(in: deleteFrame, isArmed: deleteBadgeArmed)
         }
     }
 
-    private func drawDeleteBadge(in frame: CGRect) {
+    private func drawDeleteBadge(in frame: CGRect, isArmed: Bool) {
         let badgePath = NSBezierPath(ovalIn: frame)
         NSColor.white.withAlphaComponent(0.94).setFill()
         badgePath.fill()
 
-        let crossInset = frame.width * 0.34
-        let crossPath = NSBezierPath()
-        crossPath.move(to: CGPoint(x: frame.minX + crossInset, y: frame.minY + crossInset))
-        crossPath.line(to: CGPoint(x: frame.maxX - crossInset, y: frame.maxY - crossInset))
-        crossPath.move(to: CGPoint(x: frame.maxX - crossInset, y: frame.minY + crossInset))
-        crossPath.line(to: CGPoint(x: frame.minX + crossInset, y: frame.maxY - crossInset))
-        crossPath.lineWidth = 1.8
-        crossPath.lineCapStyle = .round
-        NSColor.systemRed.withAlphaComponent(0.88).setStroke()
-        crossPath.stroke()
+        let iconInset = frame.width * 0.34
+        let iconPath = NSBezierPath()
+        if isArmed {
+            iconPath.move(to: CGPoint(x: frame.minX + iconInset * 0.75, y: frame.midY + iconInset * 0.1))
+            iconPath.line(to: CGPoint(x: frame.midX - iconInset * 0.1, y: frame.maxY - iconInset))
+            iconPath.line(to: CGPoint(x: frame.maxX - iconInset * 0.7, y: frame.minY + iconInset * 0.8))
+        } else {
+            iconPath.move(to: CGPoint(x: frame.minX + iconInset, y: frame.minY + iconInset))
+            iconPath.line(to: CGPoint(x: frame.maxX - iconInset, y: frame.maxY - iconInset))
+            iconPath.move(to: CGPoint(x: frame.maxX - iconInset, y: frame.minY + iconInset))
+            iconPath.line(to: CGPoint(x: frame.minX + iconInset, y: frame.maxY - iconInset))
+        }
+        iconPath.lineWidth = 1.8
+        iconPath.lineCapStyle = .round
+        iconPath.lineJoinStyle = .round
+        (isArmed ? NSColor.systemRed : NSColor.secondaryLabelColor).withAlphaComponent(0.88).setStroke()
+        iconPath.stroke()
     }
 
     private func eventGeometry(at point: CGPoint) -> WeekCalendarCanvasEventGeometry? {
