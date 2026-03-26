@@ -19,6 +19,15 @@ enum TodayMdCalendarAuthorizationState: Equatable {
     case writeOnly
     case fullAccess
 
+    var settingsActivationPath: String? {
+        switch self {
+        case .denied, .restricted, .writeOnly:
+            return "System Settings > Privacy & Security > Calendars"
+        case .notDetermined, .fullAccess:
+            return nil
+        }
+    }
+
     var label: String {
         switch self {
         case .notDetermined:
@@ -47,13 +56,50 @@ enum TodayMdCalendarAuthorizationState: Equatable {
         case .notDetermined:
             return "Connect Calendar to read your availability and create focus blocks from tasks."
         case .denied:
-            return "today-md cannot read your calendars until you allow access in System Settings."
+            return "today-md cannot read your calendars until you allow access in \(settingsActivationPath ?? "System Settings")."
         case .restricted:
-            return "Calendar access is restricted on this Mac."
+            return "Calendar access is restricted on this Mac. Review \(settingsActivationPath ?? "System Settings"), but changes may still be managed by Screen Time or device policies."
         case .writeOnly:
-            return "today-md can create events, but full access is required to read your schedule and suggest open slots."
+            return "today-md can create events, but full access is required to read your schedule and suggest open slots. Change it in \(settingsActivationPath ?? "System Settings")."
         case .fullAccess:
             return "today-md can read your schedule and block time directly from a task."
+        }
+    }
+
+    var resolutionActionTitle: String {
+        switch self {
+        case .notDetermined:
+            return "Connect Calendar"
+        case .denied, .restricted, .writeOnly:
+            return "Open Calendar Settings"
+        case .fullAccess:
+            return "Refresh Calendar"
+        }
+    }
+
+    var resolutionActionSubtitle: String {
+        switch self {
+        case .notDetermined:
+            return "Grant full access so today-md can read availability and create focus blocks."
+        case .denied:
+            return "Open \(settingsActivationPath ?? "System Settings") and allow today-md to access your calendars."
+        case .restricted:
+            return "Open \(settingsActivationPath ?? "System Settings") to review access. This Mac may still block changes."
+        case .writeOnly:
+            return "Open \(settingsActivationPath ?? "System Settings") and change today-md to Full Access."
+        case .fullAccess:
+            return "Refresh available calendars and upcoming events from macOS Calendar."
+        }
+    }
+
+    var resolutionActionSystemImage: String {
+        switch self {
+        case .notDetermined:
+            return "calendar.badge.plus"
+        case .denied, .restricted, .writeOnly:
+            return "gearshape"
+        case .fullAccess:
+            return "arrow.clockwise"
         }
     }
 }
@@ -324,6 +370,8 @@ enum CalendarTimeBlocking {
 final class TodayMdCalendarService: ObservableObject {
     private static let todayMdBlockMarker = "Created from today-md"
     private static let taskIDMarkerPrefix = "Task ID: "
+    private static let calendarPrivacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+    private static let systemSettingsAppURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
 
     @Published private(set) var authorizationStatus: TodayMdCalendarAuthorizationState
     @Published private(set) var calendars: [TodayMdCalendarSummary] = []
@@ -400,6 +448,31 @@ final class TodayMdCalendarService: ObservableObject {
                     }
                 }
             }
+        }
+    }
+
+    func openCalendarPrivacySettings() {
+        lastError = nil
+
+        if let url = Self.calendarPrivacySettingsURL, NSWorkspace.shared.open(url) {
+            return
+        }
+
+        if NSWorkspace.shared.open(Self.systemSettingsAppURL) {
+            return
+        }
+
+        lastError = "Couldn't open System Settings automatically. Go to \(authorizationStatus.settingsActivationPath ?? "System Settings > Privacy & Security > Calendars")."
+    }
+
+    func resolveAuthorization() {
+        switch authorizationStatus {
+        case .notDetermined:
+            requestFullAccess()
+        case .denied, .restricted, .writeOnly:
+            openCalendarPrivacySettings()
+        case .fullAccess:
+            refreshIfNeeded()
         }
     }
 

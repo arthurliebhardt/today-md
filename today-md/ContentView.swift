@@ -633,11 +633,7 @@ struct ContentView: View {
     }
 
     private func requestCalendarAccessFromSettings() {
-        calendarService.requestFullAccess()
-    }
-
-    private func refreshCalendarFromSettings() {
-        calendarService.refreshIfNeeded()
+        calendarService.resolveAuthorization()
     }
 
     private func syncScheduledTasksIntoToday() {
@@ -1100,13 +1096,11 @@ struct ContentView: View {
 
                     VStack(spacing: 12) {
                         settingsActionCard(
-                            title: calendarService.authorizationStatus.canReadEvents ? "Refresh Calendar" : "Connect Calendar",
-                            subtitle: calendarService.authorizationStatus.canReadEvents
-                                ? "Refresh available calendars and upcoming events from macOS Calendar."
-                                : "Grant full access so today-md can read availability and create focus blocks.",
-                            systemImage: calendarService.authorizationStatus.canReadEvents ? "arrow.clockwise" : "calendar.badge.plus",
+                            title: calendarService.authorizationStatus.resolutionActionTitle,
+                            subtitle: calendarService.authorizationStatus.resolutionActionSubtitle,
+                            systemImage: calendarService.authorizationStatus.resolutionActionSystemImage,
                             tint: .orange,
-                            action: calendarService.authorizationStatus.canReadEvents ? refreshCalendarFromSettings : requestCalendarAccessFromSettings
+                            action: requestCalendarAccessFromSettings
                         )
                     }
 
