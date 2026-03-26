@@ -704,7 +704,12 @@ final class TodayMdStore {
         }
     }
 
-    func moveTask(id: UUID, to block: TimeBlock, markDone: Bool? = nil) {
+    func moveTask(
+        id: UUID,
+        to block: TimeBlock,
+        markDone: Bool? = nil,
+        preserveSchedulingState: Bool = false
+    ) {
         guard let task = task(id: id) else { return }
         let previousBlock = task.block
         let nextDoneState = markDone ?? task.isDone
@@ -713,6 +718,9 @@ final class TodayMdStore {
         performMutation(actionName: "Move Task", persistenceMode: .deferred) {
             task.block = block
             task.isDone = nextDoneState
+            if previousBlock != block, !preserveSchedulingState {
+                task.schedulingState = .unscheduled
+            }
             task.sortOrder = nextSortOrder(for: task.list, in: block)
 
             if previousBlock != block {
@@ -723,7 +731,12 @@ final class TodayMdStore {
         }
     }
 
-    func moveTasks(ids: [UUID], to block: TimeBlock, markDone: Bool? = nil) {
+    func moveTasks(
+        ids: [UUID],
+        to block: TimeBlock,
+        markDone: Bool? = nil,
+        preserveSchedulingState: Bool = false
+    ) {
         let uniqueIDs = Set(ids)
         guard !uniqueIDs.isEmpty else { return }
 
@@ -754,8 +767,12 @@ final class TodayMdStore {
             persistenceMode: .deferred
         ) {
             for task in tasksToMove {
+                let previousBlock = task.block
                 task.block = block
                 task.isDone = markDone ?? task.isDone
+                if previousBlock != block, !preserveSchedulingState {
+                    task.schedulingState = .unscheduled
+                }
                 task.sortOrder = nextSortOrder(for: task.list, in: block)
             }
 
@@ -773,7 +790,7 @@ final class TodayMdStore {
             .map(\.id)
 
         guard !taskIDsToPromote.isEmpty else { return }
-        moveTasks(ids: taskIDsToPromote, to: .today, markDone: false)
+        moveTasks(ids: taskIDsToPromote, to: .today, markDone: false, preserveSchedulingState: true)
     }
 
     func setTaskSchedulingState(id: UUID, isScheduled: Bool) {
@@ -790,14 +807,23 @@ final class TodayMdStore {
         }
     }
 
-    func syncTaskBlockWithScheduledDate(id: UUID, scheduledDate: Date, calendar: Calendar = .current) {
+    func syncTaskBlockWithScheduledDate(
+        id: UUID,
+        scheduledDate: Date,
+        calendar: Calendar = .current,
+        referenceDate: Date = Date()
+    ) {
         guard let task = task(id: id) else { return }
 
         let targetBlock: TimeBlock
+        let referenceStartOfDay = calendar.startOfDay(for: referenceDate)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: referenceStartOfDay)
 
-        if calendar.isDateInToday(scheduledDate) {
+        if calendar.isDate(scheduledDate, inSameDayAs: referenceStartOfDay) {
             targetBlock = .today
-        } else if let currentWeek = calendar.dateInterval(of: .weekOfYear, for: Date()),
+        } else if let tomorrow, calendar.isDate(scheduledDate, inSameDayAs: tomorrow) {
+            targetBlock = .thisWeek
+        } else if let currentWeek = calendar.dateInterval(of: .weekOfYear, for: referenceDate),
                   scheduledDate >= currentWeek.start,
                   scheduledDate < currentWeek.end {
             targetBlock = .thisWeek
@@ -946,7 +972,12 @@ final class TodayMdStore {
         }
     }
 
-    func moveActiveTaskOnBoard(_ draggedID: UUID, to block: TimeBlock, before beforeID: UUID?) {
+    func moveActiveTaskOnBoard(
+        _ draggedID: UUID,
+        to block: TimeBlock,
+        before beforeID: UUID?,
+        preserveSchedulingState: Bool = false
+    ) {
         guard let draggedTask = task(id: draggedID) else { return }
         if beforeID == draggedID, draggedTask.block == block, !draggedTask.isDone { return }
 
@@ -955,6 +986,9 @@ final class TodayMdStore {
 
             if draggedTask.block != block {
                 draggedTask.block = block
+                if !preserveSchedulingState {
+                    draggedTask.schedulingState = .unscheduled
+                }
             }
 
             if draggedTask.isDone {
@@ -984,7 +1018,13 @@ final class TodayMdStore {
         }
     }
 
-    func reorderTaskInListBlock(listID: UUID, draggedID: UUID, block: TimeBlock, before beforeID: UUID?) {
+    func reorderTaskInListBlock(
+        listID: UUID,
+        draggedID: UUID,
+        block: TimeBlock,
+        before beforeID: UUID?,
+        preserveSchedulingState: Bool = false
+    ) {
         if beforeID == draggedID { return }
         guard let list = list(id: listID),
               let draggedTask = list.items.first(where: { $0.id == draggedID })
@@ -997,6 +1037,9 @@ final class TodayMdStore {
 
             if draggedTask.block != block {
                 draggedTask.block = block
+                if !preserveSchedulingState {
+                    draggedTask.schedulingState = .unscheduled
+                }
                 draggedTask.sortOrder = nextSortOrder(for: list, in: block)
             }
 

@@ -2571,6 +2571,7 @@ struct ContentView: View {
 
     private func moveTask(id: UUID, to block: TimeBlock) {
         let taskIDs = draggedSelectionTaskIDs(for: id)
+        clearManagedCalendarBlocksForTasksMovingAcrossLanes(taskIDs, to: block)
 
         if taskIDs.count == 1, let taskID = taskIDs.first {
             store.moveTask(id: taskID, to: block, markDone: false)
@@ -2594,6 +2595,21 @@ struct ContentView: View {
         if taskIDs.contains(where: { selectedTaskIDs.contains($0) }) {
             focusedBlock = block
         }
+    }
+
+    private func clearManagedCalendarBlocksForTasksMovingAcrossLanes(_ taskIDs: [UUID], to targetBlock: TimeBlock) {
+        let scheduledTaskIDs = Set(taskIDs.compactMap { taskID -> UUID? in
+            guard let task = store.task(id: taskID),
+                  task.isScheduled,
+                  task.block != targetBlock else {
+                return nil
+            }
+
+            return taskID
+        })
+
+        guard !scheduledTaskIDs.isEmpty else { return }
+        try? calendarService.deleteManagedBlocks(forTaskIDs: scheduledTaskIDs)
     }
 
     private func deleteTask(_ task: TaskItem) {
@@ -2752,12 +2768,14 @@ struct ContentView: View {
         if case .list = selection {
             reorderTaskInCurrentListBlock(draggedID, block, beforeID)
         } else {
+            clearManagedCalendarBlocksForTasksMovingAcrossLanes([draggedID], to: block)
             store.moveActiveTaskOnBoard(draggedID, to: block, before: beforeID)
         }
     }
 
     private func reorderTaskInCurrentListBlock(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
         guard case .list(let listID) = selection else { return }
+        clearManagedCalendarBlocksForTasksMovingAcrossLanes([draggedID], to: block)
         store.reorderTaskInListBlock(listID: listID, draggedID: draggedID, block: block, before: beforeID)
     }
 

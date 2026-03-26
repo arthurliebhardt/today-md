@@ -671,6 +671,63 @@ final class TodayMdCalendarService: ObservableObject {
         refresh()
     }
 
+    func deleteManagedBlocks(forTaskIDs taskIDs: Set<UUID>) throws {
+        guard !taskIDs.isEmpty else { return }
+
+        refreshIfNeeded()
+
+        guard authorizationStatus.canCreateEvents else {
+            throw TodayMdCalendarError.accessRequired
+        }
+        guard authorizationStatus.canReadEvents else {
+            throw TodayMdCalendarError.fullAccessRequired
+        }
+
+        let searchStart = Calendar.current.date(byAdding: .year, value: -1, to: nowProvider())
+            ?? nowProvider().addingTimeInterval(-365 * 24 * 60 * 60)
+        let searchEnd = Calendar.current.date(byAdding: .year, value: 2, to: nowProvider())
+            ?? nowProvider().addingTimeInterval(2 * 365 * 24 * 60 * 60)
+        let events = fetchEvents(
+            from: searchStart,
+            end: searchEnd,
+            calendars: eventStore.calendars(for: .event)
+        ).filter { event in
+            guard Self.isTodayMdManaged(event),
+                  let taskID = Self.taskID(from: event.notes) else {
+                return false
+            }
+
+            return taskIDs.contains(taskID)
+        }
+
+        guard !events.isEmpty else {
+            if let lastCreatedBlock, let taskID = lastCreatedBlock.taskID, taskIDs.contains(taskID) {
+                self.lastCreatedBlock = nil
+            }
+            return
+        }
+
+        do {
+            for event in events {
+                guard event.calendar.allowsContentModifications else {
+                    throw TodayMdCalendarError.eventNotEditable
+                }
+                try eventStore.remove(event, span: .thisEvent, commit: false)
+            }
+            try eventStore.commit()
+        } catch let error as TodayMdCalendarError {
+            throw error
+        } catch {
+            throw TodayMdCalendarError.failedToDelete(error.localizedDescription)
+        }
+
+        if let lastCreatedBlock, let taskID = lastCreatedBlock.taskID, taskIDs.contains(taskID) {
+            self.lastCreatedBlock = nil
+        }
+
+        refresh()
+    }
+
     func moveEvent(identifier: String, to interval: DateInterval) throws -> TodayMdCalendarBlockResult {
         refreshIfNeeded()
 
