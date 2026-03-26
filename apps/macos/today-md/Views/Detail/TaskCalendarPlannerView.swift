@@ -102,6 +102,23 @@ struct TaskCalendarPlannerView: View {
         [30, 60, 90, 120].contains(calendarDefaultDurationMinutes) ? calendarDefaultDurationMinutes : 60
     }
 
+    private func calendarAuthorizationMessage(for capability: String) -> String {
+        let settingsPath = calendarService.authorizationStatus.settingsActivationPath ?? "System Settings > Privacy & Security > Calendars"
+
+        switch calendarService.authorizationStatus {
+        case .notDetermined:
+            return "Grant calendar access to \(capability)"
+        case .denied:
+            return "Enable today-md in \(settingsPath) to \(capability)"
+        case .restricted:
+            return "Review \(settingsPath) to \(capability) Access may still be managed by Screen Time or device policies on this Mac."
+        case .writeOnly:
+            return "Change today-md to Full Access in \(settingsPath) to \(capability)"
+        case .fullAccess:
+            return capability
+        }
+    }
+
     private var calendar: Calendar {
         Calendar.current
     }
@@ -248,11 +265,18 @@ struct TaskCalendarPlannerView: View {
     @ViewBuilder
     private var plannerContent: some View {
         if !calendarService.authorizationStatus.canReadEvents {
-            Button("Connect Calendar") {
-                calendarService.requestFullAccess()
+            VStack(alignment: .leading, spacing: 12) {
+                Text(calendarAuthorizationMessage(for: "see availability and place a time block from this task."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button(calendarService.authorizationStatus.resolutionActionTitle) {
+                    calendarService.resolveAuthorization()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
         } else if calendarService.selectedDestinationCalendar(preferredIdentifier: preferredIdentifier) == nil {
             Text("No writable calendar is available yet. Add an account in Calendar or choose a writable calendar in Settings.")
                 .font(.subheadline)
@@ -1195,6 +1219,23 @@ struct WeekCalendarPanelView: View {
         [30, 60, 90, 120].contains(calendarDefaultDurationMinutes) ? calendarDefaultDurationMinutes : 60
     }
 
+    private func calendarAuthorizationMessage(for capability: String) -> String {
+        let settingsPath = calendarService.authorizationStatus.settingsActivationPath ?? "System Settings > Privacy & Security > Calendars"
+
+        switch calendarService.authorizationStatus {
+        case .notDetermined:
+            return "Grant calendar access to \(capability)"
+        case .denied:
+            return "Enable today-md in \(settingsPath) to \(capability)"
+        case .restricted:
+            return "Review \(settingsPath) to \(capability) Access may still be managed by Screen Time or device policies on this Mac."
+        case .writeOnly:
+            return "Change today-md to Full Access in \(settingsPath) to \(capability)"
+        case .fullAccess:
+            return capability
+        }
+    }
+
     private var timelineHeight: CGFloat {
         CGFloat(WeekCalendarPanelStyle.dayEndHour - WeekCalendarPanelStyle.dayStartHour) * WeekCalendarPanelStyle.hourHeight
     }
@@ -1345,11 +1386,11 @@ struct WeekCalendarPanelView: View {
     private var plannerContent: some View {
         if !calendarService.authorizationStatus.canReadEvents {
             unavailableState(
-                title: "Connect Calendar",
-                message: "Grant calendar access to drag tasks into the week, inspect availability, and place time blocks without leaving this workspace.",
-                actionTitle: "Connect Calendar",
+                title: calendarService.authorizationStatus.resolutionActionTitle,
+                message: calendarAuthorizationMessage(for: "drag tasks into the week, inspect availability, and place time blocks without leaving this workspace."),
+                actionTitle: calendarService.authorizationStatus.resolutionActionTitle,
                 action: {
-                    calendarService.requestFullAccess()
+                    calendarService.resolveAuthorization()
                 }
             )
         } else if calendarService.selectedDestinationCalendar(preferredIdentifier: preferredIdentifier) == nil {
