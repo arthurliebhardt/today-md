@@ -4,6 +4,7 @@ struct SidebarView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var presentationState: AppPresentationState
     @Binding var selection: SidebarSelection
+    @Binding var workspaceMode: WorkspaceMode
 
     @State private var isAddingList = false
     @State private var newListName = ""
@@ -27,6 +28,17 @@ struct SidebarView: View {
 
     var body: some View {
         List {
+            Section("Workspace") {
+                Picker("Workspace", selection: $workspaceMode) {
+                    ForEach(WorkspaceMode.allCases) { mode in
+                        Text(mode.title)
+                            .tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+
             Section {
                 Button(action: { selection = .all }) {
                     ViewThatFits(in: .horizontal) {

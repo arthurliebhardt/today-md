@@ -7,6 +7,51 @@ enum SidebarSelection: Hashable {
     case list(UUID)
 }
 
+private enum AuxiliaryPanelMode: String, CaseIterable, Identifiable {
+    case details
+    case week
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .details:
+            return "Details"
+        case .week:
+            return "Week"
+        }
+    }
+}
+
+enum WorkspaceMode: String, CaseIterable, Identifiable {
+    case board
+    case planner
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .board:
+            return "Board"
+        case .planner:
+            return "Planner"
+        }
+    }
+}
+
+@MainActor
+enum TaskVisibilityScope {
+    static func tasks(for selection: SidebarSelection, store: TodayMdStore) -> [TaskItem] {
+        switch selection {
+        case .all:
+            return store.allTasks
+        case .list(let listID):
+            guard let list = store.list(id: listID) else { return [] }
+            return list.items.sorted(by: taskSort)
+        }
+    }
+}
+
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
@@ -18,6 +63,7 @@ private struct MarkdownArchiveSnapshot: Equatable {
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
+    case calendar
     case dataBackup
     case sync
     case shortcuts
@@ -28,6 +74,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Interface"
+        case .calendar:
+            return "Calendar"
         case .dataBackup:
             return "Data"
         case .sync:
@@ -41,6 +89,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Appearance and quick capture"
+        case .calendar:
+            return "Availability and time blocking"
         case .dataBackup:
             return "Import, export, and archive"
         case .sync:
@@ -54,6 +104,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "paintbrush.pointed.fill"
+        case .calendar:
+            return "calendar.badge.clock"
         case .dataBackup:
             return "internaldrive"
         case .sync:
@@ -67,6 +119,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return .indigo
+        case .calendar:
+            return .orange
         case .dataBackup:
             return .orange
         case .sync:
@@ -205,13 +259,80 @@ struct ShortcutSequenceView: View {
     }
 }
 
+@MainActor
+private struct WindowChromeInsetReader: NSViewRepresentable {
+    let onTopInsetChange: (CGFloat) -> Void
+
+    final class TrackingView: NSView {
+        var onTopInsetChange: ((CGFloat) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            reportTopInset()
+        }
+
+        override func layout() {
+            super.layout()
+            reportTopInset()
+        }
+
+        override func viewDidEndLiveResize() {
+            super.viewDidEndLiveResize()
+            reportTopInset()
+        }
+
+        private func reportTopInset() {
+            guard let window else { return }
+            let topInset = max(0, window.frame.height - window.contentLayoutRect.maxY)
+            onTopInsetChange?(topInset)
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        private var lastReportedInset: CGFloat = -1
+
+        func update(topInset: CGFloat, onTopInsetChange: @escaping (CGFloat) -> Void) {
+            guard abs(topInset - lastReportedInset) > 0.5 else { return }
+            lastReportedInset = topInset
+
+            DispatchQueue.main.async {
+                onTopInsetChange(topInset)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onTopInsetChange = { topInset in
+            context.coordinator.update(topInset: topInset, onTopInsetChange: onTopInsetChange)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        nsView.onTopInsetChange = { topInset in
+            context.coordinator.update(topInset: topInset, onTopInsetChange: onTopInsetChange)
+        }
+        nsView.layoutSubtreeIfNeeded()
+    }
+}
+
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
+    @EnvironmentObject private var calendarService: TodayMdCalendarService
     @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
     @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
+    @AppStorage(TodayMdPreferenceKey.workspaceMode) private var workspaceModeRawValue = WorkspaceMode.board.rawValue
+    @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
+    @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
 
     @State private var selection: SidebarSelection = .all
     @State private var selectedTaskID: UUID?
@@ -220,12 +341,21 @@ struct ContentView: View {
     @State private var focusedBlock: TimeBlock?
     @State private var expandedDoneBlocks: Set<TimeBlock> = []
     @State private var allTasksDoneSectionExpanded = false
+    @State private var auxiliaryPanelMode: AuxiliaryPanelMode = .details
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowIsNarrow = false
+    @State private var windowChromeTopInset: CGFloat = 0
     @State private var showOverlaySidebar = false
+    @State private var plannerShowsSidebar = true
     @State private var showingSettingsSheet = false
     @State private var selectedSettingsSection: SettingsSection = .interface
     @State private var transferAlert: TransferAlert?
+    @State private var plannerThisWeekCollapsed = false
+    @State private var plannerBacklogCollapsed = false
+    @State private var showingPlannerTaskCreationSheet = false
+    @State private var plannerTaskDraftTitle = ""
+    @State private var plannerTaskDraftListID: UUID?
+    @State private var plannerTaskDraftBlock: TimeBlock = .today
 
     private var selectedList: TaskList? {
         guard case .list(let id) = selection else { return nil }
@@ -238,7 +368,7 @@ struct ContentView: View {
     }
 
     private var isBoardLayoutActive: Bool {
-        !store.hasActiveSearch
+        workspaceMode == .board && !store.hasActiveSearch
     }
 
     private var isListBoardSelectionActive: Bool {
@@ -249,10 +379,21 @@ struct ContentView: View {
         AppAppearanceMode(rawValue: appearanceModeRawValue) ?? .system
     }
 
+    private var workspaceMode: WorkspaceMode {
+        WorkspaceMode(rawValue: workspaceModeRawValue) ?? .board
+    }
+
     private var appearanceModeSelection: Binding<AppAppearanceMode> {
         Binding(
             get: { appearanceMode },
             set: { appearanceModeRawValue = $0.rawValue }
+        )
+    }
+
+    private var workspaceModeSelection: Binding<WorkspaceMode> {
+        Binding(
+            get: { workspaceMode },
+            set: { workspaceModeRawValue = $0.rawValue }
         )
     }
 
@@ -280,13 +421,20 @@ struct ContentView: View {
             return store.rankedTasks(store.allTasks)
         }
 
+        let tasks = TaskVisibilityScope.tasks(for: selection, store: store)
+
+        let activeTasks = tasks.filter { !$0.isDone }
+        let doneTasks = tasks.filter(\.isDone)
+        return activeTasks + doneTasks
+    }
+
+    private var plannerVisibleTasks: [TaskItem] {
         let tasks: [TaskItem]
 
-        switch selection {
-        case .all:
-            tasks = store.allTasks
-        case .list:
-            tasks = TimeBlock.allCases.flatMap(listTasks)
+        if store.hasActiveSearch {
+            tasks = store.rankedTasks(store.allTasks)
+        } else {
+            tasks = TaskVisibilityScope.tasks(for: selection, store: store)
         }
 
         let activeTasks = tasks.filter { !$0.isDone }
@@ -294,15 +442,19 @@ struct ContentView: View {
         return activeTasks + doneTasks
     }
 
+    private var currentVisibleTasks: [TaskItem] {
+        workspaceMode == .planner ? plannerVisibleTasks : preferredVisibleTasks
+    }
+
     private var visibleFlatTasks: [TaskItem] {
-        let activeTasks = preferredVisibleTasks.filter { !$0.isDone }
+        let activeTasks = currentVisibleTasks.filter { !$0.isDone }
         guard allTasksDoneSectionExpanded else { return activeTasks }
-        let doneTasks = preferredVisibleTasks.filter(\.isDone)
+        let doneTasks = currentVisibleTasks.filter(\.isDone)
         return activeTasks + doneTasks
     }
 
     private func syncSelectedTask() {
-        let visibleTasks = preferredVisibleTasks
+        let visibleTasks = currentVisibleTasks
         let visibleIDs = Set(visibleTasks.map(\.id))
         var retainedIDs = selectedTaskIDs.intersection(visibleIDs)
 
@@ -344,7 +496,7 @@ struct ContentView: View {
     }
 
     private var orderedSelectedTaskIDs: [UUID] {
-        preferredVisibleTasks.map(\.id).filter { selectedTaskIDs.contains($0) }
+        currentVisibleTasks.map(\.id).filter { selectedTaskIDs.contains($0) }
     }
 
     private func orderedTaskIDsForLane(_ block: TimeBlock) -> [UUID] {
@@ -360,7 +512,7 @@ struct ContentView: View {
     }
 
     private var canSelectAllVisibleTasks: Bool {
-        !preferredVisibleTasks.isEmpty && !isModalUIActive
+        !currentVisibleTasks.isEmpty && !isModalUIActive
     }
 
     private var currentSelectionTaskIDs: [UUID] {
@@ -480,6 +632,56 @@ struct ContentView: View {
         syncService.disableSync()
     }
 
+    private func requestCalendarAccessFromSettings() {
+        calendarService.resolveAuthorization()
+    }
+
+    private func syncScheduledTasksIntoToday() {
+        let scheduledTaskIDs = calendarService.managedTaskIDs(forDay: Date())
+        store.promoteScheduledTasksToToday(ids: scheduledTaskIDs)
+    }
+
+    private func presentPlannerTaskCreationSheet() {
+        plannerTaskDraftTitle = ""
+        plannerTaskDraftBlock = plannerDefaultNewTaskBlock
+
+        if let selectedList {
+            plannerTaskDraftListID = selectedList.id
+        } else {
+            plannerTaskDraftListID = selectedTask?.list?.id
+        }
+
+        showingPlannerTaskCreationSheet = true
+    }
+
+    private func expandPlannerSection(for block: TimeBlock) {
+        switch block {
+        case .today:
+            break
+        case .thisWeek:
+            plannerThisWeekCollapsed = false
+        case .backlog:
+            plannerBacklogCollapsed = false
+        }
+    }
+
+    private func createTaskFromPlannerSheet() {
+        let normalizedTitle = plannerTaskDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else { return }
+
+        guard let task = store.quickAddTask(
+            title: normalizedTitle,
+            to: plannerTaskDraftBlock,
+            listID: plannerTaskDraftListID
+        ) else {
+            return
+        }
+
+        expandPlannerSection(for: plannerTaskDraftBlock)
+        showingPlannerTaskCreationSheet = false
+        setSingleSelection(task.id, focusedBlock: plannerTaskDraftBlock)
+    }
+
     private func presentTransferError(title: String, error: Error) {
         transferAlert = TransferAlert(
             title: title,
@@ -533,6 +735,78 @@ struct ContentView: View {
             get: { syncService.conflict != nil },
             set: { _ in }
         )
+    }
+
+    private var calendarPreferredIdentifier: String? {
+        calendarDefaultIdentifier.isEmpty ? nil : calendarDefaultIdentifier
+    }
+
+    private var calendarDefaultDurationSelection: Binding<Int> {
+        Binding(
+            get: {
+                [30, 60, 90, 120].contains(calendarDefaultDurationMinutes) ? calendarDefaultDurationMinutes : 60
+            },
+            set: { calendarDefaultDurationMinutes = $0 }
+        )
+    }
+
+    private var calendarStatusColor: Color {
+        switch calendarService.authorizationStatus {
+        case .notDetermined:
+            return .secondary
+        case .denied, .restricted:
+            return .red
+        case .writeOnly:
+            return .orange
+        case .fullAccess:
+            return .green
+        }
+    }
+
+    private var calendarDestinationSummary: String {
+        if let selectedCalendar = calendarService.selectedDestinationCalendar(preferredIdentifier: calendarPreferredIdentifier) {
+            return selectedCalendar.displayTitle
+        }
+
+        return "No writable calendar found"
+    }
+
+    private var plannerShelfPhaseKey: String {
+        if !calendarService.authorizationStatus.canReadEvents {
+            return "authorization-\(calendarService.authorizationStatus.label)"
+        }
+
+        if calendarService.selectedDestinationCalendar(preferredIdentifier: calendarPreferredIdentifier) == nil {
+            return "no-writable-calendar"
+        }
+
+        return "calendar-ready"
+    }
+
+    private var plannerShowsTaskColumns: Bool {
+        true
+    }
+
+    private func calendarSuggestedSlotText(durationMinutes: Int) -> String {
+        guard let interval = calendarService.suggestedBlockInterval(durationMinutes: durationMinutes) else {
+            return "No open slot found in the next two weeks."
+        }
+
+        let formatter = DateIntervalFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: interval.start, to: interval.end)
+    }
+
+    private func calendarEventTimeText(_ event: TodayMdCalendarEventSummary) -> String {
+        if event.isAllDay {
+            return "All day"
+        }
+
+        let intervalFormatter = DateIntervalFormatter()
+        intervalFormatter.dateStyle = Calendar.current.isDate(event.startDate, inSameDayAs: Date()) ? .none : .medium
+        intervalFormatter.timeStyle = .short
+        return intervalFormatter.string(from: event.startDate, to: event.endDate)
     }
 
     private var syncStatusColor: Color {
@@ -776,6 +1050,153 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(Color.indigo.opacity(0.12), lineWidth: 1)
                     )
+                }
+
+            case .calendar:
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Calendar blocking")
+                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(calendarStatusColor)
+                                .frame(width: 10, height: 10)
+
+                            Text("Status: \(calendarService.authorizationStatus.label)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text(calendarService.authorizationStatus.guidance)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("Calendars shown here come from macOS Calendar. Outlook / Exchange calendars appear here when the account is added to Calendar on this Mac.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let lastError = calendarService.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.orange.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.orange.opacity(0.14), lineWidth: 1)
+                    )
+
+                    VStack(spacing: 12) {
+                        settingsActionCard(
+                            title: calendarService.authorizationStatus.resolutionActionTitle,
+                            subtitle: calendarService.authorizationStatus.resolutionActionSubtitle,
+                            systemImage: calendarService.authorizationStatus.resolutionActionSystemImage,
+                            tint: .orange,
+                            action: requestCalendarAccessFromSettings
+                        )
+                    }
+
+                    if calendarService.authorizationStatus.canReadEvents {
+                        VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Destination calendar")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Picker("Destination calendar", selection: $calendarDefaultIdentifier) {
+                                    Text("Auto (prefer Outlook / Exchange)")
+                                        .tag("")
+
+                                    ForEach(calendarService.writableCalendars) { calendar in
+                                        Text(calendar.displayTitle)
+                                            .tag(calendar.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+
+                                Text("Current target: \(calendarDestinationSummary)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Default block length")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Picker("Default block length", selection: calendarDefaultDurationSelection) {
+                                    Text("30m").tag(30)
+                                    Text("60m").tag(60)
+                                    Text("90m").tag(90)
+                                    Text("120m").tag(120)
+                                }
+                                .pickerStyle(.segmented)
+
+                                Text("Next open \(calendarDefaultDurationSelection.wrappedValue)m slot: \(calendarSuggestedSlotText(durationMinutes: calendarDefaultDurationSelection.wrappedValue))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+                        )
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Upcoming events")
+                                .font(.headline)
+
+                            if calendarService.upcomingEvents.isEmpty {
+                                Text("No events found in the next seven days.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(Array(calendarService.upcomingEvents.prefix(6)), id: \.id) { event in
+                                    HStack(alignment: .top, spacing: 12) {
+                                        Image(systemName: event.isAllDay ? "sun.max" : "calendar")
+                                            .foregroundStyle(.orange)
+                                            .frame(width: 18)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(event.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(calendarEventTimeText(event))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Text(event.calendarTitle)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                        .padding(18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                        )
+                    }
                 }
 
             case .dataBackup:
@@ -1186,6 +1607,323 @@ struct ContentView: View {
         }
     }
 
+    private var plannerWorkspaceView: some View {
+        HStack(alignment: .top, spacing: 0) {
+            if plannerShowsTaskColumns {
+                plannerTaskShelf
+                    .id(plannerShelfPhaseKey)
+                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 380, maxHeight: .infinity, alignment: .top)
+
+                Divider()
+            }
+
+            WeekCalendarPanelView(displayMode: .week)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .layoutPriority(1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 8)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+    }
+
+    private var plannerTaskShelf: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 18)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Tasks")
+                                .font(.title3.weight(.semibold))
+
+                            Text(plannerShelfSubtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Button {
+                            presentPlannerTaskCreationSheet()
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(width: 30, height: 30)
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Create a new task")
+                    }
+
+                    if currentSelectionTaskIDs.count > 1 {
+                        selectionActionBar
+                    }
+
+                    if plannerTaskSections.isEmpty {
+                        ContentUnavailableView(
+                            "No Active Tasks",
+                            systemImage: "checkmark.circle",
+                            description: Text(store.hasActiveSearch
+                                ? "Adjust the search to surface tasks you can drag onto the calendar."
+                                : "Add a task, then drag it into the calendar to place a time block.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                    } else {
+                        ForEach(plannerTaskSections, id: \.block.id) { section in
+                            plannerTaskSection(block: section.block, tasks: section.tasks)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
+            }
+        }
+    }
+
+    private var plannerShelfSubtitle: String {
+        if store.hasActiveSearch {
+            return "Filtered tasks stay beside the calendar so you can schedule them without switching back."
+        }
+
+        if selectedList != nil {
+            return "This list stays beside the calendar so you can schedule it without switching back."
+        }
+
+        return "Keep the task shelf open while you block time on the calendar."
+    }
+
+    private var plannerDefaultNewTaskBlock: TimeBlock {
+        selectedTask?.block ?? .today
+    }
+
+    private var plannerSortedLists: [TaskList] {
+        store.lists.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    private var plannerTaskSections: [(block: TimeBlock, tasks: [TaskItem])] {
+        TimeBlock.allCases.compactMap { block in
+            let tasks = plannerVisibleTasks.filter { !$0.isDone && $0.block == block }
+            return tasks.isEmpty ? nil : (block, tasks)
+        }
+    }
+
+    private var plannerTaskCreationSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("New Task")
+                    .font(.title3.weight(.semibold))
+
+                Text("Choose the title, list, and lane before placing the task on the calendar.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Title")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                TextField("Task title", text: $plannerTaskDraftTitle)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        createTaskFromPlannerSheet()
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("List")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Picker("List", selection: $plannerTaskDraftListID) {
+                    Text("Unassigned")
+                        .tag(nil as UUID?)
+
+                    ForEach(plannerSortedLists) { list in
+                        Label(list.name, systemImage: list.icon)
+                            .tag(Optional(list.id))
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Lane")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Picker("Lane", selection: $plannerTaskDraftBlock) {
+                    ForEach(TimeBlock.allCases) { block in
+                        Text(block.label)
+                            .tag(block)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            HStack {
+                Spacer(minLength: 0)
+
+                Button("Cancel") {
+                    showingPlannerTaskCreationSheet = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Create Task") {
+                    createTaskFromPlannerSheet()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(plannerTaskDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
+    }
+
+    private func plannerTaskSection(block: TimeBlock, tasks: [TaskItem]) -> some View {
+        let isCollapsible = block == .thisWeek || block == .backlog
+        let isCollapsed = switch block {
+        case .today:
+            false
+        case .thisWeek:
+            plannerThisWeekCollapsed
+        case .backlog:
+            plannerBacklogCollapsed
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                guard isCollapsible else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    switch block {
+                    case .today:
+                        break
+                    case .thisWeek:
+                        plannerThisWeekCollapsed.toggle()
+                    case .backlog:
+                        plannerBacklogCollapsed.toggle()
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Label(block.label, systemImage: block.icon)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text("\(tasks.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.secondary.opacity(0.10))
+                        )
+
+                    if isCollapsible {
+                        Spacer(minLength: 8)
+
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!isCollapsible)
+
+            if !isCollapsed {
+                VStack(spacing: 8) {
+                    ForEach(tasks) { task in
+                        plannerTaskRow(task)
+                    }
+                }
+            }
+        }
+    }
+
+    private func plannerTaskRow(_ task: TaskItem) -> some View {
+        let isSelected = selectedTaskIDs.contains(task.id)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Button(action: { toggleTask(task) }) {
+                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(task.isDone ? .green : .secondary)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(task.title.isEmpty ? "Untitled" : task.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: 10) {
+                    if task.isScheduled {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+
+                    if let list = task.list {
+                        Label(list.name, systemImage: list.icon)
+                            .font(.caption)
+                            .foregroundStyle(list.listColor.color)
+                    }
+
+                    if task.checkboxTotal > 0 {
+                        Label("\(task.checkboxDone)/\(task.checkboxTotal)", systemImage: "checklist")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if task.note != nil {
+                        Image(systemName: "note.text")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color.orange.opacity(0.12)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.84)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    isSelected
+                        ? Color.orange.opacity(0.42)
+                        : Color(nsColor: .separatorColor).opacity(0.24),
+                    lineWidth: 1.2
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onTapGesture {
+            let extendingRange = NSEvent.modifierFlags.contains(.shift)
+            selectTask(task, extendingRange: extendingRange)
+        }
+        .draggable(TaskItemTransfer(id: task.id))
+    }
+
     private var selectionActionBar: some View {
         HStack(spacing: 12) {
             Text(selectionSummaryText)
@@ -1386,63 +2124,74 @@ struct ContentView: View {
         }
     }
 
+    private var plannerContentWithDetail: some View {
+        plannerWorkspaceView
+            .frame(maxWidth: .infinity)
+            .layoutPriority(1)
+    }
+
     @ViewBuilder
     private var inlineDetailColumn: some View {
-        if hasDetailContent {
-            detailPanel
+        VStack(spacing: 0) {
+            Picker("Workspace", selection: $auxiliaryPanelMode) {
+                ForEach(AuxiliaryPanelMode.allCases) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            if auxiliaryPanelMode == .week {
+                WeekCalendarPanelView(displayMode: .todayAndTomorrow)
+            } else if hasDetailContent {
+                detailPanel
+            } else {
+                ContentUnavailableView(
+                    "Select a Task",
+                    systemImage: "checkmark.circle",
+                    description: Text("Click a task to view details.")
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mainWorkspaceSurface: some View {
+        if workspaceMode == .planner {
+            HStack(spacing: 0) {
+                if plannerShowsSidebar && !windowIsNarrow {
+                    SidebarView(
+                        selection: $selection,
+                        workspaceMode: workspaceModeSelection
+                    )
+                        .frame(minWidth: 220, idealWidth: 240, maxWidth: 280, maxHeight: .infinity, alignment: .topLeading)
+
+                    Divider()
+                }
+
+                plannerContentWithDetail
+            }
         } else {
-            ContentUnavailableView(
-                "Select a Task",
-                systemImage: "checkmark.circle",
-                description: Text("Click a task to view details.")
-            )
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView(
+                    selection: $selection,
+                    workspaceMode: workspaceModeSelection
+                )
+            } detail: {
+                inlineContentWithDetail
+            }
+            .navigationSplitViewStyle(.prominentDetail)
         }
     }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView(selection: $selection)
-            } detail: {
-                inlineContentWithDetail
-            }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    toolbarSearchField
-                }
-
-                ToolbarItemGroup {
-                    Button {
-                        undoController.undo()
-                    } label: {
-                        Label("Undo", systemImage: "arrow.uturn.backward")
-                    }
-                    .help("Undo the last change")
-
-                    Button {
-                        undoController.redo()
-                    } label: {
-                        Label("Redo", systemImage: "arrow.uturn.forward")
-                    }
-                    .help("Redo the last undone change")
-
-                    Button {
-                        openShortcutCheatsheet()
-                    } label: {
-                        Label("Keyboard Shortcuts", systemImage: "command")
-                    }
-                    .help("Open the keyboard shortcuts cheatsheet")
-
-                    Button {
-                        selectedSettingsSection = .interface
-                        showingSettingsSheet = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .help("Open settings and app actions")
-                }
-            }
-            .navigationSplitViewStyle(.prominentDetail)
+        ZStack(alignment: .topLeading) {
+            mainWorkspaceSurface
             .frame(minWidth: 900, minHeight: 500)
             .background(
                 GeometryReader { geo in
@@ -1451,9 +2200,12 @@ struct ContentView: View {
                             let narrow = newWidth < 1200
                             if narrow != windowIsNarrow {
                                 windowIsNarrow = narrow
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    columnVisibility = narrow ? .detailOnly : .all
-                                    if !narrow { showOverlaySidebar = false }
+                            }
+
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                columnVisibility = resolvedColumnVisibility(forNarrowWindow: narrow)
+                                if !narrow {
+                                    showOverlaySidebar = false
                                 }
                             }
                         }
@@ -1467,6 +2219,12 @@ struct ContentView: View {
                 WindowTitleSyncView(title: boardTitle)
                     .allowsHitTesting(false)
             )
+            .background(
+                WindowChromeInsetReader { topInset in
+                    windowChromeTopInset = max(windowChromeTopInset, topInset)
+                }
+                .allowsHitTesting(false)
+            )
 
             // Floating sidebar overlay for narrow windows
             if showOverlaySidebar {
@@ -1478,7 +2236,10 @@ struct ContentView: View {
                         }
                     }
 
-                SidebarView(selection: $selection)
+                SidebarView(
+                    selection: $selection,
+                    workspaceMode: workspaceModeSelection
+                )
                     .frame(width: 260)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .background(.ultraThickMaterial)
@@ -1514,8 +2275,56 @@ struct ContentView: View {
                 .transition(.move(edge: .trailing))
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                if workspaceMode == .planner {
+                    Button(action: togglePlannerSidebar) {
+                        Image(systemName: "sidebar.leading")
+                    }
+                    .help("Show or hide the sidebar")
+                }
+            }
+
+            ToolbarItem(placement: .principal) {
+                toolbarSearchField
+            }
+
+            ToolbarItemGroup {
+                Button {
+                    undoController.undo()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .help("Undo the last change")
+
+                Button {
+                    undoController.redo()
+                } label: {
+                    Label("Redo", systemImage: "arrow.uturn.forward")
+                }
+                .help("Redo the last undone change")
+
+                Button {
+                    openShortcutCheatsheet()
+                } label: {
+                    Label("Keyboard Shortcuts", systemImage: "command")
+                }
+                .help("Open the keyboard shortcuts cheatsheet")
+
+                Button {
+                    selectedSettingsSection = .interface
+                    showingSettingsSheet = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open settings and app actions")
+            }
+        }
         .sheet(isPresented: $showingSettingsSheet) {
             settingsSheetView
+        }
+        .sheet(isPresented: $showingPlannerTaskCreationSheet) {
+            plannerTaskCreationSheet
         }
         .sheet(isPresented: $presentationState.showingKeyboardShortcuts) {
             shortcutsSheetView
@@ -1539,6 +2348,7 @@ struct ContentView: View {
         }
         .onAppear {
             syncSelectedTask()
+            syncScheduledTasksIntoToday()
         }
         .onChange(of: selection, initial: true) { _, _ in
             syncSelectedTask()
@@ -1555,6 +2365,9 @@ struct ContentView: View {
             validateSelection()
             syncSelectedTask()
         }
+        .onChange(of: calendarService.refreshRevision, initial: true) { _, _ in
+            syncScheduledTasksIntoToday()
+        }
         .onChange(of: presentationState.taskNavigationRequest) { _, request in
             guard let request else { return }
             openTaskFromMenuBar(request.taskID)
@@ -1563,13 +2376,43 @@ struct ContentView: View {
             deleteSelectedTasks()
         }
         .onChange(of: columnVisibility) { _, newValue in
-            if windowIsNarrow && newValue != .detailOnly {
+            if workspaceMode == .board && windowIsNarrow && newValue != .detailOnly {
                 columnVisibility = .detailOnly
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showOverlaySidebar.toggle()
                 }
             }
         }
+        .onChange(of: workspaceMode) { _, _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                columnVisibility = resolvedColumnVisibility(forNarrowWindow: windowIsNarrow)
+                if !windowIsNarrow {
+                    showOverlaySidebar = false
+                }
+                if workspaceMode == .planner && !windowIsNarrow {
+                    plannerShowsSidebar = true
+                }
+            }
+            syncSelectedTask()
+        }
+    }
+
+    private func togglePlannerSidebar() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if windowIsNarrow {
+                showOverlaySidebar.toggle()
+            } else {
+                plannerShowsSidebar.toggle()
+            }
+        }
+    }
+
+    private func resolvedColumnVisibility(forNarrowWindow narrow: Bool) -> NavigationSplitViewVisibility {
+        if narrow {
+            return .detailOnly
+        }
+
+        return .all
     }
 
     private var toolbarSearchField: some View {
@@ -1909,7 +2752,7 @@ struct ContentView: View {
         if case .list = selection {
             reorderTaskInCurrentListBlock(draggedID, block, beforeID)
         } else {
-            reorderActiveTask(draggedID, beforeID)
+            store.moveActiveTaskOnBoard(draggedID, to: block, before: beforeID)
         }
     }
 

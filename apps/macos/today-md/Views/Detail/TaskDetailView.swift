@@ -17,10 +17,10 @@ struct TaskDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     headerSection(searchQuery: searchQuery)
                     Divider()
-                    ChecklistSection(task: task)
-                    Divider()
                     MarkdownEditorView(task: task)
                         .frame(maxHeight: .infinity, alignment: .top)
+                    Divider()
+                    ChecklistSection(task: task)
                 }
                 .frame(
                     maxWidth: .infinity,
@@ -76,11 +76,8 @@ struct TaskDetailView: View {
             }
 
             HStack(spacing: 12) {
-                if let list = task.list {
-                    Label(list.name, systemImage: list.icon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                TaskListBadgePicker(task: task)
+
                 Text("Created \(task.creationDate.formatted(date: .abbreviated, time: .shortened))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
