@@ -507,6 +507,12 @@ struct TodayMdApp: App {
 }
 
 @MainActor
+enum TodayMdStoreSyncObserverTarget: CaseIterable, Hashable {
+    case cloudSync
+    case reminders
+}
+
+@MainActor
 @Observable
 final class TodayMdStore {
     private enum PersistenceMode {
@@ -529,7 +535,10 @@ final class TodayMdStore {
     private var undoManager: UndoManager?
 
     @ObservationIgnored
-    private var persistenceObservers: [() -> Void] = []
+    private var cloudSyncObservers: [() -> Void] = []
+
+    @ObservationIgnored
+    private var reminderSyncObservers: [() -> Void] = []
 
     @ObservationIgnored
     private let persistenceQueue = DispatchQueue(label: "com.todaymd.persistence", qos: .utility)
@@ -541,7 +550,7 @@ final class TodayMdStore {
     private var pendingPersistToken = 0
 
     @ObservationIgnored
-    private var hasPendingSyncNotification = false
+    private var pendingSyncNotificationTargets: Set<TodayMdStoreSyncObserverTarget> = []
 
     init(
         databaseURL: URL? = nil,
@@ -592,8 +601,12 @@ final class TodayMdStore {
         undoManager = manager
     }
 
-    func addPersistenceObserver(_ handler: @escaping () -> Void) {
-        persistenceObservers.append(handler)
+    func addCloudSyncObserver(_ handler: @escaping () -> Void) {
+        cloudSyncObservers.append(handler)
+    }
+
+    func addReminderSyncObserver(_ handler: @escaping () -> Void) {
+        reminderSyncObservers.append(handler)
     }
 
     func list(id: UUID) -> TaskList? {
@@ -1265,14 +1278,17 @@ final class TodayMdStore {
         )
     }
 
-    func applyRemoteArchive(_ archive: TodayMdArchive, notifySync: Bool = false) {
+    func applyRemoteArchive(
+        _ archive: TodayMdArchive,
+        notifyTargets: Set<TodayMdStoreSyncObserverTarget> = []
+    ) {
         applyArchive(archive, refreshSearch: true)
-        persist(notifySync: notifySync)
+        persist(notifyTargets: notifyTargets)
     }
 
     func applyMarkdownArchive(_ archive: TodayMdArchive) {
         applyArchive(archive, refreshSearch: true)
-        persist(notifySync: true)
+        persist(notifyTargets: Set(TodayMdStoreSyncObserverTarget.allCases))
     }
 
     private func loadShowcaseData() {
@@ -1434,7 +1450,7 @@ final class TodayMdStore {
     ) {
         let previous = registersUndo ? makeArchive() : nil
         change()
-        persist(using: persistenceMode)
+        persist(using: persistenceMode, notifyTargets: Set(TodayMdStoreSyncObserverTarget.allCases))
         refreshSearch()
         dataRevision += 1
 
@@ -1448,7 +1464,7 @@ final class TodayMdStore {
     private func restore(from archive: TodayMdArchive, actionName: String) {
         let current = makeArchive()
         applyArchive(archive, refreshSearch: true)
-        persist(using: .immediate)
+        persist(using: .immediate, notifyTargets: Set(TodayMdStoreSyncObserverTarget.allCases))
         undoManager?.registerUndo(withTarget: self) { target in
             target.restore(from: current, actionName: actionName)
         }
@@ -1472,45 +1488,52 @@ final class TodayMdStore {
 
     func flushPendingPersistence() {
         pendingPersistToken += 1
-        let shouldNotifySync = hasPendingSyncNotification
-        hasPendingSyncNotification = false
+        let notifyTargets = pendingSyncNotificationTargets
+        pendingSyncNotificationTargets = []
         pendingPersistWorkItem?.cancel()
         pendingPersistWorkItem = nil
-        persistArchive(makeArchive(), notifySync: shouldNotifySync)
+        persistArchive(makeArchive(), notifyTargets: notifyTargets)
     }
 
     private func persist(notifySync: Bool = true) {
-        persist(using: .immediate, notifySync: notifySync)
+        persist(
+            using: .immediate,
+            notifyTargets: notifySync ? Set(TodayMdStoreSyncObserverTarget.allCases) : []
+        )
     }
 
-    private func persist(using mode: PersistenceMode, notifySync: Bool = true) {
+    private func persist(notifyTargets: Set<TodayMdStoreSyncObserverTarget>) {
+        persist(using: .immediate, notifyTargets: notifyTargets)
+    }
+
+    private func persist(using mode: PersistenceMode, notifyTargets: Set<TodayMdStoreSyncObserverTarget>) {
         let archive = makeArchive()
 
         switch mode {
         case .immediate:
             pendingPersistToken += 1
-            hasPendingSyncNotification = false
+            pendingSyncNotificationTargets = []
             pendingPersistWorkItem?.cancel()
             pendingPersistWorkItem = nil
-            persistArchive(archive, notifySync: notifySync)
+            persistArchive(archive, notifyTargets: notifyTargets)
         case .deferred:
-            scheduleDeferredPersist(archive, notifySync: notifySync)
+            scheduleDeferredPersist(archive, notifyTargets: notifyTargets)
         }
     }
 
-    private func persistArchive(_ archive: TodayMdArchive, notifySync: Bool) {
+    private func persistArchive(_ archive: TodayMdArchive, notifyTargets: Set<TodayMdStoreSyncObserverTarget>) {
         do {
             try database.replaceAll(with: archive)
-            if notifySync {
-                notifyPersistenceObservers()
+            if !notifyTargets.isEmpty {
+                notifyPersistenceObservers(targets: notifyTargets)
             }
         } catch {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
         }
     }
 
-    private func scheduleDeferredPersist(_ archive: TodayMdArchive, notifySync: Bool) {
-        hasPendingSyncNotification = hasPendingSyncNotification || notifySync
+    private func scheduleDeferredPersist(_ archive: TodayMdArchive, notifyTargets: Set<TodayMdStoreSyncObserverTarget>) {
+        pendingSyncNotificationTargets.formUnion(notifyTargets)
         pendingPersistToken += 1
         let token = pendingPersistToken
 
@@ -1540,22 +1563,30 @@ final class TodayMdStore {
         guard token == pendingPersistToken else { return }
 
         pendingPersistWorkItem = nil
-        let shouldNotifySync = hasPendingSyncNotification
-        hasPendingSyncNotification = false
+        let notifyTargets = pendingSyncNotificationTargets
+        pendingSyncNotificationTargets = []
 
         if let error {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
             return
         }
 
-        if shouldNotifySync {
-            notifyPersistenceObservers()
+        if !notifyTargets.isEmpty {
+            notifyPersistenceObservers(targets: notifyTargets)
         }
     }
 
-    private func notifyPersistenceObservers() {
-        for observer in persistenceObservers {
-            observer()
+    private func notifyPersistenceObservers(targets: Set<TodayMdStoreSyncObserverTarget>) {
+        if targets.contains(.cloudSync) {
+            for observer in cloudSyncObservers {
+                observer()
+            }
+        }
+
+        if targets.contains(.reminders) {
+            for observer in reminderSyncObservers {
+                observer()
+            }
         }
     }
 

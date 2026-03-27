@@ -115,7 +115,7 @@ final class TodayMdSyncService: ObservableObject {
 
     func attach(store: TodayMdStore) {
         self.store = store
-        store.addPersistenceObserver { [weak self] in
+        store.addCloudSyncObserver { [weak self] in
             self?.handleLocalStoreChange()
         }
     }
@@ -256,7 +256,7 @@ final class TodayMdSyncService: ObservableObject {
                 switch resolution {
                 case .useRemote:
                     try writeConflictBackup(for: pendingConflict.localArchive, prefix: "local", in: folderURL)
-                    store.applyRemoteArchive(pendingConflict.remoteArchive)
+                    store.applyRemoteArchive(pendingConflict.remoteArchive, notifyTargets: [.reminders])
                     updatePersistedState { state in
                         state.lastSyncedRevision = try? TodayMdObsidianBridge.contentRevisionID(for: pendingConflict.remoteArchive)
                         state.lastSyncAt = Date()
@@ -305,7 +305,7 @@ final class TodayMdSyncService: ObservableObject {
                     return
                 }
 
-                store.applyRemoteArchive(remoteArchive)
+                store.applyRemoteArchive(remoteArchive, notifyTargets: [.reminders])
                 pendingConflict = nil
                 conflict = nil
                 let effectiveRevisionID = try TodayMdObsidianBridge.contentRevisionID(for: remoteArchive)

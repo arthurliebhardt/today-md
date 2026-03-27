@@ -845,9 +845,13 @@ final class TodayMdStoreTests: XCTestCase {
 
     func testApplyRemoteArchiveNotifiesPersistenceObserversWhenRequested() throws {
         let store = try makeStore()
-        var notificationCount = 0
-        store.addPersistenceObserver {
-            notificationCount += 1
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
         }
 
         let archive = TodayMdArchive(
@@ -866,16 +870,21 @@ final class TodayMdStoreTests: XCTestCase {
             ]
         )
 
-        store.applyRemoteArchive(archive, notifySync: true)
+        store.applyRemoteArchive(archive, notifyTargets: [.cloudSync])
 
-        XCTAssertEqual(notificationCount, 1)
+        XCTAssertEqual(cloudNotificationCount, 1)
+        XCTAssertEqual(reminderNotificationCount, 0)
     }
 
     func testApplyRemoteArchiveStaysSilentByDefault() throws {
         let store = try makeStore()
-        var notificationCount = 0
-        store.addPersistenceObserver {
-            notificationCount += 1
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
         }
 
         let archive = TodayMdArchive(
@@ -896,7 +905,41 @@ final class TodayMdStoreTests: XCTestCase {
 
         store.applyRemoteArchive(archive)
 
-        XCTAssertEqual(notificationCount, 0)
+        XCTAssertEqual(cloudNotificationCount, 0)
+        XCTAssertEqual(reminderNotificationCount, 0)
+    }
+
+    func testApplyRemoteArchiveCanNotifyReminderObserversWithoutCloudObservers() throws {
+        let store = try makeStore()
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
+        }
+
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Obsidian edit",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: []
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive, notifyTargets: [.reminders])
+
+        XCTAssertEqual(cloudNotificationCount, 0)
+        XCTAssertEqual(reminderNotificationCount, 1)
     }
 
     func testStoreCanResetToShowcaseDataOnLaunch() throws {

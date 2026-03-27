@@ -742,7 +742,7 @@ final class TodayMdReminderSyncService: ObservableObject {
 
     func attach(store: TodayMdStore) {
         self.store = store
-        store.addPersistenceObserver { [weak self] in
+        store.addReminderSyncObserver { [weak self] in
             self?.handleLocalStoreChange()
         }
     }
@@ -915,7 +915,7 @@ final class TodayMdReminderSyncService: ObservableObject {
         let localRevision = try TodayMdObsidianBridge.contentRevisionID(for: localArchive)
         let mergedRevision = try TodayMdObsidianBridge.contentRevisionID(for: outcome.archive)
         if localRevision != mergedRevision {
-            store.applyRemoteArchive(outcome.archive, notifySync: true)
+            store.applyRemoteArchive(outcome.archive, notifyTargets: [.cloudSync])
         }
 
         try applyMutations(outcome.mutations, in: managedCalendar)
