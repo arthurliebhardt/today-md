@@ -24,6 +24,22 @@ final class TodayMdSyncServiceTests: XCTestCase {
             includingPropertiesForKeys: nil
         )
         XCTAssertEqual(markdownFiles.filter { $0.pathExtension == "md" }.count, 1)
+        XCTAssertEqual(context.service.markdownArchivePath, markdownDirectoryURL.path)
+    }
+
+    func testEnableSyncExportsTaskWithoutNoteToMarkdownArchive() throws {
+        let context = try makeContext()
+        _ = createTask(in: context.store, title: "Title only")
+
+        try context.service.enableSync(at: context.syncFolderURL)
+
+        let markdownDirectoryURL = context.syncFolderURL.appendingPathComponent("Markdown Archive", isDirectory: true)
+        let markdownFiles = try FileManager.default.contentsOfDirectory(
+            at: markdownDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+
+        XCTAssertEqual(markdownFiles.filter { $0.pathExtension == "md" }.count, 1)
     }
 
     func testExistingLegacyRemoteSnapshotPopulatesEmptyStoreWithoutShowcaseSeedData() throws {
@@ -82,6 +98,81 @@ final class TodayMdSyncServiceTests: XCTestCase {
 
         XCTAssertEqual(context.store.allTasks.first?.title, "Cloud title")
         XCTAssertEqual(context.service.status, .idle)
+    }
+
+    func testRemoteMarkdownEditPullsWhenMarkdownArchiveIsNewerThanJSONSnapshot() throws {
+        let context = try makeContext(debounceInterval: 5)
+        let task = createTask(in: context.store, title: "Local title", note: "Original note")
+
+        try context.service.enableSync(at: context.syncFolderURL)
+
+        let markdownDirectoryURL = context.syncFolderURL.appendingPathComponent("Markdown Archive", isDirectory: true)
+        let markdownFiles = try FileManager.default.contentsOfDirectory(
+            at: markdownDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        let markdownURL = try XCTUnwrap(markdownFiles.first(where: { $0.pathExtension == "md" }))
+
+        let updatedMarkdown = """
+        ---
+        task_id: "\(task.id.uuidString)"
+        title: "Edited in Obsidian"
+        done: true
+        list: "Remote"
+        lane: "Backlog"
+        lane_raw: "backlog"
+        scheduling_state: "scheduled"
+        created_at: "\(iso8601String(from: task.creationDate))"
+        updated_at: "2000-01-01T00:00:00Z"
+        ---
+
+        New body from Obsidian
+        """
+        try updatedMarkdown.write(to: markdownURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(5)],
+            ofItemAtPath: markdownURL.path
+        )
+
+        context.service.syncNow()
+
+        let updatedTask = try XCTUnwrap(context.store.allTasks.first)
+        XCTAssertEqual(updatedTask.title, "Edited in Obsidian")
+        XCTAssertEqual(updatedTask.list?.name, "Remote")
+        XCTAssertEqual(updatedTask.block, .backlog)
+        XCTAssertTrue(updatedTask.isDone)
+        XCTAssertTrue(updatedTask.isScheduled)
+        XCTAssertEqual(updatedTask.note?.content, "New body from Obsidian")
+    }
+
+    func testMarkdownOnlyTaskInSyncFolderCreatesTaskWithoutJSONSnapshot() throws {
+        let context = try makeContext()
+        let markdownDirectoryURL = context.syncFolderURL.appendingPathComponent("Markdown Archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: markdownDirectoryURL, withIntermediateDirectories: true)
+
+        let markdownURL = markdownDirectoryURL.appendingPathComponent("new-obsidian-task.md")
+        let markdown = """
+        ---
+        title: "Inbox from Obsidian"
+        list: "Obsidian"
+        lane_raw: "today"
+        done: false
+        scheduling_state: "unscheduled"
+        created_at: "2026-03-26T10:00:00Z"
+        ---
+
+        - [ ] First imported checkbox
+        """
+        try markdown.write(to: markdownURL, atomically: true, encoding: .utf8)
+
+        try context.service.enableSync(at: context.syncFolderURL)
+
+        let importedTask = try XCTUnwrap(context.store.allTasks.first)
+        XCTAssertEqual(importedTask.title, "Inbox from Obsidian")
+        XCTAssertEqual(importedTask.list?.name, "Obsidian")
+        XCTAssertEqual(importedTask.block, .today)
+        XCTAssertEqual(importedTask.note?.content, "- [ ] First imported checkbox")
+        XCTAssertEqual(context.store.allTasks.count, 1)
     }
 
     func testRemoteNewerWithUnsyncedLocalChangesEntersConflict() throws {

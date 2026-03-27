@@ -82,17 +82,19 @@ private enum ContentCalendarVisibilitySelection {
 private struct MarkdownArchiveSnapshot: Equatable {
     let id: UUID
     let title: String
-    let listName: String
+    let listID: UUID?
+    let listName: String?
     let blockRaw: String
-    let noteContent: String
-    let noteLastModified: Date
+    let isDone: Bool
+    let schedulingStateRaw: String
+    let noteContent: String?
+    let noteLastModified: Date?
 }
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
     case calendar
-    case dataBackup
-    case sync
+    case data
     case shortcuts
 
     var id: String { rawValue }
@@ -103,10 +105,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "Interface"
         case .calendar:
             return "Calendar"
-        case .dataBackup:
+        case .data:
             return "Data"
-        case .sync:
-            return "Sync"
         case .shortcuts:
             return "Shortcuts"
         }
@@ -118,10 +118,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "Appearance and quick capture"
         case .calendar:
             return "Availability and time blocking"
-        case .dataBackup:
-            return "Import, export, and archive"
-        case .sync:
-            return "Cloud folder and sync status"
+        case .data:
+            return "Backups, archive, and sync source"
         case .shortcuts:
             return "App commands and cheatsheet"
         }
@@ -133,10 +131,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "paintbrush.pointed.fill"
         case .calendar:
             return "calendar.badge.clock"
-        case .dataBackup:
+        case .data:
             return "internaldrive"
-        case .sync:
-            return "arrow.triangle.2.circlepath.icloud"
         case .shortcuts:
             return "command"
         }
@@ -148,10 +144,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return .indigo
         case .calendar:
             return .orange
-        case .dataBackup:
+        case .data:
             return .orange
-        case .sync:
-            return .teal
         case .shortcuts:
             return .purple
         }
@@ -718,35 +712,55 @@ struct ContentView: View {
     }
 
     private var markdownArchivePath: String? {
-        try? TodayMdMarkdownArchiveService.archivePath()
+        if syncService.syncEnabled {
+            return syncService.markdownArchivePath
+        }
+        return try? TodayMdMarkdownArchiveService.archivePath()
     }
 
     private var markdownArchiveSnapshots: [MarkdownArchiveSnapshot] {
         store.allTasks
-            .compactMap { task -> MarkdownArchiveSnapshot? in
-                guard let note = task.note else { return nil }
-
-                return MarkdownArchiveSnapshot(
+            .map { task in
+                MarkdownArchiveSnapshot(
                     id: task.id,
                     title: task.title,
-                    listName: task.list?.name ?? "Unassigned",
+                    listID: task.list?.id,
+                    listName: task.list?.name,
                     blockRaw: task.blockRaw,
-                    noteContent: note.content,
-                    noteLastModified: note.lastModified
+                    isDone: task.isDone,
+                    schedulingStateRaw: task.schedulingStateRaw,
+                    noteContent: task.note?.content,
+                    noteLastModified: task.note?.lastModified
                 )
             }
             .sorted { $0.id.uuidString < $1.id.uuidString }
     }
 
     private func syncMarkdownArchive() {
+        guard !syncService.syncEnabled else { return }
+
         do {
-            try TodayMdMarkdownArchiveService.syncNotes(for: store.allTasks)
+            try TodayMdMarkdownArchiveService.reconcileArchive(with: store)
         } catch {
             presentTransferError(title: "Markdown Archive Sync Failed", error: error)
         }
     }
 
+    private func handleApplicationDidBecomeActive() {
+        if syncService.syncEnabled {
+            syncService.handleAppDidBecomeActive()
+            return
+        }
+
+        syncMarkdownArchive()
+    }
+
     private func openMarkdownArchive() {
+        if syncService.syncEnabled {
+            syncService.openMarkdownArchiveFolder()
+            return
+        }
+
         do {
             try TodayMdMarkdownArchiveService.revealArchiveFolder()
         } catch {
@@ -883,10 +897,10 @@ struct ContentView: View {
 
     private var syncFolderActionSubtitle: String {
         if syncService.syncEnabled {
-            return "Switch the iCloud Drive or OneDrive folder that stores the shared sync snapshot."
+            return "Switch the iCloud Drive or OneDrive folder that stores the shared snapshot and active markdown archive."
         }
 
-        return "Choose a synced cloud folder and keep this Mac in sync through a single shared JSON snapshot."
+        return "Choose a synced cloud folder and make its markdown archive the single shared source of truth."
     }
 
     private var syncLastSyncText: String {
@@ -1308,62 +1322,9 @@ struct ContentView: View {
                     }
                 }
 
-            case .dataBackup:
+            case .data:
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Backups and note exports")
-                        .font(.headline)
-
-                    VStack(spacing: 12) {
-                        settingsActionCard(
-                            title: "Import Backup",
-                            subtitle: "Select a JSON backup file and merge it or replace the current data.",
-                            systemImage: "square.and.arrow.down",
-                            tint: .blue,
-                            action: startImport
-                        )
-
-                        settingsActionCard(
-                            title: "Export Backup",
-                            subtitle: "Choose a folder and create a timestamped JSON backup plus separate markdown note files.",
-                            systemImage: "square.and.arrow.up",
-                            tint: .orange,
-                            action: startExport
-                        )
-
-                        settingsActionCard(
-                            title: "Open Markdown Archive",
-                            subtitle: "Open the folder where task notes are mirrored as reusable .md files.",
-                            systemImage: "doc.text",
-                            tint: .green,
-                            action: openMarkdownArchive
-                        )
-                    }
-                    .padding(18)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
-                    )
-
-                    if let markdownArchivePath {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Archive location")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            Text(markdownArchivePath)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
-
-            case .sync:
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Cloud sync")
+                    Text("Data source and backups")
                         .font(.headline)
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -1372,9 +1333,17 @@ struct ContentView: View {
                                 .fill(syncStatusColor)
                                 .frame(width: 10, height: 10)
 
-                            Text("Status: \(syncService.statusLabel)")
+                            Text(syncService.syncEnabled ? "Source: Sync Folder" : "Source: Local Archive")
                                 .font(.subheadline.weight(.semibold))
                         }
+
+                        Text(
+                            syncService.syncEnabled
+                                ? "The sync folder is the active markdown archive and single source of truth while sync is enabled."
+                                : "The local Application Support archive is the active markdown archive until sync is enabled."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                         Text("Last successful sync: \(syncLastSyncText)")
                             .font(.caption)
@@ -1410,6 +1379,32 @@ struct ContentView: View {
                     )
 
                     VStack(spacing: 12) {
+                        settingsActionCard(
+                            title: "Import Backup",
+                            subtitle: "Select a JSON backup file and merge it or replace the current data.",
+                            systemImage: "square.and.arrow.down",
+                            tint: .blue,
+                            action: startImport
+                        )
+
+                        settingsActionCard(
+                            title: "Export Backup",
+                            subtitle: "Choose a folder and create a timestamped JSON backup plus separate markdown note files.",
+                            systemImage: "square.and.arrow.up",
+                            tint: .orange,
+                            action: startExport
+                        )
+
+                        settingsActionCard(
+                            title: "Open Markdown Archive",
+                            subtitle: syncService.syncEnabled
+                                ? "Open the markdown archive inside the selected sync folder."
+                                : "Open the local folder where tasks are mirrored as reusable .md files.",
+                            systemImage: "doc.text",
+                            tint: .green,
+                            action: openMarkdownArchive
+                        )
+
                         settingsActionCard(
                             title: syncFolderActionTitle,
                             subtitle: syncFolderActionSubtitle,
@@ -1448,12 +1443,24 @@ struct ContentView: View {
                     .padding(18)
                     .background(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
                     )
+
+                    if let markdownArchivePath {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(syncService.syncEnabled ? "Active archive location" : "Local archive location")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(markdownArchivePath)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
                 }
 
             case .shortcuts:
@@ -2469,6 +2476,9 @@ struct ContentView: View {
         }
         .onChange(of: markdownArchiveSnapshots, initial: true) { _, _ in
             syncMarkdownArchive()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            handleApplicationDidBecomeActive()
         }
         .onChange(of: store.dataRevision, initial: true) { _, _ in
             validateSelection()

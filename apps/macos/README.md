@@ -14,7 +14,8 @@ Built with SwiftUI, `@Observable` models, and a local SQLite store, `today-md` k
 - Drag-and-drop task movement and reordering
 - Global search across task titles, notes, and subtasks from the centered toolbar search field
 - Import and export of task data as JSON backups, with markdown note exports alongside them
-- Automatic mirror of task notes as `.md` files in Application Support
+- Automatic mirror of every task as a `.md` file in Application Support
+- Obsidian-compatible markdown round-tripping for editing existing tasks and creating new ones from the markdown archive or sync folder
 - Seeded sample data on first install
 
 ## Tech Stack
@@ -99,7 +100,7 @@ bash scripts/install.sh ~/Downloads/today-md-v1.7.3-macos.zip
 
 Each export creates a dated `today-md-eport-{date}` folder containing the JSON backup and a markdown notes folder. Imported data can either be merged into the existing SQLite store or replace it completely.
 
-Task notes are also mirrored automatically as Markdown files in `~/Library/Application Support/today-md/Markdown Archive/` so they can be reused outside the app.
+Every task is mirrored automatically as a Markdown file in `~/Library/Application Support/today-md/Markdown Archive/`. Editing those files updates the app on the next archive reconciliation pass, and new `.md` files created there or inside a sync folder can be imported as tasks.
 
 Search is powered by a local SQLite full-text index over task titles, markdown notes, and subtask text.
 

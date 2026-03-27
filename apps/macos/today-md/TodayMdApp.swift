@@ -1241,6 +1241,11 @@ final class TodayMdStore {
         persist(notifySync: false)
     }
 
+    func applyMarkdownArchive(_ archive: TodayMdArchive) {
+        applyArchive(archive, refreshSearch: true)
+        persist(notifySync: true)
+    }
+
     private func loadShowcaseData() {
         let privateList = TaskList(name: "Private", icon: "person", color: .blue, sortOrder: 0)
         let workList = TaskList(name: "Work", icon: "briefcase", color: .purple, sortOrder: 1)
