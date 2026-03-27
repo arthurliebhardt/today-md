@@ -175,6 +175,30 @@ enum ImportMode {
 
 @MainActor
 enum TodayMdMarkdownArchiveService {
+    static func reconcileArchive(with store: TodayMdStore) throws {
+        let directoryURL = try archiveDirectoryURL()
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        let currentArchive = store.makeArchive()
+        if let mergedArchive = try TodayMdObsidianBridge.mergedArchive(
+            baseArchive: currentArchive,
+            markdownDirectoryURL: directoryURL
+        ) {
+            let currentRevision = try TodayMdObsidianBridge.contentRevisionID(for: currentArchive)
+            let mergedRevision = try TodayMdObsidianBridge.contentRevisionID(for: mergedArchive)
+
+            if currentRevision != mergedRevision {
+                store.applyMarkdownArchive(mergedArchive)
+            }
+        }
+
+        try writeNotes(store.allTasks, to: directoryURL, removeStaleFiles: true)
+    }
+
     static func syncNotes(for tasks: [TaskItem]) throws {
         let directoryURL = try archiveDirectoryURL()
         try writeNotes(tasks, to: directoryURL, removeStaleFiles: true)
@@ -198,13 +222,10 @@ enum TodayMdMarkdownArchiveService {
 
         let noteFiles = tasks
             .sorted { $0.id.uuidString < $1.id.uuidString }
-            .compactMap { task -> (filename: String, content: String)? in
-                guard let note = task.note else { return nil }
-                guard !note.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-
-                return (
+            .map { task in
+                (
                     filename: archiveFilename(for: task),
-                    content: renderMarkdown(for: task, note: note)
+                    content: renderMarkdown(for: task)
                 )
             }
 
@@ -276,18 +297,22 @@ enum TodayMdMarkdownArchiveService {
         return String(fallback.prefix(60))
     }
 
-    private static func renderMarkdown(for task: TaskItem, note: TaskNote) -> String {
+    private static func renderMarkdown(for task: TaskItem) -> String {
         let lines = [
             "---",
             "task_id: \"\(task.id.uuidString)\"",
             "title: \"\(yamlEscaped(task.title))\"",
+            "done: \(task.isDone ? "true" : "false")",
             "list: \"\(yamlEscaped(task.list?.name ?? "Unassigned"))\"",
+            "list_id: \"\(task.list?.id.uuidString ?? "")\"",
             "lane: \"\(yamlEscaped(task.block.label))\"",
+            "lane_raw: \"\(task.block.rawValue)\"",
+            "scheduling_state: \"\(task.schedulingState.rawValue)\"",
             "created_at: \"\(iso8601String(from: task.creationDate))\"",
-            "updated_at: \"\(iso8601String(from: note.lastModified))\"",
+            "updated_at: \"\(iso8601String(from: task.note?.lastModified ?? task.creationDate))\"",
             "---",
             "",
-            note.content
+            task.note?.content ?? ""
         ]
 
         return lines.joined(separator: "\n")

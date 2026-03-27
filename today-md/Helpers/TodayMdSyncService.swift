@@ -108,6 +108,11 @@ final class TodayMdSyncService: ObservableObject {
         folderPath != nil
     }
 
+    var markdownArchivePath: String? {
+        guard let folderPath else { return nil }
+        return Self.markdownArchiveDirectoryURL(in: URL(fileURLWithPath: folderPath)).path
+    }
+
     func attach(store: TodayMdStore) {
         self.store = store
         store.configureSyncHandler { [weak self] in
@@ -204,6 +209,19 @@ final class TodayMdSyncService: ObservableObject {
         }
     }
 
+    func openMarkdownArchiveFolder() {
+        do {
+            let folderURL = try resolvedFolderURL()
+            _ = try withSecurityScopedAccess(to: folderURL) {
+                let archiveURL = Self.markdownArchiveDirectoryURL(in: folderURL)
+                try fileManager.createDirectory(at: archiveURL, withIntermediateDirectories: true)
+                NSWorkspace.shared.open(archiveURL)
+            }
+        } catch {
+            recordError(error)
+        }
+    }
+
     func syncNow() {
         guard syncEnabled else { return }
         guard !isSyncInProgress else { return }
@@ -240,7 +258,7 @@ final class TodayMdSyncService: ObservableObject {
                     try writeConflictBackup(for: pendingConflict.localArchive, prefix: "local", in: folderURL)
                     store.applyRemoteArchive(pendingConflict.remoteArchive)
                     updatePersistedState { state in
-                        state.lastSyncedRevision = pendingConflict.remoteArchive.syncRevisionID
+                        state.lastSyncedRevision = try? TodayMdObsidianBridge.contentRevisionID(for: pendingConflict.remoteArchive)
                         state.lastSyncAt = Date()
                         state.lastError = nil
                         state.hasUnsyncedLocalChanges = false
@@ -290,8 +308,9 @@ final class TodayMdSyncService: ObservableObject {
                 store.applyRemoteArchive(remoteArchive)
                 pendingConflict = nil
                 conflict = nil
+                let effectiveRevisionID = try TodayMdObsidianBridge.contentRevisionID(for: remoteArchive)
                 updatePersistedState { state in
-                    state.lastSyncedRevision = remoteArchive.syncRevisionID
+                    state.lastSyncedRevision = effectiveRevisionID
                     state.lastSyncAt = Date()
                     state.lastError = nil
                     state.hasUnsyncedLocalChanges = false
@@ -330,8 +349,9 @@ final class TodayMdSyncService: ObservableObject {
 
         pendingConflict = nil
         conflict = nil
+        let effectiveRevisionID = try TodayMdObsidianBridge.contentRevisionID(for: archive)
         updatePersistedState { state in
-            state.lastSyncedRevision = revisionID
+            state.lastSyncedRevision = effectiveRevisionID
             state.lastSyncAt = syncDate
             state.lastError = nil
             state.hasUnsyncedLocalChanges = false
@@ -362,25 +382,30 @@ final class TodayMdSyncService: ObservableObject {
     }
 
     private func remoteArchiveIsNew(_ remoteArchive: TodayMdArchive) -> Bool {
-        if let remoteRevisionID = remoteArchive.syncRevisionID {
-            return remoteRevisionID != persistedState.lastSyncedRevision
-        }
-
-        if persistedState.lastSyncedRevision != nil {
+        guard let effectiveRevisionID = try? TodayMdObsidianBridge.contentRevisionID(for: remoteArchive) else {
             return true
         }
 
-        return persistedState.lastSyncAt == nil
+        return effectiveRevisionID != persistedState.lastSyncedRevision
     }
 
     private func loadRemoteArchiveIfPresent(from folderURL: URL) throws -> TodayMdArchive? {
         let remoteURL = Self.syncArchiveURL(in: folderURL)
-        guard fileManager.fileExists(atPath: remoteURL.path) else { return nil }
+        let baseArchive: TodayMdArchive?
+        if fileManager.fileExists(atPath: remoteURL.path) {
+            let data = try Data(contentsOf: remoteURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            baseArchive = try decoder.decode(TodayMdArchive.self, from: data)
+        } else {
+            baseArchive = nil
+        }
 
-        let data = try Data(contentsOf: remoteURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(TodayMdArchive.self, from: data)
+        return try TodayMdObsidianBridge.mergedArchive(
+            baseArchive: baseArchive,
+            markdownDirectoryURL: Self.markdownArchiveDirectoryURL(in: folderURL),
+            fileManager: fileManager
+        )
     }
 
     private func writeArchive(_ archive: TodayMdArchive, to url: URL) throws {
