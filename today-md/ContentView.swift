@@ -87,6 +87,7 @@ private struct MarkdownArchiveSnapshot: Equatable {
     let blockRaw: String
     let isDone: Bool
     let schedulingStateRaw: String
+    let scheduledDate: Date?
     let noteContent: String?
     let noteLastModified: Date?
 }
@@ -94,6 +95,7 @@ private struct MarkdownArchiveSnapshot: Equatable {
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
     case calendar
+    case reminders
     case data
     case shortcuts
 
@@ -105,6 +107,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "Interface"
         case .calendar:
             return "Calendar"
+        case .reminders:
+            return "Reminders"
         case .data:
             return "Data"
         case .shortcuts:
@@ -118,6 +122,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "Appearance and quick capture"
         case .calendar:
             return "Availability and time blocking"
+        case .reminders:
+            return "Apple Reminders sync"
         case .data:
             return "Backups, archive, and sync source"
         case .shortcuts:
@@ -131,6 +137,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return "paintbrush.pointed.fill"
         case .calendar:
             return "calendar.badge.clock"
+        case .reminders:
+            return "checklist.checked"
         case .data:
             return "internaldrive"
         case .shortcuts:
@@ -144,6 +152,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             return .indigo
         case .calendar:
             return .orange
+        case .reminders:
+            return .green
         case .data:
             return .orange
         case .shortcuts:
@@ -346,6 +356,7 @@ private struct WindowChromeInsetReader: NSViewRepresentable {
 struct ContentView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var calendarService: TodayMdCalendarService
+    @EnvironmentObject private var reminderSyncService: TodayMdReminderSyncService
     @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
@@ -658,6 +669,22 @@ struct ContentView: View {
         calendarService.resolveAuthorization()
     }
 
+    private func requestReminderAccessFromSettings() {
+        reminderSyncService.resolveAuthorization()
+    }
+
+    private func enableReminderSyncFromSettings() {
+        reminderSyncService.enableSync()
+    }
+
+    private func disableReminderSyncFromSettings() {
+        reminderSyncService.disableSync()
+    }
+
+    private func syncRemindersNowFromSettings() {
+        reminderSyncService.syncNow()
+    }
+
     private func syncScheduledTasksIntoToday() {
         let scheduledTaskIDs = calendarService.managedTaskIDs(forDay: Date())
         store.promoteScheduledTasksToToday(ids: scheduledTaskIDs)
@@ -729,6 +756,7 @@ struct ContentView: View {
                     blockRaw: task.blockRaw,
                     isDone: task.isDone,
                     schedulingStateRaw: task.schedulingStateRaw,
+                    scheduledDate: task.scheduledDate,
                     noteContent: task.note?.content,
                     noteLastModified: task.note?.lastModified
                 )
@@ -889,6 +917,26 @@ struct ContentView: View {
         case .error:
             return .red
         }
+    }
+
+    private var reminderStatusColor: Color {
+        switch reminderSyncService.authorizationStatus {
+        case .notDetermined:
+            return .secondary
+        case .denied, .restricted:
+            return .red
+        case .writeOnly:
+            return .orange
+        case .fullAccess:
+            return reminderSyncService.syncEnabled ? .green : .secondary
+        }
+    }
+
+    private var reminderLastSyncText: String {
+        guard let lastSyncAt = reminderSyncService.lastSyncAt else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: lastSyncAt, relativeTo: Date())
     }
 
     private var syncFolderActionTitle: String {
@@ -1320,6 +1368,92 @@ struct ContentView: View {
                                 .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
                         )
                     }
+                }
+
+            case .reminders:
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Apple Reminders")
+                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(reminderStatusColor)
+                                .frame(width: 10, height: 10)
+
+                            Text("Status: \(reminderSyncService.authorizationStatus.label)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text(reminderSyncService.authorizationStatus.guidance)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("today-md syncs through a managed Reminders list named `\(reminderSyncService.managedListTitle)`. Existing tasks keep their notes, completion state, and lane. `Today` tasks get a due date for today, `This Week` tasks get a due date later this week, and brand-new reminders import as unassigned tasks.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("Last successful sync: \(reminderLastSyncText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let lastError = reminderSyncService.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.green.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.green.opacity(0.14), lineWidth: 1)
+                    )
+
+                    VStack(spacing: 12) {
+                        settingsActionCard(
+                            title: reminderSyncService.authorizationStatus.resolutionActionTitle,
+                            subtitle: reminderSyncService.authorizationStatus.resolutionActionSubtitle,
+                            systemImage: reminderSyncService.authorizationStatus.resolutionActionSystemImage,
+                            tint: .green,
+                            action: requestReminderAccessFromSettings
+                        )
+
+                        settingsActionCard(
+                            title: reminderSyncService.syncEnabled ? "Sync Reminders Now" : "Enable Reminders Sync",
+                            subtitle: reminderSyncService.syncEnabled
+                                ? "Re-read the managed Reminders list, import changes from Apple Reminders, and push pending task edits back."
+                                : "Create or reuse the managed Reminders list and start mirroring today-md tasks into Apple Reminders.",
+                            systemImage: reminderSyncService.syncEnabled ? "arrow.triangle.2.circlepath" : "checklist",
+                            tint: .blue,
+                            isEnabled: reminderSyncService.authorizationStatus.canReadReminders,
+                            action: reminderSyncService.syncEnabled ? syncRemindersNowFromSettings : enableReminderSyncFromSettings
+                        )
+
+                        settingsActionCard(
+                            title: "Disable Reminders Sync",
+                            subtitle: "Stop reading from and writing to the managed Apple Reminders list on this Mac.",
+                            systemImage: "xmark.circle",
+                            tint: .red,
+                            isEnabled: reminderSyncService.syncEnabled,
+                            action: disableReminderSyncFromSettings
+                        )
+                    }
+                    .padding(18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.86))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+                    )
                 }
 
             case .data:

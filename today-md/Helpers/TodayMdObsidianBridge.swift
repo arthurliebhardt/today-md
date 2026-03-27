@@ -155,9 +155,10 @@ enum TodayMdObsidianBridge {
             id: taskID,
             title: title,
             block: block,
-            schedulingState: document.schedulingState ?? .unscheduled,
+            schedulingState: document.schedulingState ?? (document.scheduledAt == nil ? .unscheduled : .scheduled),
             sortOrder: 0,
             creationDate: document.createdAt ?? Date(),
+            scheduledDate: document.scheduledAt,
             isDone: document.isDone ?? false,
             note: note(from: document, existing: nil)
         )
@@ -276,6 +277,7 @@ private struct MarkdownTaskDocument {
     let block: TimeBlock?
     let isDone: Bool?
     let schedulingState: TaskSchedulingState?
+    let scheduledAt: Date?
     let createdAt: Date?
     let updatedAt: Date?
     let body: String
@@ -293,6 +295,7 @@ private struct MarkdownTaskDocument {
         self.block = Self.blockValue(raw: frontmatter["lane_raw"] ?? frontmatter["lane"] ?? frontmatter["block"])
         self.isDone = Self.boolValue(frontmatter["done"])
         self.schedulingState = Self.schedulingStateValue(frontmatter["scheduling_state"] ?? frontmatter["scheduled"])
+        self.scheduledAt = Self.dateValue(frontmatter["scheduled_at"])
         self.createdAt = Self.dateValue(frontmatter["created_at"])
         let frontmatterUpdatedAt = Self.dateValue(frontmatter["updated_at"])
         if let frontmatterUpdatedAt, let fileModifiedAt {
@@ -500,6 +503,7 @@ private struct ContentSnapshot: Codable {
         let schedulingStateRaw: String
         let sortOrder: Int
         let creationDate: Date
+        let scheduledDate: Date?
         let noteContent: String?
 
         init(archive: TodayMdArchive.TaskArchive) {
@@ -510,6 +514,7 @@ private struct ContentSnapshot: Codable {
             self.schedulingStateRaw = archive.schedulingStateRaw
             self.sortOrder = archive.sortOrder
             self.creationDate = archive.creationDate
+            self.scheduledDate = archive.scheduledDate
             self.noteContent = archive.note?.content
         }
     }

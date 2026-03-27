@@ -6,6 +6,10 @@
 	<string>today-md needs calendar access to read your availability and block time for tasks.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>today-md needs calendar access to create time blocks for tasks.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>today-md needs reminders access to sync tasks with Apple Reminders.</string>
+	<key>NSRemindersWriteOnlyAccessUsageDescription</key>
+	<string>today-md needs reminders access to create mirrored reminders for your tasks.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

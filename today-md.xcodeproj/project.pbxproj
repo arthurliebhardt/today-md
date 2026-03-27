@@ -37,6 +37,7 @@
 		AA000036 /* TodayMdCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000037 /* TodayMdCalendarService.swift */; };
 		AA000037 /* TaskCalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000038 /* TaskCalendarPlannerView.swift */; };
 		AA000038 /* TodayMdObsidianBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000039 /* TodayMdObsidianBridge.swift */; };
+		AA000039 /* TodayMdReminderSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000040 /* TodayMdReminderSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +74,7 @@
 		AB000037 /* TodayMdCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdCalendarService.swift; sourceTree = "<group>"; };
 		AB000038 /* TaskCalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCalendarPlannerView.swift; sourceTree = "<group>"; };
 		AB000039 /* TodayMdObsidianBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdObsidianBridge.swift; sourceTree = "<group>"; };
+		AB000040 /* TodayMdReminderSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdReminderSyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,6 +186,7 @@
 				AB000026 /* TodayMdSyncService.swift */,
 				AB000039 /* TodayMdObsidianBridge.swift */,
 				AB000037 /* TodayMdCalendarService.swift */,
+				AB000040 /* TodayMdReminderSyncService.swift */,
 				AB000023 /* TodayMdDatabase.swift */,
 				AB000024 /* libsqlite3.tbd */,
 			);
@@ -295,6 +298,7 @@
 				AA000036 /* TodayMdCalendarService.swift in Sources */,
 				AA000037 /* TaskCalendarPlannerView.swift in Sources */,
 				AA000038 /* TodayMdObsidianBridge.swift in Sources */,
+				AA000039 /* TodayMdReminderSyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

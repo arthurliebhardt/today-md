@@ -308,6 +308,7 @@ enum TodayMdMarkdownArchiveService {
             "lane: \"\(yamlEscaped(task.block.label))\"",
             "lane_raw: \"\(task.block.rawValue)\"",
             "scheduling_state: \"\(task.schedulingState.rawValue)\"",
+            "scheduled_at: \"\(task.scheduledDate.map(iso8601String(from:)) ?? "")\"",
             "created_at: \"\(iso8601String(from: task.creationDate))\"",
             "updated_at: \"\(iso8601String(from: task.note?.lastModified ?? task.creationDate))\"",
             "---",

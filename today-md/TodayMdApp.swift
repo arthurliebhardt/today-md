@@ -348,6 +348,7 @@ struct TodayMdApp: App {
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var syncService: TodayMdSyncService
     @StateObject private var calendarService = TodayMdCalendarService()
+    @StateObject private var reminderSyncService = TodayMdReminderSyncService()
     @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
     @State private var store: TodayMdStore
     private let shouldRunSyncLifecycle: Bool
@@ -384,6 +385,7 @@ struct TodayMdApp: App {
                 .environment(store)
                 .environmentObject(syncService)
                 .environmentObject(calendarService)
+                .environmentObject(reminderSyncService)
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
@@ -397,6 +399,8 @@ struct TodayMdApp: App {
                     guard shouldRunSyncLifecycle else { return }
                     syncService.attach(store: store)
                     syncService.handleAppLaunchIfNeeded()
+                    reminderSyncService.attach(store: store)
+                    reminderSyncService.handleAppLaunchIfNeeded()
                 }
         }
         .defaultSize(width: 1500, height: 920)
@@ -407,6 +411,7 @@ struct TodayMdApp: App {
 
                 guard shouldRunSyncLifecycle else { return }
                 syncService.handleAppDidBecomeActive()
+                reminderSyncService.handleAppDidBecomeActive()
             case .inactive, .background:
                 store.flushPendingPersistence()
             @unknown default:
@@ -524,7 +529,7 @@ final class TodayMdStore {
     private var undoManager: UndoManager?
 
     @ObservationIgnored
-    private var syncHandler: (() -> Void)?
+    private var persistenceObservers: [() -> Void] = []
 
     @ObservationIgnored
     private let persistenceQueue = DispatchQueue(label: "com.todaymd.persistence", qos: .utility)
@@ -587,8 +592,8 @@ final class TodayMdStore {
         undoManager = manager
     }
 
-    func configureSyncHandler(_ handler: @escaping () -> Void) {
-        syncHandler = handler
+    func addPersistenceObserver(_ handler: @escaping () -> Void) {
+        persistenceObservers.append(handler)
     }
 
     func list(id: UUID) -> TaskList? {
@@ -701,6 +706,7 @@ final class TodayMdStore {
 
             task.list = destinationList
             insertTask(task, into: destinationList, in: task.block, preferredSortOrder: preservedSortOrder)
+            touch(task)
         }
     }
 
@@ -720,8 +726,10 @@ final class TodayMdStore {
             task.isDone = nextDoneState
             if previousBlock != block, !preserveSchedulingState {
                 task.schedulingState = .unscheduled
+                task.scheduledDate = nil
             }
             task.sortOrder = nextSortOrder(for: task.list, in: block)
+            touch(task)
 
             if previousBlock != block {
                 normalizeSortOrder(for: task.list, in: previousBlock)
@@ -772,9 +780,11 @@ final class TodayMdStore {
                 task.isDone = markDone ?? task.isDone
                 if previousBlock != block, !preserveSchedulingState {
                     task.schedulingState = .unscheduled
+                    task.scheduledDate = nil
                 }
                 task.sortOrder = nextSortOrder(for: task.list, in: block)
             }
+            touch(tasksToMove)
 
             for scope in affectedScopes {
                 normalizeSortOrder(for: scope.listID.flatMap(list(id:)), in: scope.block)
@@ -804,6 +814,10 @@ final class TodayMdStore {
             persistenceMode: .deferred
         ) {
             task.schedulingState = targetState
+            if !isScheduled {
+                task.scheduledDate = nil
+            }
+            touch(task)
         }
     }
 
@@ -834,11 +848,14 @@ final class TodayMdStore {
         let previousBlock = task.block
         let shouldUpdateBlock = previousBlock != targetBlock
         let shouldUpdateSchedulingState = !task.isScheduled
+        let shouldUpdateScheduledDate = task.scheduledDate != scheduledDate
 
-        guard shouldUpdateBlock || shouldUpdateSchedulingState else { return }
+        guard shouldUpdateBlock || shouldUpdateSchedulingState || shouldUpdateScheduledDate else { return }
 
         performMutation(actionName: "Schedule Task", persistenceMode: .deferred) {
             task.schedulingState = .scheduled
+            task.scheduledDate = scheduledDate
+            touch(task)
 
             guard shouldUpdateBlock else { return }
 
@@ -900,6 +917,7 @@ final class TodayMdStore {
         performMutation(actionName: isDone ? "Complete Task" : "Mark Task Incomplete") {
             task.isDone = isDone
             task.sortOrder = nextSortOrder(for: task.list, in: task.block)
+            touch(task)
             normalizeSortOrder(for: task.list, in: task.block)
         }
     }
@@ -931,6 +949,7 @@ final class TodayMdStore {
                 task.isDone = isDone
                 task.sortOrder = nextSortOrder(for: task.list, in: task.block)
             }
+            touch(tasksToUpdate)
 
             for scope in affectedScopes {
                 normalizeSortOrder(for: scope.listID.flatMap(list(id:)), in: scope.block)
@@ -988,6 +1007,7 @@ final class TodayMdStore {
                 draggedTask.block = block
                 if !preserveSchedulingState {
                     draggedTask.schedulingState = .unscheduled
+                    draggedTask.scheduledDate = nil
                 }
             }
 
@@ -1039,6 +1059,7 @@ final class TodayMdStore {
                 draggedTask.block = block
                 if !preserveSchedulingState {
                     draggedTask.schedulingState = .unscheduled
+                    draggedTask.scheduledDate = nil
                 }
                 draggedTask.sortOrder = nextSortOrder(for: list, in: block)
             }
@@ -1080,6 +1101,7 @@ final class TodayMdStore {
         guard let task = task(id: id), task.title != title else { return }
         performMutation(actionName: "Edit Task", registersUndo: registersUndo) {
             task.title = title
+            touch(task)
         }
     }
 
@@ -1096,6 +1118,7 @@ final class TodayMdStore {
             } else {
                 task.note = TaskNote(content: normalized)
             }
+            touch(task)
         }
     }
 
@@ -1116,6 +1139,7 @@ final class TodayMdStore {
                let subtask = task.subtasks.first(where: { $0.id == mappedSubtaskID }) {
                 subtask.isCompleted = nextCheckedState
             }
+            touch(task)
         }
     }
 
@@ -1130,6 +1154,7 @@ final class TodayMdStore {
                 task.subtasks.removeAll { $0.id == mappedSubtaskID }
                 normalizeSubtaskSortOrder(in: task)
             }
+            touch(task)
         }
     }
 
@@ -1142,6 +1167,7 @@ final class TodayMdStore {
             task.subtasks.append(
                 SubTask(title: trimmed, sortOrder: task.subtasks.count)
             )
+            touch(task)
         }
     }
 
@@ -1154,6 +1180,7 @@ final class TodayMdStore {
                 SubTask(title: trimmed, sortOrder: task.subtasks.count)
             )
             appendChecklistLine(to: task, title: trimmed)
+            touch(task)
         }
     }
 
@@ -1173,6 +1200,7 @@ final class TodayMdStore {
             if let mappedLineIndex {
                 setChecklistItem(in: task, lineIndex: mappedLineIndex, isChecked: nextCompletedState)
             }
+            touch(task)
         }
     }
 
@@ -1188,6 +1216,7 @@ final class TodayMdStore {
             }
 
             normalizeSubtaskSortOrder(in: task)
+            touch(task)
         }
     }
 
@@ -1236,9 +1265,9 @@ final class TodayMdStore {
         )
     }
 
-    func applyRemoteArchive(_ archive: TodayMdArchive) {
+    func applyRemoteArchive(_ archive: TodayMdArchive, notifySync: Bool = false) {
         applyArchive(archive, refreshSearch: true)
-        persist(notifySync: false)
+        persist(notifySync: notifySync)
     }
 
     func applyMarkdownArchive(_ archive: TodayMdArchive) {
@@ -1368,27 +1397,6 @@ final class TodayMdStore {
         var didChange = false
 
         for task in allTasks where !task.subtasks.isEmpty {
-            let mappedLineIndices = task.subtasks
-                .compactMap { task.mappedChecklistLineIndex(for: $0.id) }
-                .sorted(by: >)
-
-            if let note = task.note, !mappedLineIndices.isEmpty {
-                var lines = note.content.components(separatedBy: "\n")
-
-                for lineIndex in mappedLineIndices where lineIndex < lines.count {
-                    lines.remove(at: lineIndex)
-                }
-
-                if lines.isEmpty {
-                    task.note = nil
-                } else {
-                    note.content = lines.joined(separator: "\n")
-                    note.lastModified = Date()
-                }
-
-                didChange = true
-            }
-
             task.subtasks.removeAll()
             didChange = true
         }
@@ -1494,7 +1502,7 @@ final class TodayMdStore {
         do {
             try database.replaceAll(with: archive)
             if notifySync {
-                syncHandler?()
+                notifyPersistenceObservers()
             }
         } catch {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
@@ -1541,7 +1549,13 @@ final class TodayMdStore {
         }
 
         if shouldNotifySync {
-            syncHandler?()
+            notifyPersistenceObservers()
+        }
+    }
+
+    private func notifyPersistenceObservers() {
+        for observer in persistenceObservers {
+            observer()
         }
     }
 
@@ -1663,6 +1677,17 @@ final class TodayMdStore {
     private func applySortOrder(_ tasks: [TaskItem]) {
         for (index, task) in tasks.enumerated() where task.sortOrder != index {
             task.sortOrder = index
+        }
+    }
+
+    private func touch(_ task: TaskItem) {
+        task.modifiedDate = Date()
+    }
+
+    private func touch(_ tasks: [TaskItem]) {
+        let timestamp = Date()
+        for task in tasks {
+            task.modifiedDate = timestamp
         }
     }
 

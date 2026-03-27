@@ -43,6 +43,8 @@ final class TaskItem: Identifiable, Hashable {
     var schedulingStateRaw: String
     var sortOrder: Int
     var creationDate: Date
+    var modifiedDate: Date
+    var scheduledDate: Date?
     weak var list: TaskList?
     var subtasks: [SubTask]
     var note: TaskNote?
@@ -129,6 +131,8 @@ final class TaskItem: Identifiable, Hashable {
         schedulingState: TaskSchedulingState = .unscheduled,
         sortOrder: Int = 0,
         creationDate: Date = Date(),
+        modifiedDate: Date? = nil,
+        scheduledDate: Date? = nil,
         isDone: Bool = false,
         subtasks: [SubTask] = [],
         note: TaskNote? = nil
@@ -140,6 +144,8 @@ final class TaskItem: Identifiable, Hashable {
         self.schedulingStateRaw = schedulingState.rawValue
         self.sortOrder = sortOrder
         self.creationDate = creationDate
+        self.modifiedDate = modifiedDate ?? creationDate
+        self.scheduledDate = scheduledDate
         self.subtasks = subtasks
         self.note = note
     }

@@ -115,7 +115,7 @@ final class TodayMdSyncService: ObservableObject {
 
     func attach(store: TodayMdStore) {
         self.store = store
-        store.configureSyncHandler { [weak self] in
+        store.addPersistenceObserver { [weak self] in
             self?.handleLocalStoreChange()
         }
     }

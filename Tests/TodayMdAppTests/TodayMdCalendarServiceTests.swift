@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import TodayMdApp
 
+@MainActor
 final class TodayMdCalendarServiceTests: XCTestCase {
     func testRoundUpMovesToNextQuarterHour() {
         let date = makeDate(year: 2026, month: 3, day: 23, hour: 9, minute: 7)
@@ -63,6 +64,24 @@ final class TodayMdCalendarServiceTests: XCTestCase {
 
         XCTAssertEqual(slot?.start, makeDate(year: 2026, month: 3, day: 24, hour: 8, minute: 0))
         XCTAssertEqual(slot?.end, makeDate(year: 2026, month: 3, day: 24, hour: 9, minute: 0))
+    }
+
+    func testResolvedAuthorizationStatusFallsBackToFullAccessWhenCalendarDataIsVisible() {
+        let resolved = TodayMdCalendarService.resolvedAuthorizationStatus(
+            reported: .notDetermined,
+            hasVisibleCalendarData: true
+        )
+
+        XCTAssertEqual(resolved, .fullAccess)
+    }
+
+    func testResolvedAuthorizationStatusKeepsExplicitDeniedState() {
+        let resolved = TodayMdCalendarService.resolvedAuthorizationStatus(
+            reported: .denied,
+            hasVisibleCalendarData: true
+        )
+
+        XCTAssertEqual(resolved, .denied)
     }
 
     private let calendar: Calendar = {
