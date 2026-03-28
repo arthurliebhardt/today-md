@@ -372,6 +372,7 @@ final class TodayMdCalendarService: ObservableObject {
     private static let taskIDMarkerPrefix = "Task ID: "
     private static let calendarPrivacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
     private static let systemSettingsAppURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
+    private static let authorizationRefreshRetryDelayNanoseconds: UInt64 = 500_000_000
 
     @Published private(set) var authorizationStatus: TodayMdCalendarAuthorizationState
     @Published private(set) var calendars: [TodayMdCalendarSummary] = []
@@ -385,16 +386,23 @@ final class TodayMdCalendarService: ObservableObject {
     private let nowProvider: () -> Date
     private var eventStoreChangeObserver: NSObjectProtocol?
     private var busySlots: [CalendarTimeBlocking.BusySlot] = []
+    private var pendingAuthorizationRefreshTask: Task<Void, Never>?
+    private var hasAttemptedAuthorizationRequest = false
 
     init(
         eventStore: EKEventStore = EKEventStore(),
         notificationCenter: NotificationCenter = .default,
         nowProvider: @escaping () -> Date = Date.init
     ) {
+        let initialAuthorizationStatus = Self.resolvedAuthorizationStatus(
+            reported: Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event)),
+            hasVisibleCalendarData: eventStore.defaultCalendarForNewEvents != nil
+                || !eventStore.calendars(for: .event).isEmpty
+        )
         self.eventStore = eventStore
         self.notificationCenter = notificationCenter
         self.nowProvider = nowProvider
-        self.authorizationStatus = Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event))
+        self.authorizationStatus = initialAuthorizationStatus
         startObservingEventStoreChanges()
 
         if authorizationStatus.canReadEvents {
@@ -410,10 +418,13 @@ final class TodayMdCalendarService: ObservableObject {
 
     func refreshIfNeeded() {
         let previousAuthorizationStatus = authorizationStatus
-        authorizationStatus = Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event))
+        authorizationStatus = currentAuthorizationStatus()
 
         if authorizationStatus.canReadEvents || previousAuthorizationStatus != authorizationStatus {
-            refresh()
+            refresh(
+                resetEventStore: previousAuthorizationStatus != authorizationStatus,
+                allowDeferredRetry: previousAuthorizationStatus != authorizationStatus && authorizationStatus.canReadEvents
+            )
         }
     }
 
@@ -425,10 +436,13 @@ final class TodayMdCalendarService: ObservableObject {
             return
         }
 
+        NSApp.activate(ignoringOtherApps: true)
+        hasAttemptedAuthorizationRequest = true
+
         eventStore.requestFullAccessToEvents { [weak self] granted, error in
             Task { @MainActor in
                 guard let self else { return }
-                self.authorizationStatus = Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event))
+                self.authorizationStatus = self.currentAuthorizationStatus()
 
                 if let error {
                     if !Self.hasCalendarUsageDescription {
@@ -440,12 +454,11 @@ final class TodayMdCalendarService: ObservableObject {
                 }
 
                 if granted {
-                    self.refresh()
+                    self.hasAttemptedAuthorizationRequest = false
+                    self.refresh(resetEventStore: true, allowDeferredRetry: true)
                 } else {
                     self.clearReadOnlyData()
-                    if self.authorizationStatus == .denied {
-                        self.lastError = "Calendar access is off for today-md. Enable it in System Settings > Privacy & Security > Calendars."
-                    }
+                    self.lastError = Self.authorizationFailureMessage(for: self.authorizationStatus)
                 }
             }
         }
@@ -466,9 +479,15 @@ final class TodayMdCalendarService: ObservableObject {
     }
 
     func resolveAuthorization() {
+        refreshIfNeeded()
+
         switch authorizationStatus {
         case .notDetermined:
-            requestFullAccess()
+            if hasAttemptedAuthorizationRequest {
+                openCalendarPrivacySettings()
+            } else {
+                requestFullAccess()
+            }
         case .denied, .restricted, .writeOnly:
             openCalendarPrivacySettings()
         case .fullAccess:
@@ -476,8 +495,15 @@ final class TodayMdCalendarService: ObservableObject {
         }
     }
 
-    func refresh() {
-        authorizationStatus = Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event))
+    func refresh(resetEventStore: Bool = false, allowDeferredRetry: Bool = false) {
+        pendingAuthorizationRefreshTask?.cancel()
+        pendingAuthorizationRefreshTask = nil
+
+        if resetEventStore {
+            eventStore.reset()
+        }
+
+        authorizationStatus = currentAuthorizationStatus()
         guard authorizationStatus.canReadEvents else {
             clearReadOnlyData()
             return
@@ -486,6 +512,10 @@ final class TodayMdCalendarService: ObservableObject {
         let eventCalendars = eventStore.calendars(for: .event)
             .map(Self.makeCalendarSummary)
             .sorted(by: Self.sortCalendarSummaries)
+
+        if allowDeferredRetry, eventCalendars.isEmpty {
+            scheduleDeferredAuthorizationRefresh()
+        }
 
         calendars = eventCalendars
 
@@ -502,6 +532,31 @@ final class TodayMdCalendarService: ObservableObject {
         upcomingEvents = events.prefix(8).map(Self.makeEventSummary)
         lastError = nil
         refreshRevision += 1
+    }
+
+    private func currentAuthorizationStatus() -> TodayMdCalendarAuthorizationState {
+        let reported = Self.mapAuthorizationStatus(EKEventStore.authorizationStatus(for: .event))
+        let hasVisibleCalendarData = eventStore.defaultCalendarForNewEvents != nil
+            || !eventStore.calendars(for: .event).isEmpty
+        return Self.resolvedAuthorizationStatus(
+            reported: reported,
+            hasVisibleCalendarData: hasVisibleCalendarData
+        )
+    }
+
+    private func scheduleDeferredAuthorizationRefresh() {
+        pendingAuthorizationRefreshTask?.cancel()
+        pendingAuthorizationRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.authorizationRefreshRetryDelayNanoseconds)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self?.performDeferredAuthorizationRefresh()
+            }
+        }
+    }
+
+    private func performDeferredAuthorizationRefresh() {
+        refresh(resetEventStore: true, allowDeferredRetry: false)
     }
 
     func selectedDestinationCalendar(preferredIdentifier: String?) -> TodayMdCalendarSummary? {
@@ -819,6 +874,32 @@ final class TodayMdCalendarService: ObservableObject {
             return .fullAccess
         @unknown default:
             return .denied
+        }
+    }
+
+    static func resolvedAuthorizationStatus(
+        reported: TodayMdCalendarAuthorizationState,
+        hasVisibleCalendarData: Bool
+    ) -> TodayMdCalendarAuthorizationState {
+        guard reported == .notDetermined, hasVisibleCalendarData else {
+            return reported
+        }
+
+        return .fullAccess
+    }
+
+    private static func authorizationFailureMessage(for status: TodayMdCalendarAuthorizationState) -> String {
+        switch status {
+        case .notDetermined:
+            return "macOS did not complete the Calendar permission request. Open System Settings > Privacy & Security > Calendars and allow today-md manually."
+        case .denied:
+            return "Calendar access is off for today-md. Enable it in System Settings > Privacy & Security > Calendars."
+        case .restricted:
+            return "Calendar access is restricted on this Mac. Review System Settings > Privacy & Security > Calendars."
+        case .writeOnly:
+            return "today-md only has write-only calendar access. Change it to Full Access in System Settings > Privacy & Security > Calendars."
+        case .fullAccess:
+            return "Calendar access is already enabled."
         }
     }
 

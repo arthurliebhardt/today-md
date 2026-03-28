@@ -110,7 +110,9 @@ final class TodayMdDatabase: @unchecked Sendable {
                 block_raw TEXT NOT NULL,
                 sort_order INTEGER NOT NULL,
                 creation_date REAL NOT NULL,
-                scheduling_state_raw TEXT NOT NULL DEFAULT 'unscheduled'
+                scheduling_state_raw TEXT NOT NULL DEFAULT 'unscheduled',
+                modified_date REAL NOT NULL DEFAULT 0,
+                scheduled_date REAL
             );
             """
         )
@@ -120,6 +122,17 @@ final class TodayMdDatabase: @unchecked Sendable {
             in: "tasks",
             definition: "TEXT NOT NULL DEFAULT 'unscheduled'"
         )
+        try ensureColumn(
+            named: "modified_date",
+            in: "tasks",
+            definition: "REAL NOT NULL DEFAULT 0"
+        )
+        try ensureColumn(
+            named: "scheduled_date",
+            in: "tasks",
+            definition: "REAL"
+        )
+        try execute("UPDATE tasks SET modified_date = creation_date WHERE modified_date <= 0;")
 
         try execute(
             """
@@ -201,7 +214,7 @@ final class TodayMdDatabase: @unchecked Sendable {
         if listID == nil {
             sql =
                 """
-                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw
+                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw, modified_date, scheduled_date
                 FROM tasks
                 WHERE list_id IS NULL
                 ORDER BY
@@ -217,7 +230,7 @@ final class TodayMdDatabase: @unchecked Sendable {
         } else {
             sql =
                 """
-                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw
+                SELECT id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw, modified_date, scheduled_date
                 FROM tasks
                 WHERE list_id = ?
                 ORDER BY
@@ -254,6 +267,11 @@ final class TodayMdDatabase: @unchecked Sendable {
             let sortOrder = Int(sqlite3_column_int64(statement, 4))
             let creationDate = Date(timeIntervalSince1970: sqlite3_column_double(statement, 5))
             let schedulingStateRaw = columnText(statement, index: 6) ?? TaskSchedulingState.unscheduled.rawValue
+            let modifiedDate = Date(timeIntervalSince1970: sqlite3_column_double(statement, 7))
+            let scheduledDate: Date? =
+                sqlite3_column_type(statement, 8) == SQLITE_NULL
+                    ? nil
+                    : Date(timeIntervalSince1970: sqlite3_column_double(statement, 8))
 
             tasks.append(
                 TodayMdArchive.TaskArchive(
@@ -264,6 +282,8 @@ final class TodayMdDatabase: @unchecked Sendable {
                     schedulingStateRaw: schedulingStateRaw,
                     sortOrder: sortOrder,
                     creationDate: creationDate,
+                    modifiedDate: modifiedDate,
+                    scheduledDate: scheduledDate,
                     note: try fetchNote(taskID: id),
                     subtasks: try fetchSubtasks(taskID: id)
                 )
@@ -359,8 +379,8 @@ final class TodayMdDatabase: @unchecked Sendable {
     ) throws {
         let taskStatement = try prepare(
             """
-            INSERT INTO tasks (id, list_id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO tasks (id, list_id, title, is_done, block_raw, sort_order, creation_date, scheduling_state_raw, modified_date, scheduled_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
         )
         defer { sqlite3_finalize(taskStatement) }
@@ -405,6 +425,12 @@ final class TodayMdDatabase: @unchecked Sendable {
             try bind(Int64(task.sortOrder), at: 6, in: taskStatement)
             try bind(task.creationDate.timeIntervalSince1970, at: 7, in: taskStatement)
             try bind(task.schedulingStateRaw, at: 8, in: taskStatement)
+            try bind(task.modifiedDate.timeIntervalSince1970, at: 9, in: taskStatement)
+            if let scheduledDate = task.scheduledDate {
+                try bind(scheduledDate.timeIntervalSince1970, at: 10, in: taskStatement)
+            } else {
+                try bindNull(at: 10, in: taskStatement)
+            }
             try stepDone(taskStatement)
 
             if let note = task.note {

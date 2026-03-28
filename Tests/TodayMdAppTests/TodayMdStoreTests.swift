@@ -265,6 +265,29 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertFalse(task.isScheduled)
     }
 
+    func testMoveActiveTaskOnBoardTouchesMovedTask() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Move me", block: .backlog)
+        let originalModifiedDate = task.modifiedDate
+
+        Thread.sleep(forTimeInterval: 0.01)
+        store.moveActiveTaskOnBoard(task.id, to: .today, before: nil)
+
+        XCTAssertGreaterThan(task.modifiedDate, originalModifiedDate)
+    }
+
+    func testReorderTaskInListBlockTouchesMovedTask() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let task = try XCTUnwrap(store.addTask(title: "Move me", block: .backlog, listID: list.id))
+        let originalModifiedDate = task.modifiedDate
+
+        Thread.sleep(forTimeInterval: 0.01)
+        store.reorderTaskInListBlock(listID: list.id, draggedID: task.id, block: .today, before: nil)
+
+        XCTAssertGreaterThan(task.modifiedDate, originalModifiedDate)
+    }
+
     func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
@@ -272,6 +295,21 @@ final class TodayMdStoreTests: XCTestCase {
         store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: Date())
 
         XCTAssertEqual(task.block, .today)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateStoresExactScheduledDate() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let scheduledDate = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 27, hour: 14, minute: 30))
+        )
+
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: scheduledDate, calendar: calendar)
+
+        XCTAssertEqual(task.scheduledDate, scheduledDate)
         XCTAssertTrue(task.isScheduled)
     }
 
@@ -781,6 +819,150 @@ final class TodayMdStoreTests: XCTestCase {
 
         let task = try XCTUnwrap(store.allTasks.first(where: { $0.id == taskID }))
         XCTAssertEqual(task.note?.content, "- [x] Ship\n- Bullet\n1. Test")
+    }
+
+    func testApplyRemoteArchivePreservesChecklistMarkdownWhenLegacySubtasksExist() throws {
+        let store = try makeStore()
+        let taskID = UUID()
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: taskID,
+                    title: "Remote reminder task",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: .init(
+                        content: """
+                        Keep this lightweight and easy to book.
+
+                        - [ ] Test
+                        - [ ] to obsidian
+                        """,
+                        lastModified: Date()
+                    ),
+                    subtasks: [
+                        .init(id: UUID(), title: "Test", isCompleted: false, sortOrder: 0),
+                        .init(id: UUID(), title: "to obsidian", isCompleted: false, sortOrder: 1)
+                    ]
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive)
+
+        let task = try XCTUnwrap(store.allTasks.first(where: { $0.id == taskID }))
+        XCTAssertEqual(
+            task.note?.content,
+            """
+            Keep this lightweight and easy to book.
+
+            - [ ] Test
+            - [ ] to obsidian
+            """
+        )
+        XCTAssertEqual(task.checklistItems.map(\.title), ["Test", "to obsidian"])
+    }
+
+    func testApplyRemoteArchiveNotifiesPersistenceObserversWhenRequested() throws {
+        let store = try makeStore()
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
+        }
+
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Reminder edit",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: []
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive, notifyTargets: [.cloudSync])
+
+        XCTAssertEqual(cloudNotificationCount, 1)
+        XCTAssertEqual(reminderNotificationCount, 0)
+    }
+
+    func testApplyRemoteArchiveStaysSilentByDefault() throws {
+        let store = try makeStore()
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
+        }
+
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Cloud sync edit",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: []
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive)
+
+        XCTAssertEqual(cloudNotificationCount, 0)
+        XCTAssertEqual(reminderNotificationCount, 0)
+    }
+
+    func testApplyRemoteArchiveCanNotifyReminderObserversWithoutCloudObservers() throws {
+        let store = try makeStore()
+        var cloudNotificationCount = 0
+        var reminderNotificationCount = 0
+        store.addCloudSyncObserver {
+            cloudNotificationCount += 1
+        }
+        store.addReminderSyncObserver {
+            reminderNotificationCount += 1
+        }
+
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Obsidian edit",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: []
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive, notifyTargets: [.reminders])
+
+        XCTAssertEqual(cloudNotificationCount, 0)
+        XCTAssertEqual(reminderNotificationCount, 1)
     }
 
     func testStoreCanResetToShowcaseDataOnLaunch() throws {

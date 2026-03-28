@@ -16,6 +16,7 @@ Built with SwiftUI, `@Observable` models, and a local SQLite store, `today-md` k
 - Import and export of task data as JSON backups, with markdown note exports alongside them
 - Automatic mirror of every task as a `.md` file in Application Support
 - Obsidian-compatible markdown round-tripping for editing existing tasks and creating new ones from the markdown archive or sync folder
+- Two-way sync with Apple Reminders through a managed `today-md` reminder list
 - Seeded sample data on first install
 
 ## Tech Stack

@@ -4,6 +4,21 @@ import XCTest
 
 @MainActor
 final class TodayMdSyncServiceTests: XCTestCase {
+    func testShouldAttachReturnsFalseForSameStore() {
+        let store = TodayMdStore()
+
+        XCTAssertFalse(TodayMdSyncService.shouldAttach(currentStore: store, newStore: store))
+    }
+
+    func testShouldAttachReturnsTrueForDifferentStore() {
+        XCTAssertTrue(
+            TodayMdSyncService.shouldAttach(
+                currentStore: TodayMdStore(),
+                newStore: TodayMdStore()
+            )
+        )
+    }
+
     func testEnableSyncCreatesSyncSnapshotAndMarkdownArchive() throws {
         let context = try makeContext()
         _ = createTask(in: context.store, title: "Write release notes", note: "# Notes")

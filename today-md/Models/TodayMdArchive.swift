@@ -113,6 +113,8 @@ struct TodayMdArchive: Codable {
         let schedulingStateRaw: String
         let sortOrder: Int
         let creationDate: Date
+        let modifiedDate: Date
+        let scheduledDate: Date?
         let note: NoteArchive?
         let subtasks: [SubTaskArchive]
 
@@ -124,6 +126,8 @@ struct TodayMdArchive: Codable {
             case schedulingStateRaw
             case sortOrder
             case creationDate
+            case modifiedDate
+            case scheduledDate
             case note
             case subtasks
         }
@@ -136,6 +140,8 @@ struct TodayMdArchive: Codable {
             schedulingStateRaw: String = TaskSchedulingState.unscheduled.rawValue,
             sortOrder: Int,
             creationDate: Date,
+            modifiedDate: Date? = nil,
+            scheduledDate: Date? = nil,
             note: NoteArchive?,
             subtasks: [SubTaskArchive]
         ) {
@@ -146,6 +152,8 @@ struct TodayMdArchive: Codable {
             self.schedulingStateRaw = schedulingStateRaw
             self.sortOrder = sortOrder
             self.creationDate = creationDate
+            self.modifiedDate = modifiedDate ?? creationDate
+            self.scheduledDate = scheduledDate
             self.note = note
             self.subtasks = subtasks
         }
@@ -160,6 +168,8 @@ struct TodayMdArchive: Codable {
                 ?? TaskSchedulingState.unscheduled.rawValue
             sortOrder = try container.decode(Int.self, forKey: .sortOrder)
             creationDate = try container.decode(Date.self, forKey: .creationDate)
+            modifiedDate = try container.decodeIfPresent(Date.self, forKey: .modifiedDate) ?? creationDate
+            scheduledDate = try container.decodeIfPresent(Date.self, forKey: .scheduledDate)
             note = try container.decodeIfPresent(NoteArchive.self, forKey: .note)
             subtasks = try container.decode([SubTaskArchive].self, forKey: .subtasks)
         }
@@ -172,6 +182,8 @@ struct TodayMdArchive: Codable {
             self.schedulingStateRaw = task.schedulingStateRaw
             self.sortOrder = task.sortOrder
             self.creationDate = task.creationDate
+            self.modifiedDate = task.modifiedDate
+            self.scheduledDate = task.scheduledDate
             self.note = task.note.map(NoteArchive.init(note:))
             self.subtasks = task.subtasks
                 .sorted { $0.sortOrder < $1.sortOrder }
@@ -186,6 +198,8 @@ struct TodayMdArchive: Codable {
                 schedulingState: TaskSchedulingState(rawValue: schedulingStateRaw) ?? .unscheduled,
                 sortOrder: sortOrder,
                 creationDate: creationDate,
+                modifiedDate: modifiedDate,
+                scheduledDate: scheduledDate,
                 isDone: isDone,
                 subtasks: subtasks.map { $0.makeSubtask() },
                 note: note?.makeNote()
