@@ -265,6 +265,29 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertFalse(task.isScheduled)
     }
 
+    func testMoveActiveTaskOnBoardTouchesMovedTask() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Move me", block: .backlog)
+        let originalModifiedDate = task.modifiedDate
+
+        Thread.sleep(forTimeInterval: 0.01)
+        store.moveActiveTaskOnBoard(task.id, to: .today, before: nil)
+
+        XCTAssertGreaterThan(task.modifiedDate, originalModifiedDate)
+    }
+
+    func testReorderTaskInListBlockTouchesMovedTask() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let task = try XCTUnwrap(store.addTask(title: "Move me", block: .backlog, listID: list.id))
+        let originalModifiedDate = task.modifiedDate
+
+        Thread.sleep(forTimeInterval: 0.01)
+        store.reorderTaskInListBlock(listID: list.id, draggedID: task.id, block: .today, before: nil)
+
+        XCTAssertGreaterThan(task.modifiedDate, originalModifiedDate)
+    }
+
     func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)

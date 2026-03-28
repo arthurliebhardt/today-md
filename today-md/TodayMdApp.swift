@@ -1028,6 +1028,8 @@ final class TodayMdStore {
                 draggedTask.isDone = false
             }
 
+            touch(draggedTask)
+
             var active = allTasks.filter { !$0.isDone }.sorted(by: taskSort)
             let done = allTasks.filter(\.isDone).sorted(by: taskSort)
 
@@ -1080,6 +1082,8 @@ final class TodayMdStore {
             if draggedTask.isDone {
                 draggedTask.isDone = false
             }
+
+            touch(draggedTask)
 
             var active = list.items
                 .filter { $0.block == block && !$0.isDone }

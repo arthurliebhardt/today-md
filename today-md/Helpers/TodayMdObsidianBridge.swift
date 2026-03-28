@@ -69,8 +69,10 @@ enum TodayMdObsidianBridge {
             task.title = document.resolvedTitle(for: task.title)
             task.block = targetBlock
             task.isDone = document.isDone ?? task.isDone
-            task.schedulingState = document.schedulingState ?? task.schedulingState
+            task.schedulingState = document.schedulingState ?? (document.scheduledAt == nil ? .unscheduled : .scheduled)
             task.creationDate = document.createdAt ?? task.creationDate
+            task.modifiedDate = document.updatedAt ?? document.createdAt ?? task.modifiedDate
+            task.scheduledDate = document.scheduledAt
             task.list = targetList
             task.note = note(from: document, existing: task.note)
         }
@@ -158,6 +160,7 @@ enum TodayMdObsidianBridge {
             schedulingState: document.schedulingState ?? (document.scheduledAt == nil ? .unscheduled : .scheduled),
             sortOrder: 0,
             creationDate: document.createdAt ?? Date(),
+            modifiedDate: document.updatedAt ?? document.createdAt ?? Date(),
             scheduledDate: document.scheduledAt,
             isDone: document.isDone ?? false,
             note: note(from: document, existing: nil)
