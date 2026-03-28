@@ -114,6 +114,7 @@ final class TodayMdSyncService: ObservableObject {
     }
 
     func attach(store: TodayMdStore) {
+        guard Self.shouldAttach(currentStore: self.store, newStore: store) else { return }
         self.store = store
         store.addCloudSyncObserver { [weak self] in
             self?.handleLocalStoreChange()
@@ -578,6 +579,10 @@ final class TodayMdSyncService: ObservableObject {
 
     private static func conflictBackupsDirectoryURL(in folderURL: URL) -> URL {
         folderURL.appendingPathComponent("Conflict Backups", isDirectory: true)
+    }
+
+    static func shouldAttach(currentStore: TodayMdStore?, newStore: TodayMdStore) -> Bool {
+        currentStore !== newStore
     }
 
     private static let persistedStateDefaultsKey = "today-md.sync.state"

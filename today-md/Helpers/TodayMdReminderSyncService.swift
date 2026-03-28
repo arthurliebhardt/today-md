@@ -90,6 +90,12 @@ enum TodayMdRemindersAuthorizationState: Equatable {
     }
 }
 
+enum TodayMdReminderSyncRequestDisposition: Equatable {
+    case ignore
+    case schedule
+    case queueFollowUp
+}
+
 struct TodayMdReminderSyncSnapshot: Codable {
     let taskID: UUID
     let reminderIdentifier: String
@@ -451,7 +457,7 @@ struct TodayMdReminderTaskSnapshot: Hashable {
             subtasks: subtasks,
             note: note
         )
-        task.list = nil
+        task.list = listID.flatMap { listsByID[$0] }
         return task
     }
 
@@ -524,8 +530,8 @@ enum TodayMdReminderSyncEngine {
             Dictionary(uniqueKeysWithValues: (lists.flatMap(\.items) + unassignedTasks).map { ($0.id, $0) })
         }
 
-        let remoteByTaskID = Dictionary(uniqueKeysWithValues: remoteRecords.map { ($0.task.id, $0) })
-        let remoteByIdentifier = Dictionary(uniqueKeysWithValues: remoteRecords.map { ($0.identifier, $0) })
+        let remoteByTaskID = latestRemoteRecordLookup(remoteRecords, keyedBy: \.task.id)
+        let remoteByIdentifier = latestRemoteRecordLookup(remoteRecords, keyedBy: \.identifier)
         var usedRemoteIdentifiers = Set<String>()
         var mutations: [TodayMdReminderMutation] = []
 
@@ -535,6 +541,8 @@ enum TodayMdReminderSyncEngine {
                 existingTask.title = remoteTask.title
                 existingTask.isDone = remoteTask.isDone
                 existingTask.block = remoteTask.block
+                existingTask.scheduledDate = remoteTask.scheduledDate
+                existingTask.schedulingState = remoteTask.scheduledDate == nil ? .unscheduled : .scheduled
                 existingTask.creationDate = remoteTask.creationDate
                 existingTask.modifiedDate = remoteTask.modifiedDate
                 existingTask.note = remoteTask.noteContent.map { TaskNote(content: $0, lastModified: remoteTask.modifiedDate) }
@@ -650,6 +658,18 @@ enum TodayMdReminderSyncEngine {
         )
     }
 
+    private static func latestRemoteRecordLookup<Key: Hashable>(
+        _ records: [TodayMdReminderRecord],
+        keyedBy keyPath: KeyPath<TodayMdReminderRecord, Key>
+    ) -> [Key: TodayMdReminderRecord] {
+        Dictionary(grouping: records, by: { $0[keyPath: keyPath] })
+            .compactMapValues { groupedRecords in
+                groupedRecords.max(by: { lhs, rhs in
+                    lhs.task.modifiedDate < rhs.task.modifiedDate
+                })
+            }
+    }
+
     private static func deduplicated(_ mutations: [TodayMdReminderMutation]) -> [TodayMdReminderMutation] {
         var latestCreateByTaskID: [UUID: TodayMdReminderTaskSnapshot] = [:]
         var latestUpdateByReminderID: [String: TodayMdReminderTaskSnapshot] = [:]
@@ -723,6 +743,7 @@ final class TodayMdReminderSyncService: ObservableObject {
     private var eventStoreChangeObserver: NSObjectProtocol?
     private var pendingSyncWorkItem: DispatchWorkItem?
     private var isSyncInProgress = false
+    private var needsResyncAfterCurrentRun = false
 
     init(
         eventStore: EKEventStore = EKEventStore(),
@@ -741,6 +762,7 @@ final class TodayMdReminderSyncService: ObservableObject {
     }
 
     func attach(store: TodayMdStore) {
+        guard Self.shouldAttach(currentStore: self.store, newStore: store) else { return }
         self.store = store
         store.addReminderSyncObserver { [weak self] in
             self?.handleLocalStoreChange()
@@ -773,6 +795,7 @@ final class TodayMdReminderSyncService: ObservableObject {
     func disableSync() {
         pendingSyncWorkItem?.cancel()
         pendingSyncWorkItem = nil
+        needsResyncAfterCurrentRun = false
         updatePersistedState { state in
             state.syncEnabled = false
             state.status = .disabled
@@ -852,7 +875,10 @@ final class TodayMdReminderSyncService: ObservableObject {
             return
         }
         guard let store else { return }
-        guard !isSyncInProgress else { return }
+        if isSyncInProgress {
+            needsResyncAfterCurrentRun = true
+            return
+        }
 
         isSyncInProgress = true
         updatePersistedState { state in
@@ -863,18 +889,25 @@ final class TodayMdReminderSyncService: ObservableObject {
         Task {
             do {
                 try await self.performSync(store: store)
-                self.isSyncInProgress = false
+                self.finishSyncRun()
             } catch {
-                self.isSyncInProgress = false
-                self.recordError(error)
+                self.finishSyncRun(error: error)
             }
         }
     }
 
     private func handleLocalStoreChange() {
-        guard syncEnabled else { return }
-        guard !isSyncInProgress else { return }
-        scheduleDebouncedSync()
+        switch Self.syncRequestDisposition(
+            syncEnabled: syncEnabled,
+            isSyncInProgress: isSyncInProgress
+        ) {
+        case .ignore:
+            return
+        case .schedule:
+            scheduleDebouncedSync()
+        case .queueFollowUp:
+            needsResyncAfterCurrentRun = true
+        }
     }
 
     private func scheduleDebouncedSync() {
@@ -895,10 +928,40 @@ final class TodayMdReminderSyncService: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                guard self.syncEnabled, !self.isSyncInProgress else { return }
-                self.scheduleDebouncedSync()
+                switch Self.syncRequestDisposition(
+                    syncEnabled: self.syncEnabled,
+                    isSyncInProgress: self.isSyncInProgress
+                ) {
+                case .ignore:
+                    return
+                case .schedule:
+                    self.scheduleDebouncedSync()
+                case .queueFollowUp:
+                    self.needsResyncAfterCurrentRun = true
+                }
             }
         }
+    }
+
+    private func finishSyncRun(error: Error? = nil) {
+        isSyncInProgress = false
+
+        if let error {
+            recordError(error)
+        }
+
+        guard Self.shouldScheduleFollowUpSync(
+            syncEnabled: syncEnabled,
+            needsResyncAfterCurrentRun: needsResyncAfterCurrentRun
+        ) else {
+            if !syncEnabled {
+                needsResyncAfterCurrentRun = false
+            }
+            return
+        }
+
+        needsResyncAfterCurrentRun = false
+        scheduleDebouncedSync()
     }
 
     private func performSync(store: TodayMdStore) async throws {
@@ -954,9 +1017,7 @@ final class TodayMdReminderSyncService: ObservableObject {
         }
 
         if persistedState.managedCalendarIdentifier != nil {
-            updatePersistedState { state in
-                state.managedCalendarIdentifier = nil
-            }
+            updateManagedCalendarIdentifier(nil)
         }
 
         if let existingCalendar = eventStore.calendars(for: .reminder)
@@ -964,9 +1025,7 @@ final class TodayMdReminderSyncService: ObservableObject {
                 calendar.allowsContentModifications
                     && calendar.title.compare(Self.managedCalendarTitle, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
             }) {
-            updatePersistedState { state in
-                state.managedCalendarIdentifier = existingCalendar.calendarIdentifier
-            }
+            updateManagedCalendarIdentifier(existingCalendar.calendarIdentifier)
             managedListTitle = existingCalendar.title
             return existingCalendar
         }
@@ -977,9 +1036,7 @@ final class TodayMdReminderSyncService: ObservableObject {
         calendar.source = try preferredReminderSource()
         try eventStore.saveCalendar(calendar, commit: true)
 
-        updatePersistedState { state in
-            state.managedCalendarIdentifier = calendar.calendarIdentifier
-        }
+        updateManagedCalendarIdentifier(calendar.calendarIdentifier)
 
         managedListTitle = calendar.title
         return calendar
@@ -1038,7 +1095,7 @@ final class TodayMdReminderSyncService: ObservableObject {
                         isDone: reminder.isCompleted,
                         noteContent: parsed.visibleNote,
                         block: parsed.block ?? .backlog,
-                        listID: nil,
+                        listID: fallback?.listID,
                         creationDate: reminder.creationDate ?? Date(),
                         modifiedDate: reminder.lastModifiedDate ?? reminder.creationDate ?? Date(),
                         scheduledDate: parsed.scheduledDate
@@ -1164,6 +1221,18 @@ final class TodayMdReminderSyncService: ObservableObject {
         saveState()
     }
 
+    private func updateManagedCalendarIdentifier(_ identifier: String?) {
+        updatePersistedState { state in
+            if Self.shouldResetSnapshots(
+                currentIdentifier: state.managedCalendarIdentifier,
+                newIdentifier: identifier
+            ) {
+                state.snapshots = []
+            }
+            state.managedCalendarIdentifier = identifier
+        }
+    }
+
     private func applyPersistedState() {
         syncEnabled = persistedState.syncEnabled
         status = persistedState.status
@@ -1186,6 +1255,32 @@ final class TodayMdReminderSyncService: ObservableObject {
         }
 
         return state
+    }
+
+    static func shouldResetSnapshots(
+        currentIdentifier: String?,
+        newIdentifier: String?
+    ) -> Bool {
+        currentIdentifier != newIdentifier
+    }
+
+    static func shouldAttach(currentStore: TodayMdStore?, newStore: TodayMdStore) -> Bool {
+        currentStore !== newStore
+    }
+
+    static func syncRequestDisposition(
+        syncEnabled: Bool,
+        isSyncInProgress: Bool
+    ) -> TodayMdReminderSyncRequestDisposition {
+        guard syncEnabled else { return .ignore }
+        return isSyncInProgress ? .queueFollowUp : .schedule
+    }
+
+    static func shouldScheduleFollowUpSync(
+        syncEnabled: Bool,
+        needsResyncAfterCurrentRun: Bool
+    ) -> Bool {
+        syncEnabled && needsResyncAfterCurrentRun
     }
 
     static func resolvedAuthorizationStatus(

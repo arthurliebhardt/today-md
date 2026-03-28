@@ -52,6 +52,102 @@ final class TodayMdReminderSyncServiceTests: XCTestCase {
         XCTAssertEqual(resolved, .denied)
     }
 
+    func testManagedCalendarIdentifierChangeResetsSnapshots() {
+        XCTAssertTrue(
+            TodayMdReminderSyncService.shouldResetSnapshots(
+                currentIdentifier: "old-list",
+                newIdentifier: "new-list"
+            )
+        )
+        XCTAssertTrue(
+            TodayMdReminderSyncService.shouldResetSnapshots(
+                currentIdentifier: "old-list",
+                newIdentifier: nil
+            )
+        )
+    }
+
+    func testManagedCalendarIdentifierStabilityKeepsSnapshots() {
+        XCTAssertFalse(
+            TodayMdReminderSyncService.shouldResetSnapshots(
+                currentIdentifier: "same-list",
+                newIdentifier: "same-list"
+            )
+        )
+        XCTAssertFalse(
+            TodayMdReminderSyncService.shouldResetSnapshots(
+                currentIdentifier: nil,
+                newIdentifier: nil
+            )
+        )
+    }
+
+    func testShouldAttachReturnsFalseForSameStore() {
+        let store = TodayMdStore()
+
+        XCTAssertFalse(TodayMdReminderSyncService.shouldAttach(currentStore: store, newStore: store))
+    }
+
+    func testShouldAttachReturnsTrueForDifferentStore() {
+        XCTAssertTrue(
+            TodayMdReminderSyncService.shouldAttach(
+                currentStore: TodayMdStore(),
+                newStore: TodayMdStore()
+            )
+        )
+    }
+
+    func testSyncRequestDispositionQueuesFollowUpWhenSyncIsInProgress() {
+        XCTAssertEqual(
+            TodayMdReminderSyncService.syncRequestDisposition(
+                syncEnabled: true,
+                isSyncInProgress: true
+            ),
+            .queueFollowUp
+        )
+    }
+
+    func testSyncRequestDispositionSchedulesWhenEnabledAndIdle() {
+        XCTAssertEqual(
+            TodayMdReminderSyncService.syncRequestDisposition(
+                syncEnabled: true,
+                isSyncInProgress: false
+            ),
+            .schedule
+        )
+    }
+
+    func testSyncRequestDispositionIgnoresWhenDisabled() {
+        XCTAssertEqual(
+            TodayMdReminderSyncService.syncRequestDisposition(
+                syncEnabled: false,
+                isSyncInProgress: true
+            ),
+            .ignore
+        )
+    }
+
+    func testShouldScheduleFollowUpSyncRequiresPendingFlagAndEnabledSync() {
+        XCTAssertTrue(
+            TodayMdReminderSyncService.shouldScheduleFollowUpSync(
+                syncEnabled: true,
+                needsResyncAfterCurrentRun: true
+            )
+        )
+        XCTAssertFalse(
+            TodayMdReminderSyncService.shouldScheduleFollowUpSync(
+                syncEnabled: false,
+                needsResyncAfterCurrentRun: true
+            )
+        )
+        XCTAssertFalse(
+            TodayMdReminderSyncService.shouldScheduleFollowUpSync(
+                syncEnabled: true,
+                needsResyncAfterCurrentRun: false
+            )
+        )
+    }
+
     func testLegacyReminderNotesAreStrippedAndMarkedForRefresh() {
         let taskID = UUID()
         let parsed = TodayMdReminderMetadata.parse(
@@ -317,6 +413,154 @@ final class TodayMdReminderSyncServiceTests: XCTestCase {
         XCTAssertEqual(hydrated.lists.first?.items.first?.blockRaw, TimeBlock.thisWeek.rawValue)
         XCTAssertEqual(hydrated.lists.first?.items.first?.list?.id, list.id)
         XCTAssertTrue(hydrated.unassignedTasks.isEmpty)
+    }
+
+    func testRemoteScheduleChangeUpdatesExistingTaskSchedule() {
+        let taskID = UUID()
+        let originalScheduledDate = Date(timeIntervalSinceReferenceDate: 100)
+        let updatedScheduledDate = Date(timeIntervalSinceReferenceDate: 200)
+        let task = TaskItem(
+            id: taskID,
+            title: "Book dentist",
+            block: .today,
+            schedulingState: .scheduled,
+            creationDate: Date(timeIntervalSinceReferenceDate: 10),
+            modifiedDate: Date(timeIntervalSinceReferenceDate: 10),
+            scheduledDate: originalScheduledDate
+        )
+        let snapshot = TodayMdReminderSyncSnapshot(
+            taskID: taskID,
+            reminderIdentifier: "reminder-schedule-change",
+            canonicalHash: TodayMdReminderTaskSnapshot(task: task).canonicalHash(),
+            blockRaw: TimeBlock.today.rawValue,
+            listID: nil,
+            scheduledDate: originalScheduledDate
+        )
+        let remoteRecord = TodayMdReminderRecord(
+            identifier: "reminder-schedule-change",
+            task: TodayMdReminderTaskSnapshot(
+                id: taskID,
+                title: task.title,
+                isDone: false,
+                noteContent: nil,
+                block: .thisWeek,
+                listID: nil,
+                creationDate: task.creationDate,
+                modifiedDate: Date(timeIntervalSinceReferenceDate: 20),
+                scheduledDate: updatedScheduledDate
+            ),
+            needsMetadataRefresh: false
+        )
+
+        let outcome = TodayMdReminderSyncEngine.sync(
+            localArchive: TodayMdArchive(lists: [], unassignedTasks: [task]),
+            remoteRecords: [remoteRecord],
+            snapshots: [snapshot]
+        )
+        let hydrated = outcome.archive.instantiate()
+
+        XCTAssertEqual(hydrated.unassignedTasks.first?.scheduledDate, updatedScheduledDate)
+        XCTAssertEqual(hydrated.unassignedTasks.first?.schedulingState, .scheduled)
+        XCTAssertEqual(hydrated.unassignedTasks.first?.blockRaw, TimeBlock.thisWeek.rawValue)
+    }
+
+    func testSnapshotBackedRemoteReminderRehydratesIntoOriginalList() {
+        let taskID = UUID()
+        let list = TaskList(name: "Private")
+        let snapshot = TodayMdReminderSyncSnapshot(
+            taskID: taskID,
+            reminderIdentifier: "reminder-restore-list",
+            canonicalHash: "snapshot-hash",
+            blockRaw: TimeBlock.today.rawValue,
+            listID: list.id
+        )
+        let remoteRecord = TodayMdReminderRecord(
+            identifier: "reminder-restore-list",
+            task: TodayMdReminderTaskSnapshot(
+                id: taskID,
+                title: "Plan weekend trip",
+                isDone: false,
+                noteContent: "Book train",
+                block: .today,
+                listID: list.id,
+                creationDate: Date(timeIntervalSinceReferenceDate: 10),
+                modifiedDate: Date(timeIntervalSinceReferenceDate: 20)
+            ),
+            needsMetadataRefresh: false
+        )
+
+        let outcome = TodayMdReminderSyncEngine.sync(
+            localArchive: TodayMdArchive(lists: [list], unassignedTasks: []),
+            remoteRecords: [remoteRecord],
+            snapshots: [snapshot]
+        )
+        let hydrated = outcome.archive.instantiate()
+
+        XCTAssertEqual(hydrated.lists.first?.items.count, 1)
+        XCTAssertEqual(hydrated.lists.first?.items.first?.title, "Plan weekend trip")
+        XCTAssertEqual(hydrated.lists.first?.items.first?.list?.id, list.id)
+        XCTAssertTrue(hydrated.unassignedTasks.isEmpty)
+    }
+
+    func testDuplicateRemoteTaskIDsPreferNewestRecordInsteadOfCrashing() {
+        let taskID = UUID()
+        let localTask = TaskItem(
+            id: taskID,
+            title: "Original",
+            block: .today,
+            creationDate: Date(timeIntervalSinceReferenceDate: 10),
+            modifiedDate: Date(timeIntervalSinceReferenceDate: 10)
+        )
+        let snapshot = TodayMdReminderSyncSnapshot(
+            taskID: taskID,
+            reminderIdentifier: "stale-reminder-id",
+            canonicalHash: TodayMdReminderTaskSnapshot(task: localTask).canonicalHash(),
+            blockRaw: TimeBlock.today.rawValue,
+            listID: nil
+        )
+        let olderRemoteRecord = TodayMdReminderRecord(
+            identifier: "reminder-older",
+            task: TodayMdReminderTaskSnapshot(
+                id: taskID,
+                title: "Older remote",
+                isDone: false,
+                noteContent: nil,
+                block: .today,
+                listID: nil,
+                creationDate: localTask.creationDate,
+                modifiedDate: Date(timeIntervalSinceReferenceDate: 20)
+            ),
+            needsMetadataRefresh: false
+        )
+        let newerRemoteRecord = TodayMdReminderRecord(
+            identifier: "reminder-newer",
+            task: TodayMdReminderTaskSnapshot(
+                id: taskID,
+                title: "Newest remote",
+                isDone: false,
+                noteContent: nil,
+                block: .thisWeek,
+                listID: nil,
+                creationDate: localTask.creationDate,
+                modifiedDate: Date(timeIntervalSinceReferenceDate: 30)
+            ),
+            needsMetadataRefresh: false
+        )
+
+        let outcome = TodayMdReminderSyncEngine.sync(
+            localArchive: TodayMdArchive(lists: [], unassignedTasks: [localTask]),
+            remoteRecords: [olderRemoteRecord, newerRemoteRecord],
+            snapshots: [snapshot]
+        )
+
+        XCTAssertEqual(outcome.archive.unassignedTasks.first?.title, "Newest remote")
+        XCTAssertEqual(outcome.archive.unassignedTasks.first?.blockRaw, TimeBlock.thisWeek.rawValue)
+        XCTAssertFalse(outcome.mutations.contains { mutation in
+            if case .create = mutation {
+                return true
+            }
+            return false
+        })
     }
 
     func testNewerMarkdownNoteBeatsOlderReminderCopy() {
