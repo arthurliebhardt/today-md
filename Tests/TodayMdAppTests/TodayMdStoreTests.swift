@@ -981,6 +981,35 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(resetStore.allTasks.count, 8)
     }
 
+    func testSwiftRunShowcaseArchiveResetKeepsRepeatedLaunchesAtEightTasks() throws {
+        let databaseURL = try makeDatabaseURL()
+        let markdownArchiveURL = try makeMarkdownArchiveURL()
+
+        try TodayMdApp.prepareLocalMarkdownArchive(at: markdownArchiveURL, shouldReset: true)
+        let firstStore = TodayMdStore(
+            databaseURL: databaseURL,
+            localMarkdownArchiveDirectoryURL: markdownArchiveURL,
+            shouldSeedShowcaseData: false,
+            shouldResetShowcaseData: true
+        )
+
+        try TodayMdMarkdownArchiveService.reconcileArchive(with: firstStore)
+        XCTAssertEqual(firstStore.allTasks.count, 8)
+        XCTAssertEqual(try markdownFileCount(at: markdownArchiveURL), 8)
+
+        try TodayMdApp.prepareLocalMarkdownArchive(at: markdownArchiveURL, shouldReset: true)
+        let secondStore = TodayMdStore(
+            databaseURL: databaseURL,
+            localMarkdownArchiveDirectoryURL: markdownArchiveURL,
+            shouldSeedShowcaseData: false,
+            shouldResetShowcaseData: true
+        )
+
+        try TodayMdMarkdownArchiveService.reconcileArchive(with: secondStore)
+        XCTAssertEqual(secondStore.allTasks.count, 8)
+        XCTAssertEqual(try markdownFileCount(at: markdownArchiveURL), 8)
+    }
+
     private func makeStore() throws -> TodayMdStore {
         let databaseURL = try makeDatabaseURL()
         let store = TodayMdStore(
@@ -1003,5 +1032,27 @@ final class TodayMdStoreTests: XCTestCase {
         }
 
         return rootURL.appendingPathComponent("today-md.sqlite")
+    }
+
+    private func makeMarkdownArchiveURL() throws -> URL {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        return rootURL.appendingPathComponent("today-md-showcase-markdown", isDirectory: true)
+    }
+
+    private func markdownFileCount(at directoryURL: URL) throws -> Int {
+        try FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        .filter { $0.pathExtension.lowercased() == "md" }
+        .count
     }
 }

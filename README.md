@@ -49,7 +49,7 @@ bash scripts/dev-run.sh
 
 Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 
-The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Packaged app builds seed sample data on first launch. `swift run` now launches against a dedicated showcase database in `.build` and resets it to the example dataset on every local start.
+The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Packaged app builds seed sample data on first launch. `swift run` now launches against dedicated showcase storage in `.build`, including an isolated SQLite database and markdown archive that both reset to the example dataset on every local start.
 
 ## Project Structure
 

@@ -742,7 +742,7 @@ struct ContentView: View {
         if syncService.syncEnabled {
             return syncService.markdownArchivePath
         }
-        return try? TodayMdMarkdownArchiveService.archivePath()
+        return try? TodayMdMarkdownArchiveService.archivePath(for: store)
     }
 
     private var markdownArchiveSnapshots: [MarkdownArchiveSnapshot] {
@@ -790,7 +790,7 @@ struct ContentView: View {
         }
 
         do {
-            try TodayMdMarkdownArchiveService.revealArchiveFolder()
+            try TodayMdMarkdownArchiveService.revealArchiveFolder(for: store)
         } catch {
             presentTransferError(title: "Open Markdown Archive Failed", error: error)
         }
@@ -3018,6 +3018,9 @@ struct ContentView: View {
     }
 
     private func reorderTaskInVisibleBoard(_ draggedID: UUID, _ block: TimeBlock, _ beforeID: UUID?) {
+#if DEBUG
+        print("KANBAN content selection=\(selection) dragged=\(draggedID.uuidString) block=\(block.rawValue) before=\(beforeID?.uuidString ?? "nil")")
+#endif
         if case .list = selection {
             reorderTaskInCurrentListBlock(draggedID, block, beforeID)
         } else {

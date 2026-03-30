@@ -15,8 +15,10 @@ final class TodayMdAppLaunchTests: XCTestCase {
 
         XCTAssertTrue(configuration.shouldSeedShowcaseData)
         XCTAssertFalse(configuration.shouldResetShowcaseData)
+        XCTAssertFalse(configuration.shouldResetLocalMarkdownArchive)
         XCTAssertTrue(configuration.shouldRunSyncLifecycle)
         XCTAssertNil(configuration.databaseURL)
+        XCTAssertNil(configuration.localMarkdownArchiveDirectoryURL)
 
         TodayMdApp.markHasLaunchedBefore(userDefaults: userDefaults)
         let secondLaunchConfiguration = TodayMdApp.makeLaunchConfiguration(
@@ -40,10 +42,12 @@ final class TodayMdAppLaunchTests: XCTestCase {
 
         XCTAssertFalse(configuration.shouldSeedShowcaseData)
         XCTAssertFalse(configuration.shouldResetShowcaseData)
+        XCTAssertFalse(configuration.shouldResetLocalMarkdownArchive)
         XCTAssertTrue(configuration.shouldRunSyncLifecycle)
+        XCTAssertNil(configuration.localMarkdownArchiveDirectoryURL)
     }
 
-    func testSwiftRunUsesDedicatedShowcaseDatabaseAndSkipsSyncLifecycle() {
+    func testSwiftRunUsesDedicatedShowcaseStorageAndSkipsSyncLifecycle() {
         let userDefaults = makeUserDefaults()
         TodayMdApp.markHasLaunchedBefore(userDefaults: userDefaults)
         let configuration = TodayMdApp.makeLaunchConfiguration(
@@ -55,10 +59,15 @@ final class TodayMdAppLaunchTests: XCTestCase {
 
         XCTAssertTrue(configuration.shouldSeedShowcaseData)
         XCTAssertTrue(configuration.shouldResetShowcaseData)
+        XCTAssertTrue(configuration.shouldResetLocalMarkdownArchive)
         XCTAssertFalse(configuration.shouldRunSyncLifecycle)
         XCTAssertEqual(
             configuration.databaseURL,
             URL(fileURLWithPath: "/Users/test/dev/today-md/.build/debug/today-md-showcase.sqlite")
+        )
+        XCTAssertEqual(
+            configuration.localMarkdownArchiveDirectoryURL,
+            URL(fileURLWithPath: "/Users/test/dev/today-md/.build/debug/today-md-showcase-markdown", isDirectory: true)
         )
     }
 
@@ -73,6 +82,29 @@ final class TodayMdAppLaunchTests: XCTestCase {
 
     func testSwiftRunShowcaseDatabaseRequiresExecutableURL() {
         XCTAssertNil(TodayMdApp.localSwiftRunShowcaseDatabaseURL(executableURL: nil))
+    }
+
+    func testSwiftRunShowcaseMarkdownArchiveRequiresExecutableURL() {
+        XCTAssertNil(TodayMdApp.localSwiftRunShowcaseMarkdownArchiveDirectoryURL(executableURL: nil))
+    }
+
+    func testPrepareLocalMarkdownArchiveResetsExistingDirectoryWhenRequested() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let archiveURL = rootURL.appendingPathComponent("today-md-showcase-markdown", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: archiveURL, withIntermediateDirectories: true)
+        let staleFileURL = archiveURL.appendingPathComponent("stale.md", isDirectory: false)
+        try "stale".write(to: staleFileURL, atomically: true, encoding: .utf8)
+
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try TodayMdApp.prepareLocalMarkdownArchive(at: archiveURL, shouldReset: true)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: archiveURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleFileURL.path))
     }
 
     private func makeUserDefaults() -> UserDefaults {

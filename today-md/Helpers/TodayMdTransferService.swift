@@ -176,7 +176,9 @@ enum ImportMode {
 @MainActor
 enum TodayMdMarkdownArchiveService {
     static func reconcileArchive(with store: TodayMdStore) throws {
-        let directoryURL = try archiveDirectoryURL()
+        let directoryURL = try archiveDirectoryURL(
+            overriding: store.localMarkdownArchiveDirectoryURL
+        )
         try FileManager.default.createDirectory(
             at: directoryURL,
             withIntermediateDirectories: true,
@@ -249,16 +251,25 @@ enum TodayMdMarkdownArchiveService {
         }
     }
 
-    static func archivePath() throws -> String {
-        try archiveDirectoryURL().path
+    static func archivePath(for store: TodayMdStore) throws -> String {
+        try archiveDirectoryURL(overriding: store.localMarkdownArchiveDirectoryURL).path
     }
 
-    static func revealArchiveFolder() throws {
-        let directoryURL = try archiveDirectoryURL()
+    static func revealArchiveFolder(for store: TodayMdStore) throws {
+        let directoryURL = try archiveDirectoryURL(overriding: store.localMarkdownArchiveDirectoryURL)
         NSWorkspace.shared.open(directoryURL)
     }
 
-    private static func archiveDirectoryURL() throws -> URL {
+    private static func archiveDirectoryURL(overriding directoryURL: URL? = nil) throws -> URL {
+        if let directoryURL {
+            try FileManager.default.createDirectory(
+                at: directoryURL,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            return directoryURL
+        }
+
         guard let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask

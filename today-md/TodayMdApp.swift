@@ -337,8 +337,10 @@ final class AppPresentationState: ObservableObject {
 struct TodayMdApp: App {
     struct LaunchConfiguration {
         let databaseURL: URL?
+        let localMarkdownArchiveDirectoryURL: URL?
         let shouldSeedShowcaseData: Bool
         let shouldResetShowcaseData: Bool
+        let shouldResetLocalMarkdownArchive: Bool
         let shouldRunSyncLifecycle: Bool
     }
 
@@ -363,12 +365,21 @@ struct TodayMdApp: App {
             bundleURL: Bundle.main.bundleURL,
             executableURL: Bundle.main.executableURL
         )
+        do {
+            try Self.prepareLocalMarkdownArchive(
+                at: launchConfiguration.localMarkdownArchiveDirectoryURL,
+                shouldReset: launchConfiguration.shouldResetLocalMarkdownArchive
+            )
+        } catch {
+            fatalError("Failed to prepare the local markdown archive: \(error.localizedDescription)")
+        }
         shouldRunSyncLifecycle = launchConfiguration.shouldRunSyncLifecycle
         Self.markHasLaunchedBefore(userDefaults: userDefaults)
         _syncService = StateObject(wrappedValue: syncService)
         _store = State(
             initialValue: TodayMdStore(
                 databaseURL: launchConfiguration.databaseURL,
+                localMarkdownArchiveDirectoryURL: launchConfiguration.localMarkdownArchiveDirectoryURL,
                 shouldSeedShowcaseData: launchConfiguration.shouldSeedShowcaseData,
                 shouldResetShowcaseData: launchConfiguration.shouldResetShowcaseData
             )
@@ -471,16 +482,20 @@ struct TodayMdApp: App {
         if isRunningLocallyFromSwiftRun(bundleURL: bundleURL, executableURL: executableURL) {
             return LaunchConfiguration(
                 databaseURL: localSwiftRunShowcaseDatabaseURL(executableURL: executableURL),
+                localMarkdownArchiveDirectoryURL: localSwiftRunShowcaseMarkdownArchiveDirectoryURL(executableURL: executableURL),
                 shouldSeedShowcaseData: true,
                 shouldResetShowcaseData: true,
+                shouldResetLocalMarkdownArchive: true,
                 shouldRunSyncLifecycle: false
             )
         }
 
         return LaunchConfiguration(
             databaseURL: nil,
+            localMarkdownArchiveDirectoryURL: nil,
             shouldSeedShowcaseData: !syncEnabled && !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey),
             shouldResetShowcaseData: false,
+            shouldResetLocalMarkdownArchive: false,
             shouldRunSyncLifecycle: true
         )
     }
@@ -503,6 +518,25 @@ struct TodayMdApp: App {
         return executableURL
             .deletingLastPathComponent()
             .appendingPathComponent("today-md-showcase.sqlite", isDirectory: false)
+    }
+
+    static func localSwiftRunShowcaseMarkdownArchiveDirectoryURL(executableURL: URL?) -> URL? {
+        guard let executableURL else { return nil }
+        return executableURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("today-md-showcase-markdown", isDirectory: true)
+    }
+
+    static func prepareLocalMarkdownArchive(at directoryURL: URL?, shouldReset: Bool) throws {
+        guard let directoryURL else { return }
+        if shouldReset, FileManager.default.fileExists(atPath: directoryURL.path) {
+            try FileManager.default.removeItem(at: directoryURL)
+        }
+
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
     }
 }
 
@@ -552,12 +586,17 @@ final class TodayMdStore {
     @ObservationIgnored
     private var pendingSyncNotificationTargets: Set<TodayMdStoreSyncObserverTarget> = []
 
+    @ObservationIgnored
+    let localMarkdownArchiveDirectoryURL: URL?
+
     init(
         databaseURL: URL? = nil,
+        localMarkdownArchiveDirectoryURL: URL? = nil,
         shouldSeedShowcaseData: Bool = true,
         shouldResetShowcaseData: Bool = false
     ) {
         do {
+            self.localMarkdownArchiveDirectoryURL = localMarkdownArchiveDirectoryURL
             database = try TodayMdDatabase(url: databaseURL ?? Self.defaultDatabaseURL())
 
             if shouldResetShowcaseData {
@@ -1542,25 +1581,18 @@ final class TodayMdStore {
         let token = pendingPersistToken
 
         pendingPersistWorkItem?.cancel()
-
-        var workItem: DispatchWorkItem?
-        workItem = DispatchWorkItem { [database] in
-            guard let workItem, !workItem.isCancelled else { return }
-
-            do {
-                try database.replaceAll(with: archive)
-                Task { @MainActor [weak self] in
-                    self?.completeDeferredPersistence(token: token, error: nil)
-                }
-            } catch {
-                Task { @MainActor [weak self] in
-                    self?.completeDeferredPersistence(token: token, error: error)
-                }
+        let database = self.database
+        let workItem = Self.makeDeferredPersistWorkItem(
+            database: database,
+            archive: archive
+        ) { [weak self] error in
+            Task { @MainActor in
+                self?.completeDeferredPersistence(token: token, error: error)
             }
         }
 
         pendingPersistWorkItem = workItem
-        persistenceQueue.asyncAfter(deadline: .now() + Self.deferredPersistenceDelay, execute: workItem!)
+        persistenceQueue.asyncAfter(deadline: .now() + Self.deferredPersistenceDelay, execute: workItem)
     }
 
     private func completeDeferredPersistence(token: Int, error: Error?) {
@@ -1743,6 +1775,26 @@ final class TodayMdStore {
         return applicationSupportURL
             .appendingPathComponent("today-md", isDirectory: true)
             .appendingPathComponent("today-md.sqlite", isDirectory: false)
+    }
+
+    nonisolated private static func makeDeferredPersistWorkItem(
+        database: TodayMdDatabase,
+        archive: TodayMdArchive,
+        completion: @escaping @Sendable (Error?) -> Void
+    ) -> DispatchWorkItem {
+        var workItem: DispatchWorkItem?
+        workItem = DispatchWorkItem {
+            guard let workItem, !workItem.isCancelled else { return }
+
+            do {
+                try database.replaceAll(with: archive)
+                completion(nil)
+            } catch {
+                completion(error)
+            }
+        }
+
+        return workItem!
     }
 
 }

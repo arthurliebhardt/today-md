@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BoardView: View {
     let tasks: (TimeBlock) -> [TaskItem]
@@ -170,18 +172,13 @@ struct LaneView: View {
     @State private var isTargeted = false
     @State private var isAdding = false
     @State private var newTitle = ""
-    @State private var currentDropTarget: ReorderTarget?
+    @State private var currentDropTarget: LaneReorderTarget?
+    @State private var activeTaskFrames: [LaneTaskDropFrame] = []
     @State private var isDoneSectionTargeted = false
     @FocusState private var isNewTaskFieldFocused: Bool
 
     private var activeTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     private var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
-
-    private enum ReorderTarget: Hashable {
-        case before(UUID)
-        case after(UUID)
-        case end
-    }
 
     private var isTodayLane: Bool {
         block == .today
@@ -222,50 +219,16 @@ struct LaneView: View {
         return Color(nsColor: .separatorColor).opacity(0.18)
     }
 
+    private var laneDropCoordinateSpaceName: String {
+        "LaneDropArea-\(block.rawValue)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             VStack(alignment: .leading, spacing: 8) {
                 ScrollView {
-                    LazyVStack(spacing: 5) {
-                        ForEach(activeTasks) { task in
-                            TaskCardView(
-                                task: task,
-                                isSelected: selectedTaskIDs.contains(task.id),
-                                showsListBadge: showsListBadge,
-                                onToggle: { onToggle(task) },
-                                onMove: { targetBlock in onMove(task.id, targetBlock) },
-                                onDelete: { onDelete(task) }
-                            )
-                            .gesture(taskTapGesture(for: task))
-                            .draggable(TaskItemTransfer(id: task.id))
-                            .overlay {
-                                if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
-                                    Rectangle()
-                                        .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .dropDestination(for: TaskItemTransfer.self) { items, location in
-                                let target: ReorderTarget = location.y > 40 ? .after(task.id) : .before(task.id)
-                                return handleReorderDrop(items, target: target)
-                            } isTargeted: { targeted in
-                                updateDropTarget(targeted: targeted, target: .before(task.id))
-                            }
-                        }
-                        reorderDropZone(target: .end, height: 48)
-                        if allowsAdding {
-                            addCard
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
-                    .padding(.bottom, doneSectionExpanded ? 8 : 0)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onFocus()
-                        dismissEmptyDraftIfNeeded()
-                    }
+                    activeTaskList
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
 
@@ -292,12 +255,8 @@ struct LaneView: View {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(laneBorderColor, lineWidth: isFocused ? 2 : (isTodayLane ? 1.5 : 1))
         )
-        .dropDestination(for: TaskItemTransfer.self) { items, _ in
-            for item in items { onMove(item.id, block) }
-            return !items.isEmpty
-        } isTargeted: { targeted in
-            guard isTargeted != targeted else { return }
-            isTargeted = targeted
+        .onPreferenceChange(LaneTaskDropFramePreferenceKey.self) { frames in
+            activeTaskFrames = frames.sorted { $0.frame.minY < $1.frame.minY }
         }
     }
 
@@ -492,8 +451,83 @@ struct LaneView: View {
         }
     }
 
-    private func handleReorderDrop(_ items: [TaskItemTransfer], target: ReorderTarget) -> Bool {
-        guard let draggedID = items.first?.id else { return false }
+    private var activeTaskList: some View {
+        LaneDropHostingView(
+            taskFrames: activeTaskFrames,
+            onTargetChange: { target in
+                currentDropTarget = target
+                isTargeted = target != nil
+            },
+            onDropTask: { draggedID, target in
+                _ = handleReorderDrop(draggedID: draggedID, target: target)
+            }
+        ) {
+            LazyVStack(spacing: 5) {
+                if activeTasks.isEmpty {
+                    reorderDropZone(target: .end, height: 72)
+                } else {
+                    reorderDropZone(target: .before(activeTasks[0].id), height: 16)
+
+                    ForEach(activeTasks) { task in
+                        activeTaskCard(task)
+                    }
+
+                    reorderDropZone(target: .end, height: 48)
+                }
+
+                if allowsAdding {
+                    addCard
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .padding(.bottom, doneSectionExpanded ? 8 : 0)
+            .contentShape(Rectangle())
+            .coordinateSpace(name: laneDropCoordinateSpaceName)
+            .onTapGesture {
+                onFocus()
+                dismissEmptyDraftIfNeeded()
+            }
+        }
+    }
+
+    private func activeTaskCard(_ task: TaskItem) -> some View {
+        TaskCardView(
+            task: task,
+            isSelected: selectedTaskIDs.contains(task.id),
+            showsListBadge: showsListBadge,
+            onToggle: { onToggle(task) },
+            onMove: { targetBlock in onMove(task.id, targetBlock) },
+            onDelete: { onDelete(task) }
+        )
+        .gesture(taskTapGesture(for: task))
+        .draggable(TaskItemTransfer(id: task.id))
+        .overlay {
+            if currentDropTarget == .before(task.id) || currentDropTarget == .after(task.id) {
+                Rectangle()
+                    .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 2)
+            }
+        }
+        .contentShape(Rectangle())
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: LaneTaskDropFramePreferenceKey.self,
+                    value: [
+                        LaneTaskDropFrame(
+                            taskID: task.id,
+                            frame: geometry.frame(in: .named(laneDropCoordinateSpaceName))
+                        )
+                    ]
+                )
+            }
+        }
+    }
+
+    private func handleReorderDrop(draggedID: UUID, target: LaneReorderTarget) -> Bool {
+#if DEBUG
+        print("KANBAN lane=\(block.rawValue) dragged=\(draggedID.uuidString) target=\(String(describing: target))")
+#endif
         let beforeID: UUID? = {
             switch target {
             case .before(let id):
@@ -506,19 +540,11 @@ struct LaneView: View {
         }()
         onReorderActive(draggedID, beforeID)
         currentDropTarget = nil
+        isTargeted = false
         return true
     }
 
-    private func updateDropTarget(targeted: Bool, target: ReorderTarget) {
-        if targeted {
-            guard currentDropTarget != target else { return }
-            currentDropTarget = target
-        } else if currentDropTarget == target {
-            currentDropTarget = nil
-        }
-    }
-
-    private func reorderDropZone(target: ReorderTarget, height: CGFloat) -> some View {
+    private func reorderDropZone(target: LaneReorderTarget, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 4)
             .strokeBorder(
                 currentDropTarget == target
@@ -532,11 +558,6 @@ struct LaneView: View {
             )
             .frame(height: height)
             .contentShape(Rectangle())
-            .dropDestination(for: TaskItemTransfer.self) { items, _ in
-                handleReorderDrop(items, target: target)
-            } isTargeted: { targeted in
-                updateDropTarget(targeted: targeted, target: target)
-            }
     }
 
     private func nextActiveTaskID(after id: UUID) -> UUID? {
@@ -592,5 +613,167 @@ struct LaneView: View {
                     dismissEmptyDraftIfNeeded()
                 }
             )
+    }
+}
+
+private enum LaneReorderTarget: Hashable {
+    case before(UUID)
+    case after(UUID)
+    case end
+}
+
+private struct LaneTaskDropFrame: Equatable {
+    let taskID: UUID
+    let frame: CGRect
+}
+
+private struct LaneTaskDropFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [LaneTaskDropFrame] = []
+
+    static func reduce(value: inout [LaneTaskDropFrame], nextValue: () -> [LaneTaskDropFrame]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+@MainActor
+private struct LaneDropHostingView<Content: View>: NSViewRepresentable {
+    let taskFrames: [LaneTaskDropFrame]
+    let onTargetChange: (LaneReorderTarget?) -> Void
+    let onDropTask: (UUID, LaneReorderTarget) -> Void
+    let content: Content
+
+    init(
+        taskFrames: [LaneTaskDropFrame],
+        onTargetChange: @escaping (LaneReorderTarget?) -> Void,
+        onDropTask: @escaping (UUID, LaneReorderTarget) -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.taskFrames = taskFrames
+        self.onTargetChange = onTargetChange
+        self.onDropTask = onDropTask
+        self.content = content()
+    }
+
+    func makeNSView(context: Context) -> LaneDropHostingNSView {
+        let view = LaneDropHostingNSView(rootView: AnyView(content))
+        view.taskFrames = taskFrames
+        view.onTargetChange = onTargetChange
+        view.onDropTask = onDropTask
+        return view
+    }
+
+    func updateNSView(_ nsView: LaneDropHostingNSView, context: Context) {
+        nsView.rootView = AnyView(content)
+        nsView.taskFrames = taskFrames
+        nsView.onTargetChange = onTargetChange
+        nsView.onDropTask = onDropTask
+    }
+}
+
+@MainActor
+private final class LaneDropHostingNSView: NSHostingView<AnyView> {
+    var taskFrames: [LaneTaskDropFrame] = []
+    var onTargetChange: ((LaneReorderTarget?) -> Void)?
+    var onDropTask: ((UUID, LaneReorderTarget) -> Void)?
+
+    required init(rootView: AnyView) {
+        super.init(rootView: rootView)
+        isFlipped = true
+        registerForDraggedTypes([NSPasteboard.PasteboardType(UTType.taskItem.identifier)])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        log("entered")
+        return draggingUpdated(sender)
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard decodeTaskTransfers(from: sender).first != nil else {
+            log("updated missing-transfer")
+            onTargetChange?(nil)
+            return []
+        }
+
+        let point = convert(sender.draggingLocation, from: nil)
+        let target = reorderTarget(at: point)
+        log("updated point=\(NSStringFromPoint(point)) target=\(String(describing: target))")
+        onTargetChange?(target)
+        return target == nil ? [] : .move
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        log("exited")
+        onTargetChange?(nil)
+    }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        decodeTaskTransfers(from: sender).first != nil
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let draggedID = decodeTaskTransfers(from: sender).first?.id else {
+            log("perform missing-transfer")
+            onTargetChange?(nil)
+            return false
+        }
+
+        let point = convert(sender.draggingLocation, from: nil)
+        guard let target = reorderTarget(at: point) else {
+            log("perform no-target point=\(NSStringFromPoint(point))")
+            onTargetChange?(nil)
+            return false
+        }
+
+        log("perform dragged=\(draggedID.uuidString) point=\(NSStringFromPoint(point)) target=\(String(describing: target))")
+        onTargetChange?(nil)
+        DispatchQueue.main.async { [onDropTask] in
+            onDropTask?(draggedID, target)
+        }
+        return true
+    }
+
+    private func reorderTarget(at point: CGPoint) -> LaneReorderTarget? {
+        guard bounds.contains(point) else { return nil }
+        guard let firstFrame = taskFrames.first else { return .end }
+
+        if point.y < firstFrame.frame.minY {
+            return .before(firstFrame.taskID)
+        }
+
+        for frame in taskFrames {
+            if point.y < frame.frame.midY {
+                return .before(frame.taskID)
+            }
+
+            if point.y <= frame.frame.maxY {
+                return .after(frame.taskID)
+            }
+        }
+
+        return .end
+    }
+
+    private func log(_ message: String) {
+#if DEBUG
+        print("KANBAN host \(message)")
+#endif
+    }
+}
+
+@MainActor
+private func decodeTaskTransfers(from draggingInfo: any NSDraggingInfo) -> [TaskItemTransfer] {
+    guard let data = draggingInfo.draggingPasteboard.data(forType: NSPasteboard.PasteboardType(UTType.taskItem.identifier)) else {
+        return []
+    }
+
+    do {
+        return [try JSONDecoder().decode(TaskItemTransfer.self, from: data)]
+    } catch {
+        return []
     }
 }

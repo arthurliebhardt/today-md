@@ -1,6 +1,6 @@
 import Foundation
 
-struct TodayMdArchive: Codable {
+struct TodayMdArchive: Codable, Sendable {
     let version: Int
     let exportedAt: Date
     let syncRevisionID: String?
@@ -87,7 +87,7 @@ struct TodayMdArchive: Codable {
         return (hydratedLists, hydratedUnassigned)
     }
 
-    struct ListArchive: Codable {
+    struct ListArchive: Codable, Sendable {
         let id: UUID
         let name: String
         let icon: String
@@ -105,7 +105,7 @@ struct TodayMdArchive: Codable {
         }
     }
 
-    struct TaskArchive: Codable {
+    struct TaskArchive: Codable, Sendable {
         let id: UUID
         let title: String
         let isDone: Bool
@@ -207,7 +207,7 @@ struct TodayMdArchive: Codable {
         }
     }
 
-    struct NoteArchive: Codable {
+    struct NoteArchive: Codable, Sendable {
         let content: String
         let lastModified: Date
 
@@ -226,7 +226,7 @@ struct TodayMdArchive: Codable {
         }
     }
 
-    struct SubTaskArchive: Codable {
+    struct SubTaskArchive: Codable, Sendable {
         let id: UUID
         let title: String
         let isCompleted: Bool
