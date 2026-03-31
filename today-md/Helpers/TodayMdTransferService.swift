@@ -201,6 +201,15 @@ enum TodayMdMarkdownArchiveService {
 
     static func syncNotes(for tasks: [TaskItem]) throws {
         let directoryURL = try archiveDirectoryURL()
+        try syncNotes(for: tasks, to: directoryURL)
+    }
+
+    static func syncNotes(for tasks: [TaskItem], to directoryURL: URL) throws {
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
         try writeNotes(tasks, to: directoryURL, removeStaleFiles: true)
     }
 

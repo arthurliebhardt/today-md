@@ -504,6 +504,10 @@ struct TodayMdApp: App {
 @MainActor
 @Observable
 final class TodayMdStore {
+    private final class DeferredPersistenceGate: @unchecked Sendable {
+        var isCancelled = false
+    }
+
     private enum PersistenceMode {
         case immediate
         case deferred
@@ -527,10 +531,16 @@ final class TodayMdStore {
     private var syncHandler: (() -> Void)?
 
     @ObservationIgnored
+    private var markdownArchiveSyncHandler: (() -> Void)?
+
+    @ObservationIgnored
     private let persistenceQueue = DispatchQueue(label: "com.todaymd.persistence", qos: .utility)
 
     @ObservationIgnored
     private var pendingPersistWorkItem: DispatchWorkItem?
+
+    @ObservationIgnored
+    private var pendingPersistGate: DeferredPersistenceGate?
 
     @ObservationIgnored
     private var pendingPersistToken = 0
@@ -589,6 +599,10 @@ final class TodayMdStore {
 
     func configureSyncHandler(_ handler: @escaping () -> Void) {
         syncHandler = handler
+    }
+
+    func configureMarkdownArchiveSyncHandler(_ handler: @escaping () -> Void) {
+        markdownArchiveSyncHandler = handler
     }
 
     func list(id: UUID) -> TaskList? {
@@ -1238,12 +1252,12 @@ final class TodayMdStore {
 
     func applyRemoteArchive(_ archive: TodayMdArchive) {
         applyArchive(archive, refreshSearch: true)
-        persist(notifySync: false)
+        persist(notifySync: false, notifyMarkdownArchive: false)
     }
 
     func applyMarkdownArchive(_ archive: TodayMdArchive) {
         applyArchive(archive, refreshSearch: true)
-        persist(notifySync: true)
+        persist(notifySync: true, notifyMarkdownArchive: false)
     }
 
     private func loadShowcaseData() {
@@ -1466,27 +1480,39 @@ final class TodayMdStore {
         pendingPersistToken += 1
         let shouldNotifySync = hasPendingSyncNotification
         hasPendingSyncNotification = false
+        pendingPersistGate?.isCancelled = true
+        pendingPersistGate = nil
         pendingPersistWorkItem?.cancel()
         pendingPersistWorkItem = nil
         persistArchive(makeArchive(), notifySync: shouldNotifySync)
+        markdownArchiveSyncHandler?()
     }
 
-    private func persist(notifySync: Bool = true) {
-        persist(using: .immediate, notifySync: notifySync)
+    private func persist(notifySync: Bool = true, notifyMarkdownArchive: Bool = true) {
+        persist(using: .immediate, notifySync: notifySync, notifyMarkdownArchive: notifyMarkdownArchive)
     }
 
-    private func persist(using mode: PersistenceMode, notifySync: Bool = true) {
+    private func persist(
+        using mode: PersistenceMode,
+        notifySync: Bool = true,
+        notifyMarkdownArchive: Bool = true
+    ) {
         let archive = makeArchive()
 
         switch mode {
         case .immediate:
             pendingPersistToken += 1
             hasPendingSyncNotification = false
+            pendingPersistGate?.isCancelled = true
+            pendingPersistGate = nil
             pendingPersistWorkItem?.cancel()
             pendingPersistWorkItem = nil
             persistArchive(archive, notifySync: notifySync)
+            if notifyMarkdownArchive {
+                markdownArchiveSyncHandler?()
+            }
         case .deferred:
-            scheduleDeferredPersist(archive, notifySync: notifySync)
+            scheduleDeferredPersist(archive, notifySync: notifySync, notifyMarkdownArchive: notifyMarkdownArchive)
         }
     }
 
@@ -1501,36 +1527,53 @@ final class TodayMdStore {
         }
     }
 
-    private func scheduleDeferredPersist(_ archive: TodayMdArchive, notifySync: Bool) {
+    private func scheduleDeferredPersist(
+        _ archive: TodayMdArchive,
+        notifySync: Bool,
+        notifyMarkdownArchive: Bool
+    ) {
         hasPendingSyncNotification = hasPendingSyncNotification || notifySync
         pendingPersistToken += 1
         let token = pendingPersistToken
 
+        pendingPersistGate?.isCancelled = true
         pendingPersistWorkItem?.cancel()
+        let gate = DeferredPersistenceGate()
+        pendingPersistGate = gate
 
         var workItem: DispatchWorkItem?
-        workItem = DispatchWorkItem { [database] in
-            guard let workItem, !workItem.isCancelled else { return }
+        let operation: @Sendable () -> Void = { [database] in
+            guard !gate.isCancelled else { return }
 
             do {
                 try database.replaceAll(with: archive)
                 Task { @MainActor [weak self] in
-                    self?.completeDeferredPersistence(token: token, error: nil)
+                    self?.completeDeferredPersistence(
+                        token: token,
+                        error: nil,
+                        notifyMarkdownArchive: notifyMarkdownArchive
+                    )
                 }
             } catch {
                 Task { @MainActor [weak self] in
-                    self?.completeDeferredPersistence(token: token, error: error)
+                    self?.completeDeferredPersistence(
+                        token: token,
+                        error: error,
+                        notifyMarkdownArchive: notifyMarkdownArchive
+                    )
                 }
             }
         }
+        workItem = DispatchWorkItem(block: operation)
 
         pendingPersistWorkItem = workItem
         persistenceQueue.asyncAfter(deadline: .now() + Self.deferredPersistenceDelay, execute: workItem!)
     }
 
-    private func completeDeferredPersistence(token: Int, error: Error?) {
+    private func completeDeferredPersistence(token: Int, error: Error?, notifyMarkdownArchive: Bool) {
         guard token == pendingPersistToken else { return }
 
+        pendingPersistGate = nil
         pendingPersistWorkItem = nil
         let shouldNotifySync = hasPendingSyncNotification
         hasPendingSyncNotification = false
@@ -1542,6 +1585,10 @@ final class TodayMdStore {
 
         if shouldNotifySync {
             syncHandler?()
+        }
+
+        if notifyMarkdownArchive {
+            markdownArchiveSyncHandler?()
         }
     }
 
