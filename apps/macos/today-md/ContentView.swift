@@ -358,6 +358,8 @@ struct ContentView: View {
     @State private var showOverlaySidebar = false
     @State private var plannerShowsSidebar = true
     @State private var showingSettingsSheet = false
+    @State private var showingCalendarDestinationDialog = false
+    @State private var shouldPromptForCalendarDestinationAfterConnect = false
     @State private var selectedSettingsSection: SettingsSection = .interface
     @State private var transferAlert: TransferAlert?
     @State private var plannerThisWeekCollapsed = false
@@ -763,6 +765,30 @@ struct ContentView: View {
         calendarDefaultIdentifier.isEmpty ? nil : calendarDefaultIdentifier
     }
 
+    private var writableCalendars: [TodayMdCalendarSummary] {
+        calendarService.writableCalendars
+    }
+
+    private var hasExplicitCalendarDestinationSelection: Bool {
+        writableCalendars.contains { $0.id == calendarDefaultIdentifier }
+    }
+
+    private var resolvedCalendarDestinationIdentifier: String {
+        if hasExplicitCalendarDestinationSelection {
+            return calendarDefaultIdentifier
+        }
+
+        return calendarService.selectedDestinationCalendar(preferredIdentifier: nil)?.id
+            ?? writableCalendars.first?.id
+            ?? ""
+    }
+
+    private var needsCalendarDestinationSelection: Bool {
+        calendarService.authorizationStatus.canReadEvents
+            && !writableCalendars.isEmpty
+            && !hasExplicitCalendarDestinationSelection
+    }
+
     private var calendarDefaultDurationSelection: Binding<Int> {
         Binding(
             get: {
@@ -854,6 +880,29 @@ struct ContentView: View {
             for: updatedSelection,
             availableCalendars: availableCalendars
         )
+    }
+
+    private func presentCalendarDestinationSelectionIfNeeded() {
+        if shouldPromptForCalendarDestinationAfterConnect {
+            guard !writableCalendars.isEmpty else { return }
+            showingCalendarDestinationDialog = true
+            shouldPromptForCalendarDestinationAfterConnect = false
+            return
+        }
+
+        guard needsCalendarDestinationSelection else {
+            showingCalendarDestinationDialog = false
+            return
+        }
+
+        showingCalendarDestinationDialog = true
+    }
+
+    private func selectCalendarDestination(_ calendarID: String) {
+        guard writableCalendars.contains(where: { $0.id == calendarID }) else { return }
+        calendarDefaultIdentifier = calendarID
+        showingCalendarDestinationDialog = false
+        shouldPromptForCalendarDestinationAfterConnect = false
     }
 
     private var syncStatusColor: Color {
@@ -1154,15 +1203,17 @@ struct ContentView: View {
                     if calendarService.authorizationStatus.canReadEvents {
                         VStack(alignment: .leading, spacing: 14) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Destination calendar")
+                                Text("Calendar for entries")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
 
-                                Picker("Destination calendar", selection: $calendarDefaultIdentifier) {
-                                    Text("Auto (prefer Outlook / Exchange)")
-                                        .tag("")
+                                Text("Choose which calendar receives blockers created from tasks.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
 
-                                    ForEach(calendarService.writableCalendars) { calendar in
+                                Picker("Destination calendar", selection: $calendarDefaultIdentifier) {
+                                    ForEach(writableCalendars) { calendar in
                                         Text(calendar.displayTitle)
                                             .tag(calendar.id)
                                     }
@@ -1543,6 +1594,90 @@ struct ContentView: View {
 
             Spacer()
         }
+    }
+
+    private var calendarDestinationDialogOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.16)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Choose Calendar for Entries")
+                        .font(.system(size: 22, weight: .bold))
+
+                    Text("Select the calendar where today-md should create task blockers.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(writableCalendars) { calendar in
+                        Button {
+                            selectCalendarDestination(calendar.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Color(nsColor: calendar.nsColor))
+                                    .frame(width: 10, height: 10)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(calendar.displayTitle)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+
+                                    Text(calendar.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer(minLength: 8)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.94))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color(nsColor: calendar.nsColor).opacity(0.26), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !needsCalendarDestinationSelection {
+                    HStack {
+                        Spacer()
+
+                        Button("Cancel") {
+                            showingCalendarDestinationDialog = false
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+            .padding(24)
+            .frame(width: 460)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
+            .padding(24)
+        }
+        .transition(.opacity)
+        .zIndex(2)
     }
 
     private func shortcutPreviewRow(title: String, shortcut: String) -> some View {
@@ -2370,6 +2505,10 @@ struct ContentView: View {
                 }
                 .transition(.move(edge: .trailing))
             }
+
+            if showingCalendarDestinationDialog, !writableCalendars.isEmpty {
+                calendarDestinationDialogOverlay
+            }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -2449,6 +2588,7 @@ struct ContentView: View {
             syncSelectedTask()
             syncScheduledTasksIntoToday()
             syncMarkdownArchive()
+            presentCalendarDestinationSelectionIfNeeded()
         }
         .onChange(of: selection, initial: true) { _, _ in
             syncSelectedTask()
@@ -2467,6 +2607,13 @@ struct ContentView: View {
         }
         .onChange(of: calendarService.refreshRevision, initial: true) { _, _ in
             syncScheduledTasksIntoToday()
+            presentCalendarDestinationSelectionIfNeeded()
+        }
+        .onChange(of: calendarService.authorizationStatus, initial: true) { oldValue, newValue in
+            if !oldValue.canReadEvents && newValue.canReadEvents {
+                shouldPromptForCalendarDestinationAfterConnect = true
+            }
+            presentCalendarDestinationSelectionIfNeeded()
         }
         .onChange(of: presentationState.taskNavigationRequest) { _, request in
             guard let request else { return }
