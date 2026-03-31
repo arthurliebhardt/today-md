@@ -684,7 +684,10 @@ struct TaskCalendarPlannerView: View {
 
     private func saveDraftInterval() {
         guard let draftInterval else { return }
+        createBlock(for: task, interval: draftInterval)
+    }
 
+    private func createBlock(for task: TaskItem, interval: DateInterval) {
         successMessage = nil
         errorMessage = nil
         isSaving = true
@@ -693,9 +696,11 @@ struct TaskCalendarPlannerView: View {
             defer { isSaving = false }
 
             do {
+                try calendarService.deleteManagedBlocks(forTaskIDs: [task.id])
+
                 let result = try calendarService.createBlock(
                     for: task,
-                    interval: draftInterval,
+                    interval: interval,
                     preferredCalendarIdentifier: preferredIdentifier
                 )
 
@@ -2033,7 +2038,11 @@ struct WeekCalendarPanelView: View {
 
     private func scheduleDroppedTask(_ taskID: UUID, interval: DateInterval) -> Bool {
         guard let task = store.task(id: taskID) else { return false }
+        createManagedBlock(for: task, interval: interval)
+        return true
+    }
 
+    private func createManagedBlock(for task: TaskItem, interval: DateInterval) {
         successMessage = nil
         errorMessage = nil
         isScheduling = true
@@ -2042,6 +2051,8 @@ struct WeekCalendarPanelView: View {
             defer { isScheduling = false }
 
             do {
+                try calendarService.deleteManagedBlocks(forTaskIDs: [task.id])
+
                 let result = try calendarService.createBlock(
                     for: task,
                     interval: interval,
@@ -2057,8 +2068,6 @@ struct WeekCalendarPanelView: View {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
         }
-
-        return true
     }
 
     private func moveEvent(_ event: TodayMdCalendarEventSummary, to interval: DateInterval) {
@@ -2096,33 +2105,8 @@ struct WeekCalendarPanelView: View {
 
     private func scheduleDroppedTask(_ taskID: UUID, on day: Date, yPosition: CGFloat) -> Bool {
         guard let task = store.task(id: taskID) else { return false }
-
-        successMessage = nil
-        errorMessage = nil
-        isScheduling = true
-
         let interval = intervalForDroppedTask(on: day, yPosition: yPosition)
-
-        Task { @MainActor in
-            defer { isScheduling = false }
-
-            do {
-                let result = try calendarService.createBlock(
-                    for: task,
-                    interval: interval,
-                    preferredCalendarIdentifier: preferredIdentifier
-                )
-
-                if let taskID = result.taskID {
-                    store.syncTaskBlockWithScheduledDate(id: taskID, scheduledDate: result.startDate, calendar: calendar)
-                }
-                successMessage = "Scheduled \(task.title) for \(result.startDate.formatted(date: .omitted, time: .shortened))."
-                reloadWeekEvents()
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            }
-        }
-
+        createManagedBlock(for: task, interval: interval)
         return true
     }
 
