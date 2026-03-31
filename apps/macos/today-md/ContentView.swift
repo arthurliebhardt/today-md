@@ -79,18 +79,6 @@ private enum ContentCalendarVisibilitySelection {
     }
 }
 
-private struct MarkdownArchiveSnapshot: Equatable {
-    let id: UUID
-    let title: String
-    let listID: UUID?
-    let listName: String?
-    let blockRaw: String
-    let isDone: Bool
-    let schedulingStateRaw: String
-    let noteContent: String?
-    let noteLastModified: Date?
-}
-
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
     case calendar
@@ -718,29 +706,21 @@ struct ContentView: View {
         return try? TodayMdMarkdownArchiveService.archivePath()
     }
 
-    private var markdownArchiveSnapshots: [MarkdownArchiveSnapshot] {
-        store.allTasks
-            .map { task in
-                MarkdownArchiveSnapshot(
-                    id: task.id,
-                    title: task.title,
-                    listID: task.list?.id,
-                    listName: task.list?.name,
-                    blockRaw: task.blockRaw,
-                    isDone: task.isDone,
-                    schedulingStateRaw: task.schedulingStateRaw,
-                    noteContent: task.note?.content,
-                    noteLastModified: task.note?.lastModified
-                )
-            }
-            .sorted { $0.id.uuidString < $1.id.uuidString }
-    }
-
     private func syncMarkdownArchive() {
         guard !syncService.syncEnabled else { return }
 
         do {
             try TodayMdMarkdownArchiveService.reconcileArchive(with: store)
+        } catch {
+            presentTransferError(title: "Markdown Archive Sync Failed", error: error)
+        }
+    }
+
+    private func writeMarkdownArchive() {
+        guard !syncService.syncEnabled else { return }
+
+        do {
+            try TodayMdMarkdownArchiveService.syncNotes(for: store.allTasks)
         } catch {
             presentTransferError(title: "Markdown Archive Sync Failed", error: error)
         }
@@ -2463,8 +2443,12 @@ struct ContentView: View {
             Text(syncConflictMessage(conflict))
         }
         .onAppear {
+            store.configureMarkdownArchiveSyncHandler {
+                writeMarkdownArchive()
+            }
             syncSelectedTask()
             syncScheduledTasksIntoToday()
+            syncMarkdownArchive()
         }
         .onChange(of: selection, initial: true) { _, _ in
             syncSelectedTask()
@@ -2473,9 +2457,6 @@ struct ContentView: View {
                     showOverlaySidebar = false
                 }
             }
-        }
-        .onChange(of: markdownArchiveSnapshots, initial: true) { _, _ in
-            syncMarkdownArchive()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             handleApplicationDidBecomeActive()

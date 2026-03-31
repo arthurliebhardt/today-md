@@ -799,6 +799,35 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(resetStore.allTasks.count, 8)
     }
 
+    func testSyncNotesRemovesStaleMarkdownFilesWhenLocalSnapshotReplacesTasks() throws {
+        let archiveDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: archiveDirectoryURL, withIntermediateDirectories: true)
+
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: archiveDirectoryURL)
+        }
+
+        let originalStore = try makeStore()
+        let originalTask = originalStore.addUnassignedTask(title: "Old task", block: .today)
+        try TodayMdMarkdownArchiveService.syncNotes(for: originalStore.allTasks, to: archiveDirectoryURL)
+
+        let replacedStore = try makeStore()
+        _ = replacedStore.addUnassignedTask(title: "Imported task", block: .today)
+        try TodayMdMarkdownArchiveService.syncNotes(for: replacedStore.allTasks, to: archiveDirectoryURL)
+
+        let markdownFiles = try FileManager.default.contentsOfDirectory(
+            at: archiveDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        let markdownFilenames = markdownFiles
+            .filter { $0.pathExtension.lowercased() == "md" }
+            .map(\.lastPathComponent)
+
+        XCTAssertEqual(markdownFilenames.count, 1)
+        XCTAssertFalse(markdownFilenames.contains { $0.contains(originalTask.id.uuidString.lowercased()) })
+    }
+
     private func makeStore() throws -> TodayMdStore {
         let databaseURL = try makeDatabaseURL()
         let store = TodayMdStore(
