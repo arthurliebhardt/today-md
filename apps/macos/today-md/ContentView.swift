@@ -2378,7 +2378,7 @@ struct ContentView: View {
             Divider()
 
             if auxiliaryPanelMode == .week {
-                WeekCalendarPanelView(displayMode: .todayAndTomorrow)
+                WeekCalendarPanelView(displayMode: .upcomingWeek)
             } else if hasDetailContent {
                 detailPanel
             } else {

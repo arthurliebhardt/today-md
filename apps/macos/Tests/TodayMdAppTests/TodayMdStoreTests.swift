@@ -278,11 +278,18 @@ final class TodayMdStoreTests: XCTestCase {
     func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForDateInCurrentWeek() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .today)
-        let calendar = Calendar.current
-        let currentWeek = try XCTUnwrap(calendar.dateInterval(of: .weekOfYear, for: Date()))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let currentWeek = calendar.mondayBasedWeekInterval(containing: referenceDate)
         let dateInCurrentWeek = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: currentWeek.start))
 
-        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: dateInCurrentWeek, calendar: calendar)
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: dateInCurrentWeek,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
 
         XCTAssertEqual(task.block, .thisWeek)
         XCTAssertTrue(task.isScheduled)
@@ -312,14 +319,35 @@ final class TodayMdStoreTests: XCTestCase {
     func testSyncTaskBlockWithScheduledDateMovesTaskToBacklogForDateInNextWeek() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Inbox task", block: .today)
-        let calendar = Calendar.current
-        let currentWeek = try XCTUnwrap(calendar.dateInterval(of: .weekOfYear, for: Date()))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let currentWeek = calendar.mondayBasedWeekInterval(containing: referenceDate)
         let dateInNextWeek = currentWeek.end
 
-        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: dateInNextWeek, calendar: calendar)
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: dateInNextWeek,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
 
         XCTAssertEqual(task.block, .backlog)
         XCTAssertTrue(task.isScheduled)
+    }
+
+    func testMondayBasedWeekIntervalStartsOnMondayAndEndsOnSunday() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let expectedStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 30, hour: 0)))
+        let expectedEnd = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 6, hour: 0)))
+
+        let interval = calendar.mondayBasedWeekInterval(containing: referenceDate)
+
+        XCTAssertEqual(interval.start, expectedStart)
+        XCTAssertEqual(interval.end, expectedEnd)
     }
 
     func testPromoteScheduledTasksToTodayPreservesSchedulingState() throws {
