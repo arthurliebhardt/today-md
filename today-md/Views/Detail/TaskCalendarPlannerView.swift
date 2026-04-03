@@ -1049,11 +1049,14 @@ private enum WeekCalendarPanelStyle {
 
 enum WeekCalendarPanelDisplayMode {
     case week
+    case upcomingWeek
     case todayAndTomorrow
 
     var visibleDayCount: Int {
         switch self {
         case .week:
+            return 7
+        case .upcomingWeek:
             return 7
         case .todayAndTomorrow:
             return 2
@@ -1064,6 +1067,8 @@ enum WeekCalendarPanelDisplayMode {
         switch self {
         case .week:
             return "This Week"
+        case .upcomingWeek:
+            return "Today"
         case .todayAndTomorrow:
             return "Today"
         }
@@ -2325,13 +2330,15 @@ struct WeekCalendarPanelView: View {
         switch displayMode {
         case .week:
             return startOfWeek(for: date, calendar: calendar)
+        case .upcomingWeek:
+            return calendar.startOfDay(for: date)
         case .todayAndTomorrow:
             return calendar.startOfDay(for: date)
         }
     }
 
     private static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
-        calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
+        calendar.mondayBasedWeekInterval(containing: date).start
     }
 
     private func toggleCalendarVisibility(_ calendar: TodayMdCalendarSummary) {

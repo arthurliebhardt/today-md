@@ -832,14 +832,13 @@ final class TodayMdStore {
         let targetBlock: TimeBlock
         let referenceStartOfDay = calendar.startOfDay(for: referenceDate)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: referenceStartOfDay)
+        let currentWeek = calendar.mondayBasedWeekInterval(containing: referenceDate)
 
         if calendar.isDate(scheduledDate, inSameDayAs: referenceStartOfDay) {
             targetBlock = .today
         } else if let tomorrow, calendar.isDate(scheduledDate, inSameDayAs: tomorrow) {
             targetBlock = .thisWeek
-        } else if let currentWeek = calendar.dateInterval(of: .weekOfYear, for: referenceDate),
-                  scheduledDate >= currentWeek.start,
-                  scheduledDate < currentWeek.end {
+        } else if scheduledDate >= currentWeek.start, scheduledDate < currentWeek.end {
             targetBlock = .thisWeek
         } else {
             targetBlock = .backlog
