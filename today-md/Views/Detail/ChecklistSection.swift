@@ -1,7 +1,19 @@
 import SwiftUI
 
+enum ChecklistDraftPersistence {
+    @MainActor
+    static func commit(_ draft: inout String, taskID: UUID, store: TodayMdStore) {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        store.addChecklistItem(taskID: taskID, title: trimmed)
+        draft = ""
+    }
+}
+
 struct ChecklistSection: View {
     @Environment(TodayMdStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     let task: TaskItem
 
     @State private var newItemTitle = ""
@@ -55,10 +67,24 @@ struct ChecklistSection: View {
                         .foregroundStyle(.secondary)
                     TextField("Add task…", text: $newItemTitle)
                         .textFieldStyle(.plain)
-                        .onSubmit { addItem() }
+                        .onSubmit { commitDraftItem() }
                 }
                 .padding(.vertical, 4)
             }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .inactive, .background:
+                commitDraftItem()
+            case .active:
+                break
+            @unknown default:
+                break
+            }
+        }
+        .onDisappear {
+            guard scenePhase != .active else { return }
+            commitDraftItem()
         }
     }
 
@@ -93,8 +119,7 @@ struct ChecklistSection: View {
         .padding(.vertical, 2)
     }
 
-    private func addItem() {
-        store.addChecklistItem(taskID: task.id, title: newItemTitle)
-        newItemTitle = ""
+    private func commitDraftItem() {
+        ChecklistDraftPersistence.commit(&newItemTitle, taskID: task.id, store: store)
     }
 }

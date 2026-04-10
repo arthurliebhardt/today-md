@@ -243,6 +243,35 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(persistedTask.block, .today)
     }
 
+    func testChecklistDraftPersistenceCommitsDraftIntoChecklist() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Parent", block: .today)
+        var draft = "  Follow up with design  "
+
+        ChecklistDraftPersistence.commit(&draft, taskID: task.id, store: store)
+
+        XCTAssertEqual(draft, "")
+        XCTAssertEqual(task.checklistItems.map(\.title), ["Follow up with design"])
+        XCTAssertEqual(task.subtasks.map(\.title), ["Follow up with design"])
+    }
+
+    func testMarkdownNoteDraftPersistenceFlushesPendingDraft() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Parent", block: .today)
+        var pendingSave: DispatchWorkItem? = DispatchWorkItem {}
+
+        MarkdownNoteDraftPersistence.flush(
+            saveTask: &pendingSave,
+            markdownText: "- [ ] Follow up with design",
+            taskID: task.id,
+            store: store
+        )
+
+        XCTAssertNil(pendingSave)
+        XCTAssertEqual(task.note?.content, "- [ ] Follow up with design")
+        XCTAssertEqual(task.checklistItems.map(\.title), ["Follow up with design"])
+    }
+
     func testMoveTaskUnschedulesTaskWhenChangingLane() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
