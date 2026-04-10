@@ -294,6 +294,11 @@ enum ShortcutCheatsheet {
             title: "App",
             items: [
                 ShortcutItem(
+                    title: "Quick add from anywhere",
+                    shortcut: QuickAddShortcut.display,
+                    detail: "Open the floating quick-add notch, focus the field, and start typing immediately."
+                ),
+                ShortcutItem(
                     title: "Open shortcuts",
                     shortcut: "Cmd-/",
                     detail: "Open this keyboard shortcuts cheatsheet."
@@ -437,6 +442,11 @@ struct TodayMdApp: App {
             }
 
             CommandGroup(after: .help) {
+                Button("Quick Add Task") {
+                    dynamicIslandController.presentQuickAdd()
+                }
+                .keyboardShortcut(KeyEquivalent(QuickAddShortcut.keyEquivalent), modifiers: [.command, .shift])
+
                 Button("Keyboard Shortcuts") {
                     presentationState.presentKeyboardShortcuts()
                 }
