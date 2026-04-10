@@ -1122,7 +1122,7 @@ struct ContentView: View {
 
                     settingsToggleCard(
                         title: "Top Screen Notch",
-                        subtitle: "Show the floating notch when the pointer reaches the top-center edge of the screen, even outside the app window.",
+                        subtitle: "Show the floating notch when the pointer reaches the top-center edge of the screen. You can always open it directly with \(QuickAddShortcut.display).",
                         systemImage: "rectangle.topthird.inset.filled",
                         tint: .indigo,
                         isOn: $dynamicIslandController.isEnabled
@@ -1133,7 +1133,7 @@ struct ContentView: View {
                             .fill(dynamicIslandController.isEnabled ? Color.green : Color.secondary.opacity(0.5))
                             .frame(width: 10, height: 10)
 
-                        Text(dynamicIslandController.isEnabled ? "The notch is active and can appear from the screen edge." : "The notch is off and will stay hidden until you enable it again.")
+                        Text(dynamicIslandController.isEnabled ? "The notch is active and can appear from the screen edge." : "The edge trigger is off, but you can still open quick add with \(QuickAddShortcut.display).")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -1513,6 +1513,7 @@ struct ContentView: View {
 
                         shortcutPreviewRow(title: "Open shortcuts", shortcut: "Cmd-/")
                         shortcutPreviewRow(title: "Open settings", shortcut: "Toolbar")
+                        shortcutPreviewRow(title: "Quick add task", shortcut: QuickAddShortcut.display)
                         shortcutPreviewRow(title: "New task", shortcut: "Cmd-N")
                         shortcutPreviewRow(title: "Mark done", shortcut: "Cmd-Shift-D")
                     }
