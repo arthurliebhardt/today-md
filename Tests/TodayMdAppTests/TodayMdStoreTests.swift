@@ -786,6 +786,57 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(reloadedTask.note?.content, "- [x] Ship\n- Bullet\n1. Test")
     }
 
+    func testStorePreservesChecklistSubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Keep subtasks", block: .today)
+
+        store.addChecklistItem(taskID: task.id, title: "Ship 1.7.5 fix")
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Ship 1.7.5 fix"])
+        XCTAssertEqual(reloadedTask.note?.content, "- [ ] Ship 1.7.5 fix")
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.title), ["Ship 1.7.5 fix"])
+    }
+
+    func testStoreBackfillsChecklistLinesFromLegacySubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let database = try TodayMdDatabase(url: databaseURL)
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Legacy subtasks",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: [
+                        .init(
+                            id: UUID(),
+                            title: "Recovered item",
+                            isCompleted: true,
+                            sortOrder: 0
+                        )
+                    ]
+                )
+            ]
+        )
+        try database.replaceAll(with: archive)
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.allTasks.first)
+
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Recovered item"])
+        XCTAssertEqual(reloadedTask.note?.content, "- [x] Recovered item")
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.title), ["Recovered item"])
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.isChecked), [true])
+    }
+
     func testApplyRemoteArchiveNormalizesLegacyNoteMarkdown() throws {
         let store = try makeStore()
         let taskID = UUID()
