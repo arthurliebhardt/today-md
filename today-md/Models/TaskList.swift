@@ -33,7 +33,7 @@ enum TimeBlock: String, Codable, CaseIterable, Identifiable {
 }
 
 enum ListColor: String, Codable, CaseIterable, Identifiable {
-    case blue, purple, pink, red, orange, yellow, green, teal
+    case blue, purple, pink, red, orange, yellow, green, teal, brown, black
 
     var id: String { rawValue }
 
@@ -57,6 +57,10 @@ enum ListColor: String, Codable, CaseIterable, Identifiable {
             return .green
         case .teal:
             return .teal
+        case .brown:
+            return .brown
+        case .black:
+            return .black
         }
     }
 }
