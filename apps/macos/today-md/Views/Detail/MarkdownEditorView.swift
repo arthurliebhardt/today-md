@@ -1,8 +1,23 @@
 import AppKit
 import SwiftUI
 
+enum MarkdownNoteDraftPersistence {
+    @MainActor
+    static func flush(
+        saveTask: inout DispatchWorkItem?,
+        markdownText: String,
+        taskID: UUID,
+        store: TodayMdStore
+    ) {
+        saveTask?.cancel()
+        saveTask = nil
+        store.updateTaskNote(id: taskID, content: markdownText)
+    }
+}
+
 struct MarkdownEditorView: View {
     @Environment(TodayMdStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     let task: TaskItem
 
     @State private var hoveredToolbarButtonID: String?
@@ -36,7 +51,10 @@ struct MarkdownEditorView: View {
             suppressInlineNormalization = true
             loadNoteContent(task.note?.content ?? "")
         }
-        .onChange(of: task.id, initial: true) { _, _ in
+        .onChange(of: task.id, initial: true) { oldValue, newValue in
+            if oldValue != newValue {
+                flushPendingSave(taskID: oldValue)
+            }
             suppressInlineNormalization = true
             loadNoteContent(task.note?.content ?? "")
             cachedTextView = nil
@@ -51,8 +69,20 @@ struct MarkdownEditorView: View {
         .onChange(of: editorText) { oldValue, newValue in
             handleEditorChange(oldValue: oldValue, newValue: newValue)
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .inactive, .background:
+                flushPendingSave()
+            case .active:
+                break
+            @unknown default:
+                break
+            }
+        }
         .onDisappear {
             hoveredToolbarButtonID = nil
+            guard scenePhase != .active else { return }
+            flushPendingSave()
         }
     }
 
@@ -468,6 +498,15 @@ struct MarkdownEditorView: View {
 
     private func saveNote() {
         store.updateTaskNote(id: task.id, content: markdownText)
+    }
+
+    private func flushPendingSave(taskID: UUID? = nil) {
+        MarkdownNoteDraftPersistence.flush(
+            saveTask: &saveTask,
+            markdownText: markdownText,
+            taskID: taskID ?? task.id,
+            store: store
+        )
     }
 
     private var noteSurface: some View {

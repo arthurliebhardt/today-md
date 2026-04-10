@@ -1109,6 +1109,8 @@ final class TodayMdStore {
     func updateTaskNote(id: UUID, content: String, registersUndo: Bool = false) {
         guard let task = task(id: id) else { return }
         let normalized = content
+        let existingContent = task.note?.content ?? ""
+        guard existingContent != normalized else { return }
 
         performMutation(actionName: "Edit Note", registersUndo: registersUndo) {
             if normalized.isEmpty {
