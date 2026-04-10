@@ -224,7 +224,7 @@ struct SidebarView: View {
                     Button(action: {
                         store.updateList(id: list.id, name: list.name, icon: list.icon, color: color)
                     }) {
-                        Label(color.label, systemImage: list.listColor == color ? "checkmark.circle.fill" : "circle.fill")
+                        colorMenuItemLabel(color)
                     }
                 }
             }
@@ -397,5 +397,37 @@ struct SidebarView: View {
         case "paintpalette": return "Creative"
         default: return icon
         }
+    }
+
+    private func colorMenuItemLabel(_ color: ListColor) -> some View {
+        Label {
+            Text(color.label)
+        } icon: {
+            Image(nsImage: colorMenuSwatchImage(color))
+        }
+    }
+
+    private func colorMenuSwatchImage(_ color: ListColor) -> NSImage {
+        let size = NSSize(width: 12, height: 12)
+        let image = NSImage(size: size)
+
+        image.lockFocus()
+
+        let rect = NSRect(origin: .zero, size: size).insetBy(dx: 0.5, dy: 0.5)
+        let path = NSBezierPath(ovalIn: rect)
+        let fillColor = NSColor(color.color)
+        let strokeOpacity: CGFloat = [.yellow, .black].contains(color) ? 0.22 : 0.08
+
+        fillColor.setFill()
+        path.fill()
+
+        NSColor.labelColor.withAlphaComponent(strokeOpacity).setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
+
+        image.unlockFocus()
+        image.isTemplate = false
+
+        return image
     }
 }
