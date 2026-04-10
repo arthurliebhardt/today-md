@@ -1387,32 +1387,28 @@ final class TodayMdStore {
         list.items.append(task)
     }
 
-    private func removeLegacySubtasksIfNeeded() -> Bool {
+    private func backfillChecklistLinesFromSubtasksIfNeeded() -> Bool {
         var didChange = false
 
         for task in allTasks where !task.subtasks.isEmpty {
-            let mappedLineIndices = task.subtasks
-                .compactMap { task.mappedChecklistLineIndex(for: $0.id) }
-                .sorted(by: >)
+            let missingSubtasks = task.subtasks
+                .sorted { $0.sortOrder < $1.sortOrder }
+                .filter { task.mappedChecklistLineIndex(for: $0.id) == nil }
 
-            if let note = task.note, !mappedLineIndices.isEmpty {
-                var lines = note.content.components(separatedBy: "\n")
+            guard !missingSubtasks.isEmpty else { continue }
 
-                for lineIndex in mappedLineIndices where lineIndex < lines.count {
-                    lines.remove(at: lineIndex)
-                }
-
-                if lines.isEmpty {
-                    task.note = nil
-                } else {
-                    note.content = lines.joined(separator: "\n")
-                    note.lastModified = Date()
-                }
-
-                didChange = true
+            let newLines = missingSubtasks.map { subtask in
+                let marker = subtask.isCompleted ? "- [x]" : "- [ ]"
+                return "\(marker) \(subtask.title)"
             }
 
-            task.subtasks.removeAll()
+            if let note = task.note, !note.content.isEmpty {
+                note.content += "\n" + newLines.joined(separator: "\n")
+                note.lastModified = Date()
+            } else {
+                task.note = TaskNote(content: newLines.joined(separator: "\n"))
+            }
+
             didChange = true
         }
 
@@ -1436,9 +1432,9 @@ final class TodayMdStore {
     }
 
     private func sanitizeHydratedDataIfNeeded() -> Bool {
-        let removedLegacySubtasks = removeLegacySubtasksIfNeeded()
+        let backfilledChecklistLines = backfillChecklistLinesFromSubtasksIfNeeded()
         let normalizedLegacyNotes = normalizeLegacyNotesIfNeeded()
-        return removedLegacySubtasks || normalizedLegacyNotes
+        return backfilledChecklistLines || normalizedLegacyNotes
     }
 
     private func performMutation(
