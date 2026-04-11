@@ -176,6 +176,7 @@ enum ImportMode {
 @MainActor
 enum TodayMdMarkdownArchiveService {
     private static let activationReconcileDebounce: TimeInterval = 1
+    private static var lastArchiveWriteRequestedAt: Date?
     private static var lastArchiveWriteAt: Date?
 
     static func reconcileArchive(with store: TodayMdStore) throws {
@@ -184,10 +185,9 @@ enum TodayMdMarkdownArchiveService {
     }
 
     static func syncArchiveAfterApplicationDidBecomeActive(with store: TodayMdStore) throws {
-        if shouldImportExternalChangesAfterActivation() {
-            try importExternalChanges(into: store)
-        }
+        guard shouldImportExternalChangesAfterActivation() else { return }
 
+        try importExternalChanges(into: store)
         try syncNotes(for: store.allTasks)
     }
 
@@ -219,12 +219,14 @@ enum TodayMdMarkdownArchiveService {
     }
 
     static func syncNotes(for tasks: [TaskItem], to directoryURL: URL) throws {
+        markArchiveWriteRequested()
         try FileManager.default.createDirectory(
             at: directoryURL,
             withIntermediateDirectories: true,
             attributes: nil
         )
         try writeNotes(tasks, to: directoryURL, removeStaleFiles: true)
+        lastArchiveWriteAt = Date()
     }
 
     static func exportNotes(for tasks: [TaskItem], to directoryURL: URL) throws {
@@ -270,15 +272,18 @@ enum TodayMdMarkdownArchiveService {
             let fileURL = directoryURL.appendingPathComponent(noteFile.filename, isDirectory: false)
             try noteFile.content.write(to: fileURL, atomically: true, encoding: .utf8)
         }
-
-        lastArchiveWriteAt = Date()
     }
 
     private static func shouldImportExternalChangesAfterActivation(
         referenceDate: Date = Date()
     ) -> Bool {
-        guard let lastArchiveWriteAt else { return true }
-        return referenceDate.timeIntervalSince(lastArchiveWriteAt) >= activationReconcileDebounce
+        let debounceReference = lastArchiveWriteRequestedAt ?? lastArchiveWriteAt
+        guard let debounceReference else { return true }
+        return referenceDate.timeIntervalSince(debounceReference) >= activationReconcileDebounce
+    }
+
+    static func markArchiveWriteRequested(referenceDate: Date = Date()) {
+        lastArchiveWriteRequestedAt = referenceDate
     }
 
     static func archivePath() throws -> String {
