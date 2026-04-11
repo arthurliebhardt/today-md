@@ -734,7 +734,11 @@ struct ContentView: View {
             return
         }
 
-        syncMarkdownArchive()
+        do {
+            try TodayMdMarkdownArchiveService.syncArchiveAfterApplicationDidBecomeActive(with: store)
+        } catch {
+            presentTransferError(title: "Markdown Archive Sync Failed", error: error)
+        }
     }
 
     private func openMarkdownArchive() {

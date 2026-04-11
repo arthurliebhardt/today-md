@@ -1492,6 +1492,7 @@ final class TodayMdStore {
         pendingPersistWorkItem?.cancel()
         pendingPersistWorkItem = nil
         persistArchive(makeArchive(), notifySync: shouldNotifySync)
+        TodayMdMarkdownArchiveService.markArchiveWriteRequested()
         markdownArchiveSyncHandler?()
     }
 
@@ -1516,6 +1517,7 @@ final class TodayMdStore {
             pendingPersistWorkItem = nil
             persistArchive(archive, notifySync: notifySync)
             if notifyMarkdownArchive {
+                TodayMdMarkdownArchiveService.markArchiveWriteRequested()
                 markdownArchiveSyncHandler?()
             }
         case .deferred:
@@ -1539,6 +1541,10 @@ final class TodayMdStore {
         notifySync: Bool,
         notifyMarkdownArchive: Bool
     ) {
+        if notifyMarkdownArchive {
+            TodayMdMarkdownArchiveService.markArchiveWriteRequested()
+        }
+
         hasPendingSyncNotification = hasPendingSyncNotification || notifySync
         pendingPersistToken += 1
         let token = pendingPersistToken
