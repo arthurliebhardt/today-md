@@ -175,7 +175,23 @@ enum ImportMode {
 
 @MainActor
 enum TodayMdMarkdownArchiveService {
+    private static let activationReconcileDebounce: TimeInterval = 1
+    private static var lastArchiveWriteAt: Date?
+
     static func reconcileArchive(with store: TodayMdStore) throws {
+        try importExternalChanges(into: store)
+        try syncNotes(for: store.allTasks)
+    }
+
+    static func syncArchiveAfterApplicationDidBecomeActive(with store: TodayMdStore) throws {
+        if shouldImportExternalChangesAfterActivation() {
+            try importExternalChanges(into: store)
+        }
+
+        try syncNotes(for: store.allTasks)
+    }
+
+    static func importExternalChanges(into store: TodayMdStore) throws {
         let directoryURL = try archiveDirectoryURL()
         try FileManager.default.createDirectory(
             at: directoryURL,
@@ -195,8 +211,6 @@ enum TodayMdMarkdownArchiveService {
                 store.applyMarkdownArchive(mergedArchive)
             }
         }
-
-        try writeNotes(store.allTasks, to: directoryURL, removeStaleFiles: true)
     }
 
     static func syncNotes(for tasks: [TaskItem]) throws {
@@ -256,6 +270,15 @@ enum TodayMdMarkdownArchiveService {
             let fileURL = directoryURL.appendingPathComponent(noteFile.filename, isDirectory: false)
             try noteFile.content.write(to: fileURL, atomically: true, encoding: .utf8)
         }
+
+        lastArchiveWriteAt = Date()
+    }
+
+    private static func shouldImportExternalChangesAfterActivation(
+        referenceDate: Date = Date()
+    ) -> Bool {
+        guard let lastArchiveWriteAt else { return true }
+        return referenceDate.timeIntervalSince(lastArchiveWriteAt) >= activationReconcileDebounce
     }
 
     static func archivePath() throws -> String {
