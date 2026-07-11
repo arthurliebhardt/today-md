@@ -73,6 +73,7 @@ enum TodayMdObsidianBridge {
             task.creationDate = document.createdAt ?? task.creationDate
             task.list = targetList
             task.note = note(from: document, existing: task.note)
+            task.reconcileSubtasksWithMarkdownChecklist()
         }
 
         normalizeListSortOrder(&lists)

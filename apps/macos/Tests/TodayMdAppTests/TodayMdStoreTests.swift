@@ -243,6 +243,21 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(persistedTask.block, .today)
     }
 
+    func testImmediateMutationSupersedesPendingDeferredPersistence() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Initial", block: .today)
+
+        store.moveTask(id: task.id, to: .thisWeek)
+        store.updateTaskTitle(id: task.id, title: "Latest")
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.task(id: task.id))
+        XCTAssertEqual(reloadedTask.title, "Latest")
+        XCTAssertEqual(reloadedTask.block, .thisWeek)
+    }
+
     func testChecklistDraftPersistenceCommitsDraftIntoChecklist() throws {
         let store = try makeStore()
         let task = store.addUnassignedTask(title: "Parent", block: .today)
@@ -830,6 +845,74 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertEqual(reloadedTask.checklistItems.map(\.title), ["Ship 1.7.5 fix"])
     }
 
+    func testEditingMarkdownReconcilesChecklistSubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Edit checklist", block: .today)
+        store.addChecklistItem(taskID: task.id, title: "Old item")
+
+        store.updateTaskNote(
+            id: task.id,
+            content: "- [x] Renamed item\n- [ ] Added item"
+        )
+
+        XCTAssertEqual(task.subtasks.map(\.title), ["Renamed item", "Added item"])
+        XCTAssertEqual(task.subtasks.map(\.isCompleted), [true, false])
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.task(id: task.id))
+        XCTAssertEqual(reloadedTask.note?.content, "- [x] Renamed item\n- [ ] Added item")
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Renamed item", "Added item"])
+
+        reloaded.updateTaskNote(id: task.id, content: "")
+        let reloadedAfterDeletion = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let taskAfterDeletion = try XCTUnwrap(reloadedAfterDeletion.task(id: task.id))
+        XCTAssertNil(taskAfterDeletion.note)
+        XCTAssertTrue(taskAfterDeletion.subtasks.isEmpty)
+    }
+
+    func testMarkdownArchiveDeletionRemovesChecklistSubtasks() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Archive checklist", block: .today)
+        store.addChecklistItem(taskID: task.id, title: "Remove externally")
+
+        let archiveDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: archiveDirectoryURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: archiveDirectoryURL)
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let updatedAt = formatter.string(from: Date().addingTimeInterval(5))
+        let markdown = """
+        ---
+        task_id: "\(task.id.uuidString)"
+        title: "Archive checklist"
+        updated_at: "\(updatedAt)"
+        ---
+
+        """
+        let markdownURL = archiveDirectoryURL.appendingPathComponent(
+            "archive-checklist--\(task.id.uuidString).md",
+            isDirectory: false
+        )
+        try markdown.write(to: markdownURL, atomically: true, encoding: .utf8)
+
+        let mergedArchive = try XCTUnwrap(
+            TodayMdObsidianBridge.mergedArchive(
+                baseArchive: store.makeArchive(),
+                markdownDirectoryURL: archiveDirectoryURL
+            )
+        )
+        store.applyMarkdownArchive(mergedArchive)
+
+        let mergedTask = try XCTUnwrap(store.task(id: task.id))
+        XCTAssertNil(mergedTask.note)
+        XCTAssertTrue(mergedTask.subtasks.isEmpty)
+    }
+
     func testStoreBackfillsChecklistLinesFromLegacySubtasksWhenReloaded() throws {
         let databaseURL = try makeDatabaseURL()
         let database = try TodayMdDatabase(url: databaseURL)
@@ -905,6 +988,31 @@ final class TodayMdStoreTests: XCTestCase {
         XCTAssertFalse(resetStore.allTasks.contains(where: { $0.title == "Existing task" }))
         XCTAssertEqual(Set(resetStore.lists.map(\.name)), ["Private", "Work"])
         XCTAssertEqual(resetStore.allTasks.count, 8)
+    }
+
+    func testMergeImportRemapsIdentifiersAndPersistsCopies() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let list = store.addList(name: "Imported", icon: "tray", color: .teal)
+        let listedTask = try XCTUnwrap(store.addTask(title: "Listed", block: .today, listID: list.id))
+        store.addChecklistItem(taskID: listedTask.id, title: "Nested")
+        _ = store.addUnassignedTask(title: "Unassigned", block: .backlog)
+        let archive = store.makeArchive()
+
+        store.applyImport(archive, mode: .merge)
+
+        XCTAssertEqual(store.lists.count, 2)
+        XCTAssertEqual(store.allTasks.count, 4)
+        XCTAssertEqual(Set(store.lists.map(\.id)).count, store.lists.count)
+        XCTAssertEqual(Set(store.allTasks.map(\.id)).count, store.allTasks.count)
+        let subtaskIDs = store.allTasks.flatMap { $0.subtasks.map(\.id) }
+        XCTAssertEqual(Set(subtaskIDs).count, subtaskIDs.count)
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        XCTAssertEqual(reloaded.lists.count, 2)
+        XCTAssertEqual(reloaded.allTasks.count, 4)
+        XCTAssertEqual(Set(reloaded.lists.map(\.id)).count, reloaded.lists.count)
+        XCTAssertEqual(Set(reloaded.allTasks.map(\.id)).count, reloaded.allTasks.count)
     }
 
     func testSyncNotesRemovesStaleMarkdownFilesWhenLocalSnapshotReplacesTasks() throws {

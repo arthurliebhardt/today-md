@@ -122,6 +122,46 @@ final class TaskItem: Identifiable, Hashable {
         markdownSubtaskMappings().first(where: { $0.item.lineIndex == lineIndex })?.subtask.id
     }
 
+    @discardableResult
+    func reconcileSubtasksWithMarkdownChecklist() -> Bool {
+        let originalIDs = subtasks.map(\.id)
+        let originalTitles = subtasks.map(\.title)
+        let originalCompletionStates = subtasks.map(\.isCompleted)
+        let originalSortOrders = subtasks.map(\.sortOrder)
+        var remainingSubtasksByTitle = Dictionary(
+            grouping: subtasks.sorted { $0.sortOrder < $1.sortOrder },
+            by: { MarkdownChecklistItem.normalize($0.title) }
+        )
+        var reconciledSubtasks: [SubTask] = []
+
+        for (sortOrder, item) in checklistItems.enumerated() {
+            var matchingSubtasks = remainingSubtasksByTitle[item.normalizedTitle] ?? []
+            let subtask: SubTask
+
+            if matchingSubtasks.isEmpty {
+                subtask = SubTask(
+                    title: item.title,
+                    isCompleted: item.isChecked,
+                    sortOrder: sortOrder
+                )
+            } else {
+                subtask = matchingSubtasks.removeFirst()
+                remainingSubtasksByTitle[item.normalizedTitle] = matchingSubtasks
+                subtask.title = item.title
+                subtask.isCompleted = item.isChecked
+                subtask.sortOrder = sortOrder
+            }
+
+            reconciledSubtasks.append(subtask)
+        }
+
+        subtasks = reconciledSubtasks
+        return originalIDs != reconciledSubtasks.map(\.id)
+            || originalTitles != reconciledSubtasks.map(\.title)
+            || originalCompletionStates != reconciledSubtasks.map(\.isCompleted)
+            || originalSortOrders != reconciledSubtasks.map(\.sortOrder)
+    }
+
     init(
         id: UUID = UUID(),
         title: String,

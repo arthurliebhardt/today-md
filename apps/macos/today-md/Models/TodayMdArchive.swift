@@ -87,6 +87,24 @@ struct TodayMdArchive: Codable {
         return (hydratedLists, hydratedUnassigned)
     }
 
+    func remappedForMerge() -> TodayMdArchive {
+        TodayMdArchive(
+            version: version,
+            exportedAt: exportedAt,
+            lists: lists.map { list in
+                ListArchive(
+                    id: UUID(),
+                    name: list.name,
+                    icon: list.icon,
+                    colorName: list.colorName,
+                    sortOrder: list.sortOrder,
+                    tasks: list.tasks.map { $0.remappedForMerge() }
+                )
+            },
+            unassignedTasks: unassignedTasks.map { $0.remappedForMerge() }
+        )
+    }
+
     struct ListArchive: Codable {
         let id: UUID
         let name: String
@@ -189,6 +207,27 @@ struct TodayMdArchive: Codable {
                 isDone: isDone,
                 subtasks: subtasks.map { $0.makeSubtask() },
                 note: note?.makeNote()
+            )
+        }
+
+        func remappedForMerge() -> TaskArchive {
+            TaskArchive(
+                id: UUID(),
+                title: title,
+                isDone: isDone,
+                blockRaw: blockRaw,
+                schedulingStateRaw: schedulingStateRaw,
+                sortOrder: sortOrder,
+                creationDate: creationDate,
+                note: note,
+                subtasks: subtasks.map { subtask in
+                    SubTaskArchive(
+                        id: UUID(),
+                        title: subtask.title,
+                        isCompleted: subtask.isCompleted,
+                        sortOrder: subtask.sortOrder
+                    )
+                }
             )
         }
     }

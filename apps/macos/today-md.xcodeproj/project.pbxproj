@@ -38,6 +38,15 @@
 		AA000037 /* TaskCalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000038 /* TaskCalendarPlannerView.swift */; };
 		AA000038 /* TodayMdObsidianBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000039 /* TodayMdObsidianBridge.swift */; };
 		AA000039 /* TodayMdWeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000040 /* TodayMdWeekCalendar.swift */; };
+		AA000040 /* TodayMdStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000041 /* TodayMdStore.swift */; };
+		AA000041 /* TodayMdAppSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000042 /* TodayMdAppSupport.swift */; };
+		AA000042 /* WorkspaceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000043 /* WorkspaceSupport.swift */; };
+		AA000043 /* CalendarViewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000044 /* CalendarViewSupport.swift */; };
+		AA000044 /* WeekCalendarPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000045 /* WeekCalendarPanelView.swift */; };
+		AA000045 /* WeekCalendarCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000046 /* WeekCalendarCanvasView.swift */; };
+		AA000046 /* WorkspaceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000047 /* WorkspaceCommands.swift */; };
+		AA000047 /* KeyboardShortcutMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000048 /* KeyboardShortcutMonitor.swift */; };
+		AA000048 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000049 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -75,6 +84,15 @@
 		AB000038 /* TaskCalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCalendarPlannerView.swift; sourceTree = "<group>"; };
 		AB000039 /* TodayMdObsidianBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdObsidianBridge.swift; sourceTree = "<group>"; };
 		AB000040 /* TodayMdWeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdWeekCalendar.swift; sourceTree = "<group>"; };
+		AB000041 /* TodayMdStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdStore.swift; sourceTree = "<group>"; };
+		AB000042 /* TodayMdAppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdAppSupport.swift; sourceTree = "<group>"; };
+		AB000043 /* WorkspaceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSupport.swift; sourceTree = "<group>"; };
+		AB000044 /* CalendarViewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewSupport.swift; sourceTree = "<group>"; };
+		AB000045 /* WeekCalendarPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendarPanelView.swift; sourceTree = "<group>"; };
+		AB000046 /* WeekCalendarCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendarCanvasView.swift; sourceTree = "<group>"; };
+		AB000047 /* WorkspaceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCommands.swift; sourceTree = "<group>"; };
+		AB000048 /* KeyboardShortcutMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMonitor.swift; sourceTree = "<group>"; };
+		AB000049 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +124,8 @@
 				AB000016 /* today-md.entitlements */,
 				AB000017 /* Info.plist */,
 				AB000015 /* Assets.xcassets */,
+				AD000012 /* Stores */,
+				AD000013 /* Support */,
 				AD000004 /* Models */,
 				AD000005 /* Views */,
 				AD000009 /* Helpers */,
@@ -133,6 +153,26 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		AD000012 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				AB000041 /* TodayMdStore.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		AD000013 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				AB000042 /* TodayMdAppSupport.swift */,
+				AB000043 /* WorkspaceSupport.swift */,
+				AB000044 /* CalendarViewSupport.swift */,
+				AB000047 /* WorkspaceCommands.swift */,
+				AB000048 /* KeyboardShortcutMonitor.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
 		AD000005 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -140,6 +180,7 @@
 				AD000007 /* Kanban */,
 				AD000008 /* Detail */,
 				AD000011 /* MenuBar */,
+				AD000014 /* Settings */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -171,6 +212,8 @@
 				AB000012 /* SubTaskListView.swift */,
 				AB000013 /* MarkdownEditorView.swift */,
 				AB000038 /* TaskCalendarPlannerView.swift */,
+				AB000045 /* WeekCalendarPanelView.swift */,
+				AB000046 /* WeekCalendarCanvasView.swift */,
 				AB000028 /* InlineMarkdownTextEditor.swift */,
 				AB000020 /* ChecklistSection.swift */,
 			);
@@ -199,6 +242,14 @@
 				AB000035 /* TodayMdMenuBarExtraView.swift */,
 			);
 			path = MenuBar;
+			sourceTree = "<group>";
+		};
+		AD000014 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				AB000049 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -299,6 +350,15 @@
 				AA000037 /* TaskCalendarPlannerView.swift in Sources */,
 				AA000038 /* TodayMdObsidianBridge.swift in Sources */,
 				AA000039 /* TodayMdWeekCalendar.swift in Sources */,
+				AA000040 /* TodayMdStore.swift in Sources */,
+				AA000041 /* TodayMdAppSupport.swift in Sources */,
+				AA000042 /* WorkspaceSupport.swift in Sources */,
+				AA000043 /* CalendarViewSupport.swift in Sources */,
+				AA000044 /* WeekCalendarPanelView.swift in Sources */,
+				AA000045 /* WeekCalendarCanvasView.swift in Sources */,
+				AA000046 /* WorkspaceCommands.swift in Sources */,
+				AA000047 /* KeyboardShortcutMonitor.swift in Sources */,
+				AA000048 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

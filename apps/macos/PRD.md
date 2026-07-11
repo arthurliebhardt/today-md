@@ -110,7 +110,7 @@ Each lane has an active section and a collapsible done section. Tasks are ordere
 
 ### 3.4 Custom Lists
 
-Users create lists with a name, SF Symbol icon (20+ options), and one of 8 color themes. Lists appear in the sidebar with task counts. Deleting a list orphans its tasks (moves to unassigned).
+Users create lists with a name, SF Symbol icon (20+ options), and one of 8 color themes. Lists appear in the sidebar with task counts. Deleting a list also deletes its tasks.
 
 ### 3.5 Subtasks
 

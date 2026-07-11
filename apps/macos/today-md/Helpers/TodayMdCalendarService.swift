@@ -370,6 +370,7 @@ enum CalendarTimeBlocking {
 final class TodayMdCalendarService: ObservableObject {
     private static let todayMdBlockMarker = "Created from today-md"
     private static let taskIDMarkerPrefix = "Task ID: "
+    private static let availabilitySearchDays = 14
     private static let calendarPrivacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
     private static let systemSettingsAppURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
 
@@ -491,8 +492,11 @@ final class TodayMdCalendarService: ObservableObject {
 
         let availabilityCalendars = eventStore.calendars(for: .event).filter(Self.shouldUseForAvailability)
         let startDate = nowProvider()
-        let endDate = Calendar.current.date(byAdding: .day, value: 7, to: startDate)
-            ?? startDate.addingTimeInterval(7 * 24 * 60 * 60)
+        let endDate = Calendar.current.date(
+            byAdding: .day,
+            value: Self.availabilitySearchDays,
+            to: startDate
+        ) ?? startDate.addingTimeInterval(TimeInterval(Self.availabilitySearchDays * 24 * 60 * 60))
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: availabilityCalendars)
         let events = eventStore.events(matching: predicate)
             .filter { $0.endDate > startDate }
@@ -528,7 +532,8 @@ final class TodayMdCalendarService: ObservableObject {
         return CalendarTimeBlocking.nextAvailableSlot(
             after: nowProvider(),
             durationMinutes: durationMinutes,
-            busySlots: busySlots
+            busySlots: busySlots,
+            searchDays: Self.availabilitySearchDays
         )
     }
 
@@ -595,7 +600,8 @@ final class TodayMdCalendarService: ObservableObject {
     func createBlock(
         for task: TaskItem,
         interval: DateInterval,
-        preferredCalendarIdentifier: String?
+        preferredCalendarIdentifier: String?,
+        replacingExistingManagedBlocks: Bool = false
     ) throws -> TodayMdCalendarBlockResult {
         refreshIfNeeded()
 
@@ -623,9 +629,30 @@ final class TodayMdCalendarService: ObservableObject {
         event.availability = .busy
         event.notes = Self.blockNotes(for: task)
 
+        let existingManagedBlocks = replacingExistingManagedBlocks
+            ? managedEvents(forTaskIDs: [task.id])
+            : []
+        guard existingManagedBlocks.allSatisfy({ $0.calendar.allowsContentModifications }) else {
+            throw TodayMdCalendarError.eventNotEditable
+        }
+
         do {
-            try eventStore.save(event, span: .thisEvent, commit: true)
+            try eventStore.save(
+                event,
+                span: .thisEvent,
+                commit: !replacingExistingManagedBlocks
+            )
+
+            if replacingExistingManagedBlocks {
+                for existingEvent in existingManagedBlocks {
+                    try eventStore.remove(existingEvent, span: .thisEvent, commit: false)
+                }
+                try eventStore.commit()
+            }
         } catch {
+            if replacingExistingManagedBlocks {
+                eventStore.reset()
+            }
             throw TodayMdCalendarError.failedToSave(error.localizedDescription)
         }
 
@@ -683,22 +710,7 @@ final class TodayMdCalendarService: ObservableObject {
             throw TodayMdCalendarError.fullAccessRequired
         }
 
-        let searchStart = Calendar.current.date(byAdding: .year, value: -1, to: nowProvider())
-            ?? nowProvider().addingTimeInterval(-365 * 24 * 60 * 60)
-        let searchEnd = Calendar.current.date(byAdding: .year, value: 2, to: nowProvider())
-            ?? nowProvider().addingTimeInterval(2 * 365 * 24 * 60 * 60)
-        let events = fetchEvents(
-            from: searchStart,
-            end: searchEnd,
-            calendars: eventStore.calendars(for: .event)
-        ).filter { event in
-            guard Self.isTodayMdManaged(event),
-                  let taskID = Self.taskID(from: event.notes) else {
-                return false
-            }
-
-            return taskIDs.contains(taskID)
-        }
+        let events = managedEvents(forTaskIDs: taskIDs)
 
         guard !events.isEmpty else {
             if let lastCreatedBlock, let taskID = lastCreatedBlock.taskID, taskIDs.contains(taskID) {
@@ -791,6 +803,29 @@ final class TodayMdCalendarService: ObservableObject {
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
         return eventStore.events(matching: predicate)
             .sorted(by: Self.sortEvents)
+    }
+
+    private func managedEvents(forTaskIDs taskIDs: Set<UUID>) -> [EKEvent] {
+        guard !taskIDs.isEmpty else { return [] }
+
+        let referenceDate = nowProvider()
+        let searchStart = Calendar.current.date(byAdding: .year, value: -1, to: referenceDate)
+            ?? referenceDate.addingTimeInterval(-365 * 24 * 60 * 60)
+        let searchEnd = Calendar.current.date(byAdding: .year, value: 2, to: referenceDate)
+            ?? referenceDate.addingTimeInterval(2 * 365 * 24 * 60 * 60)
+
+        return fetchEvents(
+            from: searchStart,
+            end: searchEnd,
+            calendars: eventStore.calendars(for: .event)
+        ).filter { event in
+            guard Self.isTodayMdManaged(event),
+                  let taskID = Self.taskID(from: event.notes) else {
+                return false
+            }
+
+            return taskIDs.contains(taskID)
+        }
     }
 
     private func startObservingEventStoreChanges() {
