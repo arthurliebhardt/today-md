@@ -119,6 +119,7 @@ final class GlobalDynamicIslandController: NSObject, ObservableObject {
     static let isEnabledDefaultsKey = "TodayMdGlobalDynamicIslandEnabled"
 
     private weak var store: TodayMdStore?
+    private weak var purchaseManager: TodayMdPurchaseManager?
     private let userDefaults: UserDefaults
     private let viewModel = GlobalDynamicIslandViewModel()
     private let hotKeyMonitor = GlobalQuickAddHotKeyMonitor()
@@ -181,8 +182,9 @@ final class GlobalDynamicIslandController: NSObject, ObservableObject {
         presentQuickAdd()
     }
 
-    func attach(store: TodayMdStore) {
+    func attach(store: TodayMdStore, purchaseManager: TodayMdPurchaseManager) {
         self.store = store
+        self.purchaseManager = purchaseManager
         ensurePanel()
         if isEnabled {
             startMonitorsIfNeeded()
@@ -423,7 +425,19 @@ final class GlobalDynamicIslandController: NSObject, ObservableObject {
             return
         }
 
-        _ = store.quickAddTask(title: viewModel.draftTitle, to: .today, listID: nil)
+        let normalizedTitle = viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else { return }
+
+        guard purchaseManager?.authorizeTaskCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) ?? true else {
+            hide()
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        _ = store.quickAddTask(title: normalizedTitle, to: .today, listID: nil)
         hide()
     }
 }

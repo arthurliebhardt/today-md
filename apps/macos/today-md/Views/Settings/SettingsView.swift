@@ -3,6 +3,7 @@ import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
+    case pro
     case calendar
     case data
     case shortcuts
@@ -13,6 +14,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Interface"
+        case .pro:
+            return "today-md Pro"
         case .calendar:
             return "Calendar"
         case .data:
@@ -26,6 +29,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Appearance and quick capture"
+        case .pro:
+            return "One-time lifetime unlock"
         case .calendar:
             return "Availability and time blocking"
         case .data:
@@ -39,6 +44,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "paintbrush.pointed.fill"
+        case .pro:
+            return "sparkles"
         case .calendar:
             return "calendar.badge.clock"
         case .data:
@@ -52,6 +59,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return .indigo
+        case .pro:
+            return .orange
         case .calendar:
             return .orange
         case .data:
@@ -69,6 +78,7 @@ struct SettingsView: View {
     @EnvironmentObject private var syncService: TodayMdSyncService
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
+    @EnvironmentObject private var purchaseManager: TodayMdPurchaseManager
     @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
@@ -157,7 +167,11 @@ struct SettingsView: View {
     }
 
     private var syncFolderActionTitle: String {
-        syncService.syncEnabled ? "Choose Sync Folder" : "Enable Sync"
+        if !purchaseManager.hasProAccess {
+            return "Enable Folder Sync — Pro"
+        }
+
+        return syncService.syncEnabled ? "Choose Sync Folder" : "Enable Sync"
     }
 
     private var syncFolderActionSubtitle: String {
@@ -274,6 +288,13 @@ struct SettingsView: View {
         .onAppear {
             calendarService.refreshIfNeeded()
         }
+        .task {
+            await purchaseManager.prepare()
+        }
+        .sheet(isPresented: $purchaseManager.isPaywallPresented) {
+            TodayMdProView(presentation: .sheet)
+                .environmentObject(purchaseManager)
+        }
     }
 
     var settingsSectionContent: some View {
@@ -358,6 +379,9 @@ struct SettingsView: View {
                             .stroke(Color.indigo.opacity(0.12), lineWidth: 1)
                     )
                 }
+
+            case .pro:
+                TodayMdProView(presentation: .settings)
 
             case .calendar:
                 VStack(alignment: .leading, spacing: 14) {
@@ -747,7 +771,11 @@ struct SettingsView: View {
         let isSelected = selectedSettingsSection == section
 
         return Button {
-            selectedSettingsSection = section
+            if section == .calendar, !purchaseManager.hasProAccess {
+                selectedSettingsSection = .pro
+            } else {
+                selectedSettingsSection = section
+            }
         } label: {
             HStack(spacing: 12) {
                 ZStack {
@@ -771,6 +799,12 @@ struct SettingsView: View {
                 }
 
                 Spacer()
+
+                if section == .calendar, !purchaseManager.hasProAccess {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(12)
             .background(
@@ -919,7 +953,14 @@ struct SettingsView: View {
     }
 
     private func startImport() {
-        TodayMdTransferService.importData(into: store)
+        TodayMdTransferService.importData(into: store) { archive, mode in
+            purchaseManager.authorizeImport(
+                archive,
+                mode: mode,
+                currentListCount: store.lists.count,
+                currentTaskCount: store.allTasks.count
+            )
+        }
     }
 
     private func startExport() {
@@ -933,10 +974,20 @@ struct SettingsView: View {
     }
 
     private func startSyncFolderSelection() {
+        guard purchaseManager.hasProAccess else {
+            purchaseManager.presentPaywall(message: "Folder Sync is included with the lifetime Pro unlock.")
+            return
+        }
+
         syncService.promptForFolderSelection()
     }
 
     private func syncNowFromSettings() {
+        guard purchaseManager.hasProAccess else {
+            purchaseManager.presentPaywall(message: "Folder Sync is included with the lifetime Pro unlock.")
+            return
+        }
+
         syncService.syncNow()
     }
 

@@ -19,6 +19,7 @@ let package = Package(
             path: "today-md",
             exclude: [
                 "Info.plist",
+                "PrivacyInfo.xcprivacy",
                 "today-md.entitlements"
             ],
             resources: [

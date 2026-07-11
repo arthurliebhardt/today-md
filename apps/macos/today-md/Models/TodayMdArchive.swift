@@ -9,6 +9,10 @@ struct TodayMdArchive: Codable {
     let lists: [ListArchive]
     let unassignedTasks: [TaskArchive]
 
+    var totalTaskCount: Int {
+        unassignedTasks.count + lists.reduce(0) { $0 + $1.tasks.count }
+    }
+
     init(
         version: Int = 1,
         exportedAt: Date = Date(),

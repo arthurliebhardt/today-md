@@ -1,0 +1,42 @@
+{
+  "identifier" : "13DA4AB1-0DA5-4A9D-A4BE-76E0C6D9AF5D",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : true,
+      "internalID" : "40DA01D1-C61B-4DE8-9C53-E126A0B36CDF",
+      "localizations" : [
+        {
+          "description" : "Unlock unlimited tasks and lists, Calendar Planner, Week View, and folder sync with one purchase.",
+          "displayName" : "today-md Pro Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.today-md.app.pro.lifetime",
+      "referenceName" : "today-md Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

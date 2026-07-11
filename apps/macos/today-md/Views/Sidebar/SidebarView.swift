@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(TodayMdStore.self) private var store
     @EnvironmentObject private var presentationState: AppPresentationState
+    @EnvironmentObject private var purchaseManager: TodayMdPurchaseManager
     @Binding var selection: SidebarSelection
     @Binding var workspaceMode: WorkspaceMode
 
@@ -99,7 +100,7 @@ struct SidebarView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button(action: { isAddingList = true }) {
+                Button(action: presentListCreation) {
                     Image(systemName: "plus")
                 }
                 .help("Add List")
@@ -320,6 +321,13 @@ struct SidebarView: View {
     private func addList() {
         let name = newListName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
+        guard purchaseManager.authorizeListCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) else {
+            isAddingList = false
+            return
+        }
         let list = store.addList(name: name, icon: newListIcon, color: newListColor)
         selection = .list(list.id)
         newListName = ""
@@ -330,6 +338,14 @@ struct SidebarView: View {
         if let idx = allColors.firstIndex(of: newListColor) {
             newListColor = allColors[(idx + 1) % allColors.count]
         }
+    }
+
+    private func presentListCreation() {
+        guard purchaseManager.authorizeListCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) else { return }
+        isAddingList = true
     }
 
     private func renameList(_ list: TaskList) {

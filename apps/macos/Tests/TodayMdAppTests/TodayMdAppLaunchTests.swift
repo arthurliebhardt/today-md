@@ -43,6 +43,21 @@ final class TodayMdAppLaunchTests: XCTestCase {
         XCTAssertTrue(configuration.shouldRunSyncLifecycle)
     }
 
+    func testAppStoreFirstLaunchStartsEmptyForFreeTier() {
+        let userDefaults = makeUserDefaults()
+        let configuration = TodayMdApp.makeLaunchConfiguration(
+            syncEnabled: false,
+            commerceEnabled: true,
+            userDefaults: userDefaults,
+            bundleURL: appBundleURL(),
+            executableURL: appExecutableURL()
+        )
+
+        XCTAssertFalse(configuration.shouldSeedShowcaseData)
+        XCTAssertFalse(configuration.shouldResetShowcaseData)
+        XCTAssertTrue(configuration.shouldRunSyncLifecycle)
+    }
+
     func testSwiftRunUsesDedicatedShowcaseDatabaseAndSkipsSyncLifecycle() {
         let userDefaults = makeUserDefaults()
         TodayMdApp.markHasLaunchedBefore(userDefaults: userDefaults)

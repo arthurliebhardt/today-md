@@ -47,6 +47,9 @@
 		AA000046 /* WorkspaceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000047 /* WorkspaceCommands.swift */; };
 		AA000047 /* KeyboardShortcutMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000048 /* KeyboardShortcutMonitor.swift */; };
 		AA000048 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000049 /* SettingsView.swift */; };
+		AA000049 /* TodayMdPurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000050 /* TodayMdPurchaseManager.swift */; };
+		AA000050 /* TodayMdProView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000051 /* TodayMdProView.swift */; };
+		AA000051 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AB000053 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -93,6 +96,10 @@
 		AB000047 /* WorkspaceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCommands.swift; sourceTree = "<group>"; };
 		AB000048 /* KeyboardShortcutMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMonitor.swift; sourceTree = "<group>"; };
 		AB000049 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AB000050 /* TodayMdPurchaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdPurchaseManager.swift; sourceTree = "<group>"; };
+		AB000051 /* TodayMdProView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdProView.swift; sourceTree = "<group>"; };
+		AB000052 /* today-md.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = "today-md.storekit"; sourceTree = "<group>"; };
+		AB000053 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				AD000002 /* today-md */,
+				AD000015 /* AppStore */,
 				AD000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -123,6 +131,7 @@
 				AB000036 /* GlobalDynamicIslandController.swift */,
 				AB000016 /* today-md.entitlements */,
 				AB000017 /* Info.plist */,
+				AB000053 /* PrivacyInfo.xcprivacy */,
 				AB000015 /* Assets.xcassets */,
 				AD000012 /* Stores */,
 				AD000013 /* Support */,
@@ -151,26 +160,6 @@
 				AB000022 /* TodayMdArchive.swift */,
 			);
 			path = Models;
-			sourceTree = "<group>";
-		};
-		AD000012 /* Stores */ = {
-			isa = PBXGroup;
-			children = (
-				AB000041 /* TodayMdStore.swift */,
-			);
-			path = Stores;
-			sourceTree = "<group>";
-		};
-		AD000013 /* Support */ = {
-			isa = PBXGroup;
-			children = (
-				AB000042 /* TodayMdAppSupport.swift */,
-				AB000043 /* WorkspaceSupport.swift */,
-				AB000044 /* CalendarViewSupport.swift */,
-				AB000047 /* WorkspaceCommands.swift */,
-				AB000048 /* KeyboardShortcutMonitor.swift */,
-			);
-			path = Support;
 			sourceTree = "<group>";
 		};
 		AD000005 /* Views */ = {
@@ -244,12 +233,42 @@
 			path = MenuBar;
 			sourceTree = "<group>";
 		};
+		AD000012 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				AB000041 /* TodayMdStore.swift */,
+				AB000050 /* TodayMdPurchaseManager.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		AD000013 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				AB000042 /* TodayMdAppSupport.swift */,
+				AB000043 /* WorkspaceSupport.swift */,
+				AB000044 /* CalendarViewSupport.swift */,
+				AB000047 /* WorkspaceCommands.swift */,
+				AB000048 /* KeyboardShortcutMonitor.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
 		AD000014 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
 				AB000049 /* SettingsView.swift */,
+				AB000051 /* TodayMdProView.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		AD000015 /* AppStore */ = {
+			isa = PBXGroup;
+			children = (
+				AB000052 /* today-md.storekit */,
+			);
+			path = AppStore;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -311,6 +330,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000015 /* Assets.xcassets in Resources */,
+				AA000051 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -359,6 +379,8 @@
 				AA000046 /* WorkspaceCommands.swift in Sources */,
 				AA000047 /* KeyboardShortcutMonitor.swift in Sources */,
 				AA000048 /* SettingsView.swift in Sources */,
+				AA000049 /* TodayMdPurchaseManager.swift in Sources */,
+				AA000050 /* TodayMdProView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -489,19 +511,19 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 30;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = N338K3FTHY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "today-md/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -516,19 +538,19 @@
 				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 30;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = N338K3FTHY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "today-md/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.today-md.app;
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

@@ -1,0 +1,1 @@
+tasks,todo,markdown,planner,kanban,calendar,plaintext,productivity,local,notes

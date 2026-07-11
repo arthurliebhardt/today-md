@@ -1,0 +1,3 @@
+Welcome to the Mac App Store release of today-md.
+
+This version adds the one-time today-md Pro lifetime unlock, purchase restoration, App Store-ready sandboxing, and a complete local StoreKit test configuration.

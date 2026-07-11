@@ -109,6 +109,7 @@ struct TodayMdMenuBarExtraView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var syncService: TodayMdSyncService
+    @EnvironmentObject private var purchaseManager: TodayMdPurchaseManager
     @FocusState private var isQuickAddFieldFocused: Bool
     @State private var draftTitle = ""
     @State private var selectedQuickAddListID: UUID?
@@ -546,6 +547,15 @@ struct TodayMdMenuBarExtraView: View {
     }
 
     private func submitQuickAdd() {
+        guard !trimmedDraftTitle.isEmpty else { return }
+        guard purchaseManager.authorizeTaskCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) else {
+            openWorkspace()
+            return
+        }
+
         guard store.quickAddTask(title: draftTitle, to: .today, listID: selectedQuickAddList?.id) != nil else { return }
         draftTitle = ""
         isQuickAddFieldFocused = true

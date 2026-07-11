@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 @MainActor
 enum TodayMdTransferService {
+    typealias ImportAuthorization = (TodayMdArchive, ImportMode) -> Bool
+
     private static var activePanel: NSOpenPanel?
 
     static func exportData(from store: TodayMdStore) {
@@ -56,7 +58,10 @@ enum TodayMdTransferService {
         }
     }
 
-    static func importData(into store: TodayMdStore) {
+    static func importData(
+        into store: TodayMdStore,
+        authorization: ImportAuthorization? = nil
+    ) {
         NSApp.activate(ignoringOtherApps: true)
 
         let panel = NSOpenPanel()
@@ -73,20 +78,26 @@ enum TodayMdTransferService {
 
             do {
                 guard let mode = chooseImportMode() else { return }
-                try importData(into: store, from: url, mode: mode)
+                try importData(into: store, from: url, mode: mode, authorization: authorization)
             } catch {
                 presentError(title: "Import Failed", error: error)
             }
         }
     }
 
-    static func importData(into store: TodayMdStore, from url: URL, mode: ImportMode) throws {
+    static func importData(
+        into store: TodayMdStore,
+        from url: URL,
+        mode: ImportMode,
+        authorization: ImportAuthorization? = nil
+    ) throws {
         try withSecurityScopedAccess(to: url) {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
 
             let data = try Data(contentsOf: url)
             let archive = try decoder.decode(TodayMdArchive.self, from: data)
+            guard authorization?(archive, mode) ?? true else { return }
             store.applyImport(archive, mode: mode)
         }
     }

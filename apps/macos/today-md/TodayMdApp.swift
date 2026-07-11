@@ -22,6 +22,7 @@ struct TodayMdApp: App {
     @AppStorage(TodayMdPreferenceKey.appearanceMode) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
+    @StateObject private var purchaseManager = TodayMdPurchaseManager()
     @StateObject private var syncService: TodayMdSyncService
     @StateObject private var calendarService = TodayMdCalendarService()
     @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
@@ -32,8 +33,10 @@ struct TodayMdApp: App {
     init() {
         let syncService = TodayMdSyncService()
         let userDefaults = UserDefaults.standard
+        let commerceEnabled = TodayMdPurchaseManager.commerceIsEnabled()
         let launchConfiguration = Self.makeLaunchConfiguration(
             syncEnabled: syncService.syncEnabled,
+            commerceEnabled: commerceEnabled,
             userDefaults: userDefaults,
             bundleURL: Bundle.main.bundleURL,
             executableURL: Bundle.main.executableURL
@@ -64,13 +67,19 @@ struct TodayMdApp: App {
                 .environmentObject(undoController)
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
+                .environmentObject(purchaseManager)
                 .preferredColorScheme(appearanceMode.preferredColorScheme)
                 .onAppear {
                     store.configureUndoManager(undoController.manager)
-                    dynamicIslandController.attach(store: store)
+                    dynamicIslandController.attach(store: store, purchaseManager: purchaseManager)
                     calendarService.refreshIfNeeded()
 
-                    guard shouldRunSyncLifecycle else { return }
+                    guard shouldRunSyncLifecycle, purchaseManager.hasProAccess else { return }
+                    syncService.attach(store: store)
+                    syncService.handleAppLaunchIfNeeded()
+                }
+                .onChange(of: purchaseManager.accessState) { _, accessState in
+                    guard shouldRunSyncLifecycle, accessState == .pro else { return }
                     syncService.attach(store: store)
                     syncService.handleAppLaunchIfNeeded()
                 }
@@ -82,7 +91,7 @@ struct TodayMdApp: App {
             case .active:
                 calendarService.refreshIfNeeded()
 
-                guard shouldRunSyncLifecycle else { return }
+                guard shouldRunSyncLifecycle, purchaseManager.hasProAccess else { return }
                 syncService.handleAppDidBecomeActive()
             case .inactive, .background:
                 store.flushPendingPersistence()
@@ -95,7 +104,14 @@ struct TodayMdApp: App {
 
             CommandGroup(after: .saveItem) {
                 Button("Import...") {
-                    TodayMdTransferService.importData(into: store)
+                    TodayMdTransferService.importData(into: store) { archive, mode in
+                        purchaseManager.authorizeImport(
+                            archive,
+                            mode: mode,
+                            currentListCount: store.lists.count,
+                            currentTaskCount: store.allTasks.count
+                        )
+                    }
                 }
 
                 Button("Export...") {
@@ -135,6 +151,7 @@ struct TodayMdApp: App {
                 .environmentObject(calendarService)
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
+                .environmentObject(purchaseManager)
                 .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
 
@@ -143,6 +160,7 @@ struct TodayMdApp: App {
                 .environment(store)
                 .environmentObject(syncService)
                 .environmentObject(presentationState)
+                .environmentObject(purchaseManager)
                 .preferredColorScheme(appearanceMode.preferredColorScheme)
         } label: {
             Image(nsImage: TodayMdMenuBarIcon.image)
@@ -153,6 +171,7 @@ struct TodayMdApp: App {
 
     static func makeLaunchConfiguration(
         syncEnabled: Bool,
+        commerceEnabled: Bool = false,
         userDefaults: UserDefaults,
         bundleURL: URL,
         executableURL: URL?
@@ -168,7 +187,9 @@ struct TodayMdApp: App {
 
         return LaunchConfiguration(
             databaseURL: nil,
-            shouldSeedShowcaseData: !syncEnabled && !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey),
+            shouldSeedShowcaseData: !commerceEnabled
+                && !syncEnabled
+                && !userDefaults.bool(forKey: hasLaunchedBeforeDefaultsKey),
             shouldResetShowcaseData: false,
             shouldRunSyncLifecycle: true
         )

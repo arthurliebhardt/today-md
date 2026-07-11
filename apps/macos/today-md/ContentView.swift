@@ -9,6 +9,7 @@ struct ContentView: View {
     @EnvironmentObject private var undoController: AppUndoController
     @EnvironmentObject private var presentationState: AppPresentationState
     @EnvironmentObject private var dynamicIslandController: GlobalDynamicIslandController
+    @EnvironmentObject private var purchaseManager: TodayMdPurchaseManager
     @AppStorage(TodayMdPreferenceKey.workspaceMode) private var workspaceModeRawValue = WorkspaceMode.board.rawValue
     @AppStorage(TodayMdPreferenceKey.calendarDefaultDurationMinutes) private var calendarDefaultDurationMinutes = 60
     @AppStorage(TodayMdPreferenceKey.calendarDefaultIdentifier) private var calendarDefaultIdentifier = ""
@@ -47,7 +48,7 @@ struct ContentView: View {
     }
 
     private var isBoardLayoutActive: Bool {
-        workspaceMode == .board && !store.hasActiveSearch
+        activeWorkspaceMode == .board && !store.hasActiveSearch
     }
 
     private var isListBoardSelectionActive: Bool {
@@ -60,8 +61,33 @@ struct ContentView: View {
 
     private var workspaceModeSelection: Binding<WorkspaceMode> {
         Binding(
-            get: { workspaceMode },
-            set: { workspaceModeRawValue = $0.rawValue }
+            get: { activeWorkspaceMode },
+            set: { newMode in
+                if newMode == .planner, !purchaseManager.hasProAccess {
+                    purchaseManager.presentPaywall(message: "Calendar Planner is included with the lifetime Pro unlock.")
+                    return
+                }
+
+                workspaceModeRawValue = newMode.rawValue
+            }
+        )
+    }
+
+    private var activeWorkspaceMode: WorkspaceMode {
+        purchaseManager.hasProAccess ? workspaceMode : .board
+    }
+
+    private var auxiliaryPanelModeSelection: Binding<AuxiliaryPanelMode> {
+        Binding(
+            get: { purchaseManager.hasProAccess ? auxiliaryPanelMode : .details },
+            set: { newMode in
+                if newMode == .week, !purchaseManager.hasProAccess {
+                    purchaseManager.presentPaywall(message: "The Week calendar is included with the lifetime Pro unlock.")
+                    return
+                }
+
+                auxiliaryPanelMode = newMode
+            }
         )
     }
 
@@ -111,7 +137,7 @@ struct ContentView: View {
     }
 
     private var currentVisibleTasks: [TaskItem] {
-        workspaceMode == .planner ? plannerVisibleTasks : preferredVisibleTasks
+        activeWorkspaceMode == .planner ? plannerVisibleTasks : preferredVisibleTasks
     }
 
     private var visibleFlatTasks: [TaskItem] {
@@ -302,6 +328,13 @@ struct ContentView: View {
     private func createTaskFromPlannerSheet() {
         let normalizedTitle = plannerTaskDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedTitle.isEmpty else { return }
+        guard purchaseManager.authorizeTaskCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) else {
+            showingPlannerTaskCreationSheet = false
+            return
+        }
 
         guard let task = store.quickAddTask(
             title: normalizedTitle,
@@ -325,7 +358,7 @@ struct ContentView: View {
 
 
     private func syncMarkdownArchive() {
-        guard !syncService.syncEnabled else { return }
+        guard purchaseManager.hasProAccess, !syncService.syncEnabled else { return }
 
         do {
             try TodayMdMarkdownArchiveService.reconcileArchive(with: store)
@@ -346,9 +379,13 @@ struct ContentView: View {
 
     private func handleApplicationDidBecomeActive() {
         if syncService.syncEnabled {
-            syncService.handleAppDidBecomeActive()
+            if purchaseManager.hasProAccess {
+                syncService.handleAppDidBecomeActive()
+            }
             return
         }
+
+        guard purchaseManager.hasProAccess else { return }
 
         do {
             try TodayMdMarkdownArchiveService.syncArchiveAfterApplicationDidBecomeActive(with: store)
@@ -416,6 +453,12 @@ struct ContentView: View {
 
 
     private func presentCalendarDestinationSelectionIfNeeded() {
+        guard purchaseManager.hasProAccess else {
+            showingCalendarDestinationDialog = false
+            shouldPromptForCalendarDestinationAfterConnect = false
+            return
+        }
+
         if shouldPromptForCalendarDestinationAfterConnect {
             guard !writableCalendars.isEmpty else { return }
             showingCalendarDestinationDialog = true
@@ -1114,7 +1157,7 @@ struct ContentView: View {
     @ViewBuilder
     private var inlineDetailColumn: some View {
         VStack(spacing: 0) {
-            Picker("Workspace", selection: $auxiliaryPanelMode) {
+            Picker("Workspace", selection: auxiliaryPanelModeSelection) {
                 ForEach(AuxiliaryPanelMode.allCases) { mode in
                     Text(mode.title)
                         .tag(mode)
@@ -1127,7 +1170,7 @@ struct ContentView: View {
 
             Divider()
 
-            if auxiliaryPanelMode == .week {
+            if auxiliaryPanelModeSelection.wrappedValue == .week {
                 WeekCalendarPanelView(displayMode: .upcomingWeek)
             } else if hasDetailContent {
                 detailPanel
@@ -1143,7 +1186,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainWorkspaceSurface: some View {
-        if workspaceMode == .planner {
+        if activeWorkspaceMode == .planner {
             HStack(spacing: 0) {
                 if plannerShowsSidebar && !windowIsNarrow {
                     SidebarView(
@@ -1258,7 +1301,7 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                if workspaceMode == .planner {
+                if activeWorkspaceMode == .planner {
                     Button(action: togglePlannerSidebar) {
                         Image(systemName: "sidebar.leading")
                     }
@@ -1307,6 +1350,10 @@ struct ContentView: View {
         .sheet(isPresented: $presentationState.showingKeyboardShortcuts) {
             shortcutsSheetView
         }
+        .sheet(isPresented: $purchaseManager.isPaywallPresented) {
+            TodayMdProView(presentation: .sheet)
+                .environmentObject(purchaseManager)
+        }
         .alert(item: $transferAlert) { alert in
             Alert(
                 title: Text(alert.title),
@@ -1325,6 +1372,9 @@ struct ContentView: View {
             Text(syncConflictMessage(conflict))
         }
         .onAppear {
+            Task {
+                await purchaseManager.prepare()
+            }
             store.configureMarkdownArchiveSyncHandler {
                 writeMarkdownArchive()
             }
@@ -1384,6 +1434,20 @@ struct ContentView: View {
                 }
             }
             syncSelectedTask()
+        }
+        .onChange(of: purchaseManager.accessState) { _, accessState in
+            if accessState == .pro {
+                syncMarkdownArchive()
+                presentCalendarDestinationSelectionIfNeeded()
+            }
+
+            if accessState == .free, workspaceMode == .planner {
+                workspaceModeRawValue = WorkspaceMode.board.rawValue
+            }
+
+            if accessState == .free, auxiliaryPanelMode == .week {
+                auxiliaryPanelMode = .details
+            }
         }
     }
 
@@ -1463,6 +1527,11 @@ struct ContentView: View {
     }
 
     private func addTask(title: String, block: TimeBlock) {
+        guard purchaseManager.authorizeTaskCreation(
+            currentListCount: store.lists.count,
+            currentTaskCount: store.allTasks.count
+        ) else { return }
+
         let task: TaskItem?
 
         switch selection {

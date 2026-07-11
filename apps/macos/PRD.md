@@ -14,6 +14,8 @@ today-md is a native macOS task planner built around a Kanban board with three t
 
 The app targets individuals who want a lightweight, keyboard-driven planning tool with Markdown notes and no account or subscription requirement.
 
+The Mac App Store edition provides the task board, one list, up to five total tasks, Markdown notes, search, and backup export for free. A $19.99 non-consumable lifetime purchase removes the task/list limits and unlocks Calendar Planner, Week View, folder sync, and external Markdown reconciliation. Existing data is never deleted when a user is over the free limit. Source builds and GitHub releases include the complete feature set under the MIT license.
+
 ---
 
 ## 2. Data Model

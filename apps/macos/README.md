@@ -4,6 +4,8 @@ Native macOS task manager for planning work across `Today`, `This Week`, and `Ba
 
 Built with SwiftUI, `@Observable` models, and a local SQLite store, `today-md` keeps tasks, subtasks, and Markdown notes in a lightweight local-first desktop app.
 
+The Mac App Store edition is a free download limited to **one list and five total tasks**. A **$19.99 one-time today-md Pro unlock** removes those limits and enables Calendar Planner, Week View, folder sync, and external Markdown reconciliation. Source builds and GitHub releases continue to include the complete feature set under the MIT license.
+
 ![today-md screenshot](docs/image.png)
 
 ## Features
@@ -74,7 +76,7 @@ The installer preserves an existing sandbox database and migrates older unsandbo
 
 **Manual install:**
 
-1. Unzip `today-md-v1.7.7-macos.zip`
+1. Unzip `today-md-v1.8.0-macos.zip`
 2. Move `today-md.app` to your Applications folder
 3. On first launch macOS will block the app because it's not notarized:
 
@@ -93,7 +95,7 @@ xattr -d com.apple.quarantine /Applications/today-md.app
 If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
 
 ```bash
-bash scripts/install.sh ~/Downloads/today-md-v1.7.7-macos.zip
+bash scripts/install.sh ~/Downloads/today-md-v1.8.0-macos.zip
 ```
 
 ## Data Portability
