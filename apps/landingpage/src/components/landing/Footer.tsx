@@ -1,4 +1,5 @@
 import { ScrollReveal } from "./ScrollReveal";
+import { Link } from "react-router-dom";
 
 export function Footer() {
   return (
@@ -26,6 +27,21 @@ export function Footer() {
             <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06"/>
             <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
+        </div>
+
+        <div className="mt-6 flex justify-center gap-5">
+          <Link
+            to="/privacy"
+            className="text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            to="/terms"
+            className="text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
+          >
+            Terms of Use
+          </Link>
         </div>
       </div>
     </footer>

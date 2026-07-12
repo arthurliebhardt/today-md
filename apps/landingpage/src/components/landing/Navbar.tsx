@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 export function Navbar() {
   return (
@@ -9,14 +10,14 @@ export function Navbar() {
       className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl"
     >
       <div className="max-w-[1120px] mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link to="/" aria-label="today-md home" className="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 120" width="28" height="26">
             <rect x="14" y="8" width="104" height="104" rx="31" fill="#5A462C"/>
             <rect x="35" y="29" width="62" height="62" rx="19" fill="#EE8B06"/>
             <path d="M47 61 L61 75 L86 48" fill="none" stroke="#4A3B28" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span className="text-foreground font-bold text-[15px] tracking-tight">today-md</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-3">
           
           <button
