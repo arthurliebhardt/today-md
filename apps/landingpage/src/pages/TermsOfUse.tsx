@@ -297,14 +297,12 @@ const TermsOfUse = () => {
             <section className={sectionClassName} aria-labelledby="contact">
               <h2 id="contact" className={headingClassName}>15. Contact</h2>
               <p className={paragraphClassName}>
-                For questions about these Terms or the App, open an issue at{" "}
+                For questions about these Terms or the App, email us at{" "}
                 <a
-                  href="https://github.com/arthurliebhardt/today-md/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="mailto:support@todaymd.app"
                   className={linkClassName}
                 >
-                  github.com/arthurliebhardt/today-md/issues
+                  support@todaymd.app
                 </a>
                 .
               </p>

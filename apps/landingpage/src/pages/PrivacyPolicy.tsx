@@ -207,14 +207,12 @@ const PrivacyPolicy = () => {
             <section className={sectionClassName} aria-labelledby="contact">
               <h2 id="contact" className={headingClassName}>12. Contact</h2>
               <p className={paragraphClassName}>
-                For privacy questions or requests, open an issue at{" "}
+                For privacy questions or requests, email us at{" "}
                 <a
-                  href="https://github.com/arthurliebhardt/today-md/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="mailto:support@todaymd.app"
                   className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
                 >
-                  github.com/arthurliebhardt/today-md/issues
+                  support@todaymd.app
                 </a>
                 .
               </p>
