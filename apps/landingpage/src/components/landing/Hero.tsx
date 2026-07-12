@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import appMockup from "@/assets/app-mockup.png";
 
 export function Hero() {
   return (
@@ -13,9 +12,9 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="text-foreground text-[clamp(2.5rem,7vw,5rem)] font-black tracking-[-0.04em] leading-[1.0] text-balance mb-8">
             
-            Plan the day.{" "}
+            Plan your <span className="px-2 rounded-md inline-block bg-[#f8b262]">day,</span>{" "}
             <br className="hidden sm:block" />
-            Now in <span className="px-2 rounded-md inline-block bg-[#f8b262]">Markdown</span>
+            not your tooling
           </motion.h1>
 
           <motion.p
@@ -23,7 +22,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="text-muted-foreground text-lg md:text-xl leading-relaxed max-w-xl mx-auto text-pretty mb-8">
-            A native macOS task manager for turning notes into action — across Today, This Week, and Backlog.
+            A native macOS Kanban planner with three time-based lanes. Markdown notes, keyboard shortcuts, zero cloud dependencies. Your tasks stay on your machine.
           </motion.p>
 
           <motion.div
@@ -55,13 +54,15 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}>
           
-          <div className="rounded-3xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.06)]">
-            <img
-              src={appMockup}
-              alt="today-md app showing three planning lanes — Today, This Week, and Backlog — with task cards and a Markdown notes panel"
+          <div className="rounded-xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.06)]">
+            <video
+              src="/videos/hero-demo.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
               className="w-full h-auto block"
-              loading="eager" />
-            
+            />
           </div>
         </motion.div>
 
