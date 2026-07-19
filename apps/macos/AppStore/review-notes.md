@@ -2,7 +2,7 @@
 
 today-md is a local-first macOS task planner. It does not require an account and does not operate a remote backend.
 
-The free experience includes the task board, one list, up to five total tasks, Markdown notes, search, and backup export. Existing over-limit data remains readable, editable, deletable, and exportable. The non-consumable In-App Purchase `com.today-md.app.pro.lifetime` removes the task/list limits and unlocks Calendar Planner, Week View, user-selected folder sync, and external Markdown reconciliation permanently.
+The free experience includes the task board, one list, up to five total tasks, Markdown notes, search, and backup export. Existing over-limit data remains readable, editable, deletable, and exportable. The non-consumable In-App Purchase `com.todaymd.app.pro.lifetime` removes the task/list limits and unlocks Calendar Planner, Week View, user-selected folder sync, and external Markdown reconciliation permanently.
 
 To find the purchase:
 

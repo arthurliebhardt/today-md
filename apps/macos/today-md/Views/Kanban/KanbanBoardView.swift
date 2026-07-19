@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct BoardView: View {
+    private static let minimumReadableLaneWidth: CGFloat = 260
+    private static let collapsedLaneWidth: CGFloat = 36
+    private static let laneSpacing: CGFloat = 12
+
     let tasks: (TimeBlock) -> [TaskItem]
     let doneSectionExpanded: (TimeBlock) -> Binding<Bool>
     @Binding var selectedTaskID: UUID?
@@ -48,69 +52,72 @@ struct BoardView: View {
                 .help(isFocusTodayActive ? "Expand This Week and Backlog" : "Collapse This Week and Backlog")
             }
 
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(TimeBlock.allCases) { block in
-                    if block == .backlog || block == .thisWeek {
-                        let isCollapsed = block == .backlog ? backlogCollapsed : thisWeekCollapsed
-                        if isCollapsed {
-                            collapsedLane(block: block) {
-                                if block == .backlog { backlogCollapsed = false }
-                                else { thisWeekCollapsed = false }
-                            }
-                        } else {
-                            LaneView(
-                                block: block,
-                                tasks: tasks(block),
-                                selectedTaskID: $selectedTaskID,
-                                selectedTaskIDs: $selectedTaskIDs,
-                                isFocused: focusedBlock == block,
-                                onSelect: onSelect,
-                                onAdd: { title in onAdd(title, block) },
-                                onMove: onMove,
-                                onMoveToDone: onMoveToDone,
-                                onReorderActive: { draggedID, beforeID in
-                                    onReorderInBlock(draggedID, block, beforeID)
-                                },
-                                onDelete: onDelete,
-                                onToggle: onToggle,
-                                onFocus: { focusedBlock = block },
-                                allowsAdding: allowsAdding,
-                                doneSectionExpanded: doneSectionExpanded(block),
-                                showsListBadge: showsListBadge,
-                                onCollapse: {
-                                    if block == .backlog { backlogCollapsed = true }
-                                    else { thisWeekCollapsed = true }
+            GeometryReader { proxy in
+                let collapsedLaneCount = [backlogCollapsed, thisWeekCollapsed].filter { $0 }.count
+                let expandedLaneCount = TimeBlock.allCases.count - collapsedLaneCount
+                let totalSpacing = Self.laneSpacing * CGFloat(TimeBlock.allCases.count - 1)
+                let collapsedWidth = Self.collapsedLaneWidth * CGFloat(collapsedLaneCount)
+                let availableExpandedWidth = proxy.size.width - totalSpacing - collapsedWidth
+                let expandedLaneWidth = max(
+                    Self.minimumReadableLaneWidth,
+                    availableExpandedWidth / CGFloat(max(expandedLaneCount, 1))
+                )
+
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: Self.laneSpacing) {
+                        ForEach(TimeBlock.allCases) { block in
+                            if block == .backlog || block == .thisWeek {
+                                let isCollapsed = block == .backlog ? backlogCollapsed : thisWeekCollapsed
+                                if isCollapsed {
+                                    collapsedLane(block: block) {
+                                        if block == .backlog { backlogCollapsed = false }
+                                        else { thisWeekCollapsed = false }
+                                    }
+                                } else {
+                                    lane(block: block)
+                                        .frame(width: expandedLaneWidth)
                                 }
-                            )
+                            } else {
+                                lane(block: block)
+                                    .frame(width: expandedLaneWidth)
+                            }
                         }
-                    } else {
-                        LaneView(
-                            block: block,
-                            tasks: tasks(block),
-                            selectedTaskID: $selectedTaskID,
-                            selectedTaskIDs: $selectedTaskIDs,
-                            isFocused: focusedBlock == block,
-                            onSelect: onSelect,
-                            onAdd: { title in onAdd(title, block) },
-                            onMove: onMove,
-                            onMoveToDone: onMoveToDone,
-                            onReorderActive: { draggedID, beforeID in
-                                onReorderInBlock(draggedID, block, beforeID)
-                            },
-                            onDelete: onDelete,
-                            onToggle: onToggle,
-                            onFocus: { focusedBlock = block },
-                            allowsAdding: allowsAdding,
-                            doneSectionExpanded: doneSectionExpanded(block),
-                            showsListBadge: showsListBadge
-                        )
                     }
+                    .frame(minWidth: proxy.size.width, maxHeight: .infinity, alignment: .topLeading)
                 }
+                .scrollIndicators(.automatic)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding()
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func lane(block: TimeBlock) -> some View {
+        LaneView(
+            block: block,
+            tasks: tasks(block),
+            selectedTaskID: $selectedTaskID,
+            selectedTaskIDs: $selectedTaskIDs,
+            isFocused: focusedBlock == block,
+            onSelect: onSelect,
+            onAdd: { title in onAdd(title, block) },
+            onMove: onMove,
+            onMoveToDone: onMoveToDone,
+            onReorderActive: { draggedID, beforeID in
+                onReorderInBlock(draggedID, block, beforeID)
+            },
+            onDelete: onDelete,
+            onToggle: onToggle,
+            onFocus: { focusedBlock = block },
+            allowsAdding: allowsAdding,
+            doneSectionExpanded: doneSectionExpanded(block),
+            showsListBadge: showsListBadge,
+            onCollapse: block == .today ? nil : {
+                if block == .backlog { backlogCollapsed = true }
+                else { thisWeekCollapsed = true }
+            }
+        )
     }
 
     private func collapsedLane(block: TimeBlock, expand: @escaping () -> Void) -> some View {
@@ -136,7 +143,7 @@ struct BoardView: View {
             .buttonStyle(.plain)
             Spacer()
         }
-        .frame(width: 36)
+        .frame(width: Self.collapsedLaneWidth)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))

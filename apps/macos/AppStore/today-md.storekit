@@ -6,16 +6,16 @@
   "products" : [
     {
       "displayPrice" : "19.99",
-      "familyShareable" : true,
+      "familyShareable" : false,
       "internalID" : "40DA01D1-C61B-4DE8-9C53-E126A0B36CDF",
       "localizations" : [
         {
-          "description" : "Unlock unlimited tasks and lists, Calendar Planner, Week View, and folder sync with one purchase.",
+          "description" : "Unlimited tasks, lists, calendar, week view, and sync.",
           "displayName" : "today-md Pro Lifetime",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.today-md.app.pro.lifetime",
+      "productID" : "com.todaymd.app.pro.lifetime",
       "referenceName" : "today-md Pro Lifetime",
       "type" : "NonConsumable"
     }

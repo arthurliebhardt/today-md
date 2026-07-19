@@ -24,7 +24,7 @@ final class TodayMdPurchaseManagerTests: XCTestCase {
     func testLifetimeProductIdentifierMatchesSubmissionMetadata() {
         XCTAssertEqual(
             TodayMdPurchaseManager.lifetimeProductID,
-            "com.today-md.app.pro.lifetime"
+            "com.todaymd.app.pro.lifetime"
         )
     }
 

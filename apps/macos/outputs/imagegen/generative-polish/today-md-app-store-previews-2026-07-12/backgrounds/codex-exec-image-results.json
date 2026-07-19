@@ -1,0 +1,16 @@
+{
+  "status": "complete",
+  "total": 1,
+  "complete": 1,
+  "failed": 0,
+  "pending": 0,
+  "results": [
+    {
+      "id": "today-md-light-polish",
+      "status": "complete",
+      "image_path": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/backgrounds/today-md-light-polish.png",
+      "error": null,
+      "caveats": ""
+    }
+  ]
+}

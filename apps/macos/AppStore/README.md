@@ -8,9 +8,9 @@ App Store and TestFlight installs contain an App Store receipt, which enables th
 2. Accept the Paid Apps Agreement and complete banking and tax details.
 3. Create a **Non-Consumable** In-App Purchase:
    - Reference name: `today-md Pro Lifetime`
-   - Product ID: `com.today-md.app.pro.lifetime`
+   - Product ID: `com.todaymd.app.pro.lifetime`
    - Price: `USD 19.99` with Apple's automatic storefront conversion
-   - Family Sharing: enabled
+   - Family Sharing: disabled
 4. Use the English localization from `today-md.storekit`.
 5. Add the first IAP to the app version submission. Include a screenshot of the Pro purchase screen in the IAP review information.
 6. Set the app itself to **Free**. The lifetime unlock is the paid product.

@@ -1,0 +1,67 @@
+{
+  "project": "today-md App Store preview gallery",
+  "status": "review",
+  "dimensions": {
+    "width": 2560,
+    "height": 1600
+  },
+  "format": "PNG, RGB, no alpha",
+  "sourceScreenshots": "/Users/arthur/dev/macaps/today-md/AppStore/screenshots/upload-ready-2560x1600",
+  "generatedPolishLayer": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/backgrounds/today-md-light-polish.png",
+  "appIcon": "/Users/arthur/dev/macaps/today-md/today-md/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+  "composition": "Deterministic Pillow layout using exact copy and supplied product screenshots.",
+  "copyRisk": "Low: capability language is limited to visible, implemented features.",
+  "slides": [
+    {
+      "id": "01-plan-today",
+      "source": "01-board-task-details.png",
+      "feature": "BOARD + TASK DETAILS",
+      "headline": "Everything important, in one calm view.",
+      "description": "Plan Today and This Week while notes and checklists stay beside every task.",
+      "accent": "#E07A00",
+      "base": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/bases/01-plan-today.png",
+      "final": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/01-plan-today.png"
+    },
+    {
+      "id": "02-organize-projects",
+      "source": "02-product-launch.png",
+      "feature": "LISTS",
+      "headline": "Organize every project your way.",
+      "description": "Create focused lists and move work between Today, This Week, and Backlog.",
+      "accent": "#C02BCF",
+      "base": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/bases/02-organize-projects.png",
+      "final": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/02-organize-projects.png"
+    },
+    {
+      "id": "03-time-blocking",
+      "source": "03-calendar-planner.png",
+      "feature": "CALENDAR PLANNER \u00b7 PRO",
+      "headline": "Turn tasks into time blocks.",
+      "description": "Plan beside your calendar and protect time for the work that matters.",
+      "accent": "#2F6FDB",
+      "base": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/bases/03-time-blocking.png",
+      "final": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/03-time-blocking.png"
+    },
+    {
+      "id": "04-week-view",
+      "source": "04-week-view.png",
+      "feature": "WEEK VIEW \u00b7 PRO",
+      "headline": "See your week without switching apps.",
+      "description": "Keep tasks and calendar events together in one focused weekly view.",
+      "accent": "#128A92",
+      "base": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/bases/04-week-view.png",
+      "final": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/04-week-view.png"
+    },
+    {
+      "id": "05-folder-sync",
+      "source": "05-folder-sync.png",
+      "feature": "FOLDER SYNC \u00b7 PRO",
+      "headline": "Markdown files that stay yours.",
+      "description": "Sync a readable archive to the folder you choose.",
+      "accent": "#269447",
+      "base": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/bases/05-folder-sync.png",
+      "final": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/05-folder-sync.png"
+    }
+  ],
+  "contactSheet": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/preview/contact-sheet.png"
+}

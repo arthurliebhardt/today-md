@@ -27,7 +27,7 @@ final class TodayMdPurchaseManager: ObservableObject {
         case restoring
     }
 
-    static let lifetimeProductID = "com.today-md.app.pro.lifetime"
+    static let lifetimeProductID = "com.todaymd.app.pro.lifetime"
     static let storeKitTestingEnvironmentKey = "TODAYMD_STOREKIT_TESTING"
 
     @Published private(set) var accessState: AccessState
