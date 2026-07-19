@@ -87,15 +87,18 @@ final class TodayMdSyncService: ObservableObject {
     private var pendingConflict: PendingSyncConflict?
     private var hasHandledInitialLaunch = false
     private var isSyncInProgress = false
+    private var isSyncLifecycleActive: Bool
 
     init(
         userDefaults: UserDefaults = .standard,
         fileManager: FileManager = .default,
-        debounceInterval: TimeInterval = 2
+        debounceInterval: TimeInterval = 2,
+        syncLifecycleActive: Bool = true
     ) {
         self.userDefaults = userDefaults
         self.fileManager = fileManager
         self.debounceInterval = debounceInterval
+        self.isSyncLifecycleActive = syncLifecycleActive
         self.persistedState = Self.loadState(from: userDefaults)
         applyPersistedState()
     }
@@ -120,7 +123,24 @@ final class TodayMdSyncService: ObservableObject {
         }
     }
 
+    func setSyncLifecycleActive(_ isActive: Bool) {
+        guard isSyncLifecycleActive != isActive else { return }
+        isSyncLifecycleActive = isActive
+
+        guard isActive else {
+            cancelPendingPush()
+            return
+        }
+
+        if hasHandledInitialLaunch {
+            syncNow()
+        } else {
+            handleAppLaunchIfNeeded()
+        }
+    }
+
     func handleAppLaunchIfNeeded() {
+        guard isSyncLifecycleActive else { return }
         guard !hasHandledInitialLaunch else { return }
         hasHandledInitialLaunch = true
         syncNow()
@@ -223,6 +243,7 @@ final class TodayMdSyncService: ObservableObject {
     }
 
     func syncNow() {
+        guard isSyncLifecycleActive else { return }
         guard syncEnabled else { return }
         guard !isSyncInProgress else { return }
         guard store != nil else { return }
@@ -287,6 +308,7 @@ final class TodayMdSyncService: ObservableObject {
             }
         }
 
+        guard isSyncLifecycleActive else { return }
         guard pendingConflict == nil else { return }
         scheduleDebouncedPush()
     }

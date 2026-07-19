@@ -31,7 +31,7 @@ struct TodayMdApp: App {
     static let hasLaunchedBeforeDefaultsKey = "TodayMdHasLaunchedBefore"
 
     init() {
-        let syncService = TodayMdSyncService()
+        let syncService = TodayMdSyncService(syncLifecycleActive: false)
         let userDefaults = UserDefaults.standard
         let commerceEnabled = TodayMdPurchaseManager.commerceIsEnabled()
         let launchConfiguration = Self.makeLaunchConfiguration(
@@ -41,16 +41,20 @@ struct TodayMdApp: App {
             bundleURL: Bundle.main.bundleURL,
             executableURL: Bundle.main.executableURL
         )
+        let store = TodayMdStore(
+            databaseURL: launchConfiguration.databaseURL,
+            shouldSeedShowcaseData: launchConfiguration.shouldSeedShowcaseData,
+            shouldResetShowcaseData: launchConfiguration.shouldResetShowcaseData
+        )
+
+        if launchConfiguration.shouldRunSyncLifecycle {
+            syncService.attach(store: store)
+        }
+
         shouldRunSyncLifecycle = launchConfiguration.shouldRunSyncLifecycle
         Self.markHasLaunchedBefore(userDefaults: userDefaults)
         _syncService = StateObject(wrappedValue: syncService)
-        _store = State(
-            initialValue: TodayMdStore(
-                databaseURL: launchConfiguration.databaseURL,
-                shouldSeedShowcaseData: launchConfiguration.shouldSeedShowcaseData,
-                shouldResetShowcaseData: launchConfiguration.shouldResetShowcaseData
-            )
-        )
+        _store = State(initialValue: store)
     }
 
     private var appearanceMode: AppAppearanceMode {
@@ -73,15 +77,14 @@ struct TodayMdApp: App {
                     store.configureUndoManager(undoController.manager)
                     dynamicIslandController.attach(store: store, purchaseManager: purchaseManager)
                     calendarService.refreshIfNeeded()
-
-                    guard shouldRunSyncLifecycle, purchaseManager.hasProAccess else { return }
-                    syncService.attach(store: store)
-                    syncService.handleAppLaunchIfNeeded()
+                    syncService.setSyncLifecycleActive(
+                        shouldRunSyncLifecycle && purchaseManager.hasProAccess
+                    )
                 }
                 .onChange(of: purchaseManager.accessState) { _, accessState in
-                    guard shouldRunSyncLifecycle, accessState == .pro else { return }
-                    syncService.attach(store: store)
-                    syncService.handleAppLaunchIfNeeded()
+                    syncService.setSyncLifecycleActive(
+                        shouldRunSyncLifecycle && accessState == .pro
+                    )
                 }
         }
         .defaultSize(width: 1500, height: 920)

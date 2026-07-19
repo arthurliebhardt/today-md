@@ -78,6 +78,43 @@ final class TodayMdSyncServiceTests: XCTestCase {
         XCTAssertNotEqual(updatedArchive.syncRevisionID, initialArchive.syncRevisionID)
     }
 
+    func testLaunchTimeMutationWhileSyncLifecycleIsPausedEntersConflictInsteadOfBeingPulledOver() throws {
+        let context = try makeContext(debounceInterval: 0.05)
+        let task = createTask(in: context.store, title: "Original")
+
+        try context.service.enableSync(at: context.syncFolderURL)
+        context.service.setSyncLifecycleActive(false)
+
+        context.store.updateTaskTitle(id: task.id, title: "Launch-time edit")
+
+        XCTAssertTrue(context.service.hasUnsyncedLocalChanges)
+        XCTAssertFalse(waitUntil(timeout: 0.2) {
+            guard let remoteTitle = try? self.readArchive(
+                at: self.syncArchiveURL(in: context.syncFolderURL)
+            ).lists.first?.tasks.first?.title else {
+                return false
+            }
+            return remoteTitle == "Launch-time edit"
+        })
+
+        let archiveURL = syncArchiveURL(in: context.syncFolderURL)
+        let remoteArchive = try readArchive(at: archiveURL)
+        try writeArchive(
+            at: archiveURL,
+            updating: remoteArchive,
+            title: "Cloud edit",
+            revisionID: "remote-revision-2",
+            updatedByDeviceID: "cloud-device"
+        )
+
+        context.service.setSyncLifecycleActive(true)
+
+        XCTAssertEqual(context.service.status, .conflict)
+        XCTAssertNotNil(context.service.conflict)
+        XCTAssertEqual(context.store.allTasks.first?.title, "Launch-time edit")
+        XCTAssertEqual(try readArchive(at: archiveURL).lists.first?.tasks.first?.title, "Cloud edit")
+    }
+
     func testRemoteNewerPullsWhenNoLocalChanges() throws {
         let context = try makeContext(debounceInterval: 5)
         _ = createTask(in: context.store, title: "Local title")
