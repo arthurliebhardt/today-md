@@ -47,13 +47,7 @@ All data lives on your Mac in a local SQLite database. No analytics, no telemetr
 
 ## Get Started
 
-**Download the latest release:**
-
-```
-curl -fsSL https://raw.githubusercontent.com/arthurliebhardt/today-md/main/scripts/install.sh | bash
-```
-
-Or grab the `.zip` from [GitHub Releases](https://github.com/arthurliebhardt/today-md/releases).
+Download the latest `.zip` from [GitHub Releases](https://github.com/arthurliebhardt/today-md/releases).
 
 Requires **macOS 14.0** or later.
 

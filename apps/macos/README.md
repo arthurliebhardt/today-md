@@ -66,16 +66,6 @@ The app stores its local data in SQLite. In development builds that is `~/Librar
 
 Download the latest `.zip` from the [Releases](https://github.com/arthurliebhardt/today-md/releases) page.
 
-**Quick install** (downloads the latest release automatically):
-
-```bash
-curl -sL https://raw.githubusercontent.com/arthurliebhardt/today-md/main/scripts/install.sh | bash
-```
-
-The installer preserves an existing sandbox database and migrates older unsandboxed data into the app container when needed.
-
-**Manual install:**
-
 1. Unzip `today-md-v1.8.0-macos.zip`
 2. Move `today-md.app` to your Applications folder
 3. On first launch macOS will block the app because it's not notarized:
@@ -90,12 +80,6 @@ Alternatively, remove the quarantine flag via Terminal before opening:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/today-md.app
-```
-
-If you already downloaded a release zip and want to install that specific file instead, pass it to the script directly:
-
-```bash
-bash scripts/install.sh ~/Downloads/today-md-v1.8.0-macos.zip
 ```
 
 ## Data Portability
