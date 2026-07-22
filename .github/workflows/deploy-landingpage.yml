@@ -1,0 +1,136 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/landingpage/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.dockerignore'
+      - '.github/workflows/deploy-landingpage.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        env:
+          KUBECONFIG_BASE64: ${{ secrets.KUBECONFIG_BASE64 }}
+        run: |
+          if [ -z "$KUBECONFIG_BASE64" ]; then
+            echo "KUBECONFIG_BASE64 is not configured for this repository."
+            exit 1
+          fi
+
+  build:
+    needs: [validate-secrets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/liebhardt-io/today-md-landingpage
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/landingpage/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=landingpage
+          cache-to: type=gha,mode=max,scope=landingpage
+
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_BASE64: ${{ secrets.KUBECONFIG_BASE64 }}
+        run: |
+          mkdir -p $HOME/.kube
+          if printf '%s' "$KUBECONFIG_BASE64" | base64 -d > $HOME/.kube/config 2>/dev/null; then
+            echo "Configured kubeconfig from base64 secret"
+          else
+            printf '%s' "$KUBECONFIG_BASE64" > $HOME/.kube/config
+            echo "Configured kubeconfig from raw secret"
+          fi
+          chmod 600 $HOME/.kube/config
+
+      - name: Deploy image
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          kubectl set image deployment/today-md-landingpage \
+            app=ghcr.io/liebhardt-io/today-md-landingpage:sha-${SHORT_SHA} \
+            -n production
+          kubectl rollout status deployment/today-md-landingpage \
+            -n production --timeout=300s
+
+      - name: Verify deployment
+        if: always()
+        run: |
+          kubectl get deployment/today-md-landingpage -n production
+          kubectl get pods -l app=today-md-landingpage -n production
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK}" ]; then exit 0; fi
+          if [ "${{ job.status }}" = "success" ]; then
+            COLOR=3066993
+            STATUS="Deployed"
+          else
+            COLOR=15158332
+            STATUS="Failed"
+          fi
+          SHORT_SHA=${GITHUB_SHA::7}
+          curl -s -o /dev/null -X POST "${DISCORD_WEBHOOK}" \
+            -H "Content-Type: application/json" \
+            -d @- <<DISCORD_EOF
+          {
+            "embeds": [{
+              "title": "${STATUS}: today-md-landingpage",
+              "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "color": ${COLOR},
+              "fields": [
+                { "name": "Domain", "value": "[todaymd.app](https://todaymd.app)", "inline": true },
+                { "name": "Branch", "value": "`${{ github.ref_name }}`", "inline": true },
+                { "name": "Commit", "value": "[`${SHORT_SHA}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})", "inline": true },
+                { "name": "Actor", "value": "${{ github.actor }}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          DISCORD_EOF

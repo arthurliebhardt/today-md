@@ -1,0 +1,14 @@
+.git
+.github
+.gitignore
+**/node_modules
+**/.build
+**/build
+**/.turbo
+**/dist
+**/coverage
+**/.env*
+**/.DS_Store
+**/*.log
+playwright-report
+test-results

@@ -1,0 +1,19 @@
+{
+  "name": "today-md",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "build": "turbo run build",
+    "build:landingpage": "turbo run build --filter=@today-md/landingpage",
+    "build:macos": "turbo run build --filter=@today-md/macos",
+    "dev": "turbo run dev",
+    "dev:landingpage": "turbo run dev --filter=@today-md/landingpage",
+    "dev:macos": "turbo run dev --filter=@today-md/macos",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.17"
+  }
+}

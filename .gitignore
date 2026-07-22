@@ -1,0 +1,30 @@
+# Dependencies and task caches
+node_modules/
+.turbo/
+
+# Build outputs
+.build/
+build/
+DerivedData/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Environment files
+.env*
+!.env.example
+
+# Xcode user state
+*.xcuserstate
+xcuserdata/
+
+# Local tooling and miscellaneous files
+.codex/
+.claude/worktrees/
+.DS_Store
+*.log
+.vercel/
