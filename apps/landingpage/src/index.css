@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 34 33% 94%;
+    --background-deep: 32 30% 89%;
+    --foreground: 220 14% 10%;
+
+    --card: 34 30% 96%;
+    --card-foreground: 220 14% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 10%;
+
+    --primary: 32 78% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 68% 59%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 34 20% 88%;
+    --muted-foreground: 220 6% 44%;
+
+    --accent: 32 78% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 30 18% 82%;
+    --input: 30 18% 82%;
+    --ring: 32 78% 53%;
+
+    --radius: 0.75rem;
+
+    --neutral-accent: 220 6% 58%;
+
+    --highlight: 340 70% 85%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    overflow-wrap: break-word;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .bg-section-alt {
+    background-color: hsl(var(--background-deep));
+  }
+  .bg-highlight {
+    background-color: hsl(var(--highlight));
+  }
+}

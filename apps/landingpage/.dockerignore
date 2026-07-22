@@ -1,0 +1,8 @@
+node_modules
+dist
+.git
+.github
+npm-debug.log*
+Dockerfile
+playwright-report
+test-results
