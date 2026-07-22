@@ -6,6 +6,7 @@ struct TodayMdArchive: Codable {
     let syncRevisionID: String?
     let syncUpdatedAt: Date?
     let syncUpdatedByDeviceID: String?
+    let syncVersionVector: [String: Int]?
     let lists: [ListArchive]
     let unassignedTasks: [TaskArchive]
 
@@ -19,6 +20,7 @@ struct TodayMdArchive: Codable {
         syncRevisionID: String? = nil,
         syncUpdatedAt: Date? = nil,
         syncUpdatedByDeviceID: String? = nil,
+        syncVersionVector: [String: Int]? = nil,
         lists: [ListArchive],
         unassignedTasks: [TaskArchive]
     ) {
@@ -27,6 +29,7 @@ struct TodayMdArchive: Codable {
         self.syncRevisionID = syncRevisionID
         self.syncUpdatedAt = syncUpdatedAt
         self.syncUpdatedByDeviceID = syncUpdatedByDeviceID
+        self.syncVersionVector = syncVersionVector
         self.lists = lists
         self.unassignedTasks = unassignedTasks
     }
@@ -37,13 +40,15 @@ struct TodayMdArchive: Codable {
         exportedAt: Date = Date(),
         syncRevisionID: String? = nil,
         syncUpdatedAt: Date? = nil,
-        syncUpdatedByDeviceID: String? = nil
+        syncUpdatedByDeviceID: String? = nil,
+        syncVersionVector: [String: Int]? = nil
     ) {
         self.version = 1
         self.exportedAt = exportedAt
         self.syncRevisionID = syncRevisionID
         self.syncUpdatedAt = syncUpdatedAt
         self.syncUpdatedByDeviceID = syncUpdatedByDeviceID
+        self.syncVersionVector = syncVersionVector
         self.lists = lists
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { list in

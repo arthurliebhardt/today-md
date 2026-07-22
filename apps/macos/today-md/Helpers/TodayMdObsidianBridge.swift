@@ -79,7 +79,15 @@ enum TodayMdObsidianBridge {
         normalizeListSortOrder(&lists)
         normalizeTaskSortOrder(in: &lists, unassignedTasks: &unassignedTasks)
 
-        return TodayMdArchive(lists: lists, unassignedTasks: unassignedTasks)
+        return TodayMdArchive(
+            lists: lists,
+            unassignedTasks: unassignedTasks,
+            exportedAt: archive.exportedAt,
+            syncRevisionID: archive.syncRevisionID,
+            syncUpdatedAt: archive.syncUpdatedAt,
+            syncUpdatedByDeviceID: archive.syncUpdatedByDeviceID,
+            syncVersionVector: archive.syncVersionVector
+        )
     }
 
     private static func loadDocuments(

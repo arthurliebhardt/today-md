@@ -42,11 +42,19 @@ private struct PendingSyncConflict {
     let remoteArchive: TodayMdArchive
 }
 
+private enum VersionVectorRelation {
+    case equal
+    case before
+    case after
+    case concurrent
+}
+
 private struct TodayMdSyncPersistedState: Codable {
     var deviceID: String
     var bookmarkData: Data?
     var lastKnownFolderPath: String?
     var lastSyncedRevision: String?
+    var lastSyncedVersionVector: [String: Int]?
     var lastSyncAt: Date?
     var lastError: String?
     var syncEnabled: Bool
@@ -59,6 +67,7 @@ private struct TodayMdSyncPersistedState: Codable {
             bookmarkData: nil,
             lastKnownFolderPath: nil,
             lastSyncedRevision: nil,
+            lastSyncedVersionVector: [:],
             lastSyncAt: nil,
             lastError: nil,
             syncEnabled: false,
@@ -191,6 +200,7 @@ final class TodayMdSyncService: ObservableObject {
             state.bookmarkData = bookmarkData
             state.lastKnownFolderPath = folderURL.path
             state.lastSyncedRevision = nil
+            state.lastSyncedVersionVector = [:]
             state.lastSyncAt = nil
             state.lastError = nil
             state.syncEnabled = true
@@ -210,6 +220,7 @@ final class TodayMdSyncService: ObservableObject {
             state.bookmarkData = nil
             state.lastKnownFolderPath = nil
             state.lastSyncedRevision = nil
+            state.lastSyncedVersionVector = [:]
             state.lastSyncAt = nil
             state.lastError = nil
             state.syncEnabled = false
@@ -273,24 +284,44 @@ final class TodayMdSyncService: ObservableObject {
 
         do {
             let folderURL = try resolvedFolderURL()
-            try withSecurityScopedAccess(to: folderURL) {
+            let didResolve = try withSecurityScopedAccess(to: folderURL) { () -> Bool in
+                let latestRemoteArchive = try loadRemoteArchiveIfPresent(from: folderURL)
+                guard try remoteArchive(latestRemoteArchive, matches: pendingConflict.remoteArchive) else {
+                    guard let latestRemoteArchive else {
+                        throw TodayMdSyncError.remoteSnapshotChanged
+                    }
+                    enterConflict(
+                        localArchive: localArchiveSnapshot(from: store),
+                        remoteArchive: latestRemoteArchive
+                    )
+                    return false
+                }
+
                 switch resolution {
                 case .useRemote:
                     try writeConflictBackup(for: pendingConflict.localArchive, prefix: "local", in: folderURL)
                     store.applyRemoteArchive(pendingConflict.remoteArchive)
                     updatePersistedState { state in
                         state.lastSyncedRevision = try? TodayMdObsidianBridge.contentRevisionID(for: pendingConflict.remoteArchive)
+                        state.lastSyncedVersionVector = pendingConflict.remoteArchive.syncVersionVector ?? [:]
                         state.lastSyncAt = Date()
                         state.lastError = nil
                         state.hasUnsyncedLocalChanges = false
                         state.status = .idle
                     }
+                    return true
                 case .keepLocal:
                     try writeConflictBackup(for: pendingConflict.remoteArchive, prefix: "cloud", in: folderURL)
-                    try pushLocalSnapshot(from: store, to: folderURL)
+                    return try pushLocalSnapshot(
+                        from: store,
+                        to: folderURL,
+                        expectedRemoteArchive: pendingConflict.remoteArchive,
+                        mergingVersionVector: pendingConflict.remoteArchive.syncVersionVector ?? [:]
+                    )
                 }
             }
 
+            guard didResolve else { return }
             self.pendingConflict = nil
             conflict = nil
         } catch {
@@ -322,7 +353,15 @@ final class TodayMdSyncService: ObservableObject {
 
             let remoteArchive = try loadRemoteArchiveIfPresent(from: folderURL)
             if let remoteArchive, remoteArchiveIsNew(remoteArchive) {
-                if persistedState.hasUnsyncedLocalChanges {
+                // Descendants are ordinary later edits. An ancestor or incomparable
+                // vector means another writer replaced or branched from our revision.
+                let versionRelation = Self.compareVersionVector(
+                    remoteArchive.syncVersionVector ?? [:],
+                    to: persistedState.lastSyncedVersionVector ?? [:]
+                )
+                if persistedState.hasUnsyncedLocalChanges
+                    || versionRelation == .before
+                    || versionRelation == .concurrent {
                     enterConflict(localArchive: localArchiveSnapshot(from: store), remoteArchive: remoteArchive)
                     return
                 }
@@ -333,6 +372,7 @@ final class TodayMdSyncService: ObservableObject {
                 let effectiveRevisionID = try TodayMdObsidianBridge.contentRevisionID(for: remoteArchive)
                 updatePersistedState { state in
                     state.lastSyncedRevision = effectiveRevisionID
+                    state.lastSyncedVersionVector = remoteArchive.syncVersionVector ?? [:]
                     state.lastSyncAt = Date()
                     state.lastError = nil
                     state.hasUnsyncedLocalChanges = false
@@ -342,7 +382,11 @@ final class TodayMdSyncService: ObservableObject {
             }
 
             if persistedState.hasUnsyncedLocalChanges {
-                try pushLocalSnapshot(from: store, to: folderURL)
+                _ = try pushLocalSnapshot(
+                    from: store,
+                    to: folderURL,
+                    expectedRemoteArchive: remoteArchive
+                )
                 return
             }
 
@@ -353,13 +397,40 @@ final class TodayMdSyncService: ObservableObject {
         }
     }
 
-    private func pushLocalSnapshot(from store: TodayMdStore, to folderURL: URL) throws {
+    @discardableResult
+    private func pushLocalSnapshot(
+        from store: TodayMdStore,
+        to folderURL: URL,
+        expectedRemoteArchive: TodayMdArchive?,
+        mergingVersionVector: [String: Int] = [:]
+    ) throws -> Bool {
+        // Cloud-backed folders do not provide a reliable cross-device lock. Re-read
+        // immediately before replacing the shared snapshot as an optimistic CAS.
+        let latestRemoteArchive = try loadRemoteArchiveIfPresent(from: folderURL)
+        guard try remoteArchive(latestRemoteArchive, matches: expectedRemoteArchive) else {
+            guard let latestRemoteArchive else {
+                throw TodayMdSyncError.remoteSnapshotChanged
+            }
+            enterConflict(
+                localArchive: localArchiveSnapshot(from: store),
+                remoteArchive: latestRemoteArchive
+            )
+            return false
+        }
+
         let revisionID = UUID().uuidString.lowercased()
         let syncDate = Date()
+        var versionVector = Self.mergeVersionVectors(
+            persistedState.lastSyncedVersionVector ?? [:],
+            latestRemoteArchive?.syncVersionVector ?? [:],
+            mergingVersionVector
+        )
+        versionVector[persistedState.deviceID, default: 0] += 1
         let archive = store.makeArchive(
             syncRevisionID: revisionID,
             syncUpdatedAt: syncDate,
-            syncUpdatedByDeviceID: persistedState.deviceID
+            syncUpdatedByDeviceID: persistedState.deviceID,
+            syncVersionVector: versionVector
         )
 
         let remoteURL = Self.syncArchiveURL(in: folderURL)
@@ -369,23 +440,37 @@ final class TodayMdSyncService: ObservableObject {
             to: Self.markdownArchiveDirectoryURL(in: folderURL)
         )
 
+        // Catch a writer that became visible during our write. If it appears later,
+        // the version-vector comparison on the next sync detects the sibling revision.
+        let verifiedRemoteArchive = try loadRemoteArchiveIfPresent(from: folderURL)
+        guard try remoteArchive(verifiedRemoteArchive, matches: archive) else {
+            guard let verifiedRemoteArchive else {
+                throw TodayMdSyncError.remoteSnapshotChanged
+            }
+            enterConflict(localArchive: archive, remoteArchive: verifiedRemoteArchive)
+            return false
+        }
+
         pendingConflict = nil
         conflict = nil
         let effectiveRevisionID = try TodayMdObsidianBridge.contentRevisionID(for: archive)
         updatePersistedState { state in
             state.lastSyncedRevision = effectiveRevisionID
+            state.lastSyncedVersionVector = versionVector
             state.lastSyncAt = syncDate
             state.lastError = nil
             state.hasUnsyncedLocalChanges = false
             state.status = .idle
         }
+        return true
     }
 
     private func localArchiveSnapshot(from store: TodayMdStore) -> TodayMdArchive {
         store.makeArchive(
             syncRevisionID: persistedState.lastSyncedRevision,
             syncUpdatedAt: persistedState.lastSyncAt,
-            syncUpdatedByDeviceID: persistedState.deviceID
+            syncUpdatedByDeviceID: persistedState.deviceID,
+            syncVersionVector: persistedState.lastSyncedVersionVector ?? [:]
         )
     }
 
@@ -409,6 +494,50 @@ final class TodayMdSyncService: ObservableObject {
         }
 
         return effectiveRevisionID != persistedState.lastSyncedRevision
+    }
+
+    private func remoteArchive(
+        _ currentArchive: TodayMdArchive?,
+        matches expectedArchive: TodayMdArchive?
+    ) throws -> Bool {
+        switch (currentArchive, expectedArchive) {
+        case (nil, nil):
+            return true
+        case (.some(let currentArchive), .some(let expectedArchive)):
+            return try TodayMdObsidianBridge.contentRevisionID(for: currentArchive)
+                == TodayMdObsidianBridge.contentRevisionID(for: expectedArchive)
+                && (currentArchive.syncVersionVector ?? [:]) == (expectedArchive.syncVersionVector ?? [:])
+        case (.some, nil), (nil, .some):
+            return false
+        }
+    }
+
+    private static func compareVersionVector(
+        _ lhs: [String: Int],
+        to rhs: [String: Int]
+    ) -> VersionVectorRelation {
+        let deviceIDs = Set(lhs.keys).union(rhs.keys)
+        let lhsIsBeforeOrEqual = deviceIDs.allSatisfy { lhs[$0, default: 0] <= rhs[$0, default: 0] }
+        let rhsIsBeforeOrEqual = deviceIDs.allSatisfy { rhs[$0, default: 0] <= lhs[$0, default: 0] }
+
+        switch (lhsIsBeforeOrEqual, rhsIsBeforeOrEqual) {
+        case (true, true):
+            return .equal
+        case (true, false):
+            return .before
+        case (false, true):
+            return .after
+        case (false, false):
+            return .concurrent
+        }
+    }
+
+    private static func mergeVersionVectors(_ vectors: [String: Int]...) -> [String: Int] {
+        vectors.reduce(into: [:]) { merged, vector in
+            for (deviceID, counter) in vector {
+                merged[deviceID] = max(merged[deviceID, default: 0], counter)
+            }
+        }
     }
 
     private func loadRemoteArchiveIfPresent(from folderURL: URL) throws -> TodayMdArchive? {
@@ -491,6 +620,7 @@ final class TodayMdSyncService: ObservableObject {
             state.bookmarkData = nil
             state.lastKnownFolderPath = nil
             state.lastSyncedRevision = nil
+            state.lastSyncedVersionVector = [:]
             state.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             state.syncEnabled = false
             state.hasUnsyncedLocalChanges = false
@@ -608,6 +738,7 @@ final class TodayMdSyncService: ObservableObject {
 private enum TodayMdSyncError: LocalizedError {
     case folderNotConfigured
     case folderRequiresReselection
+    case remoteSnapshotChanged
     case storeUnavailable
 
     var errorDescription: String? {
@@ -616,6 +747,8 @@ private enum TodayMdSyncError: LocalizedError {
             return "Choose a sync folder before trying to sync."
         case .folderRequiresReselection:
             return "The sync folder is no longer available. Choose the folder again to continue syncing."
+        case .remoteSnapshotChanged:
+            return "The sync snapshot changed while today-md was saving. Your local changes were kept; sync again to resolve the conflict."
         case .storeUnavailable:
             return "The app store is unavailable."
         }

@@ -15,6 +15,7 @@ final class TodayMdSyncServiceTests: XCTestCase {
 
         let archive = try readArchive(at: archiveURL)
         XCTAssertNotNil(archive.syncRevisionID)
+        XCTAssertEqual(archive.syncVersionVector?.count, 1)
 
         let markdownDirectoryURL = context.syncFolderURL.appendingPathComponent("Markdown Archive", isDirectory: true)
         XCTAssertTrue(FileManager.default.fileExists(atPath: markdownDirectoryURL.path))
@@ -113,6 +114,85 @@ final class TodayMdSyncServiceTests: XCTestCase {
         XCTAssertNotNil(context.service.conflict)
         XCTAssertEqual(context.store.allTasks.first?.title, "Launch-time edit")
         XCTAssertEqual(try readArchive(at: archiveURL).lists.first?.tasks.first?.title, "Cloud edit")
+    }
+
+    func testConcurrentSiblingRevisionConflictsInsteadOfPullingOverLastPushedEdit() throws {
+        let context = try makeContext(debounceInterval: 5)
+        let task = createTask(in: context.store, title: "Original")
+
+        try context.service.enableSync(at: context.syncFolderURL)
+        let archiveURL = syncArchiveURL(in: context.syncFolderURL)
+        let baseArchive = try readArchive(at: archiveURL)
+        let baseVersionVector = try XCTUnwrap(baseArchive.syncVersionVector)
+
+        var siblingVersionVector = baseVersionVector
+        siblingVersionVector["mac-b", default: 0] += 1
+        let siblingArchiveURL = context.rootURL.appendingPathComponent("mac-b-sibling.json")
+        try writeArchive(
+            at: siblingArchiveURL,
+            updating: baseArchive,
+            title: "Mac B edit",
+            revisionID: "mac-b-revision",
+            updatedByDeviceID: "mac-b",
+            versionVector: siblingVersionVector
+        )
+
+        context.store.updateTaskTitle(id: task.id, title: "Mac A edit")
+        context.service.syncNow()
+
+        let macAArchive = try readArchive(at: archiveURL)
+        let macAVersionVector = try XCTUnwrap(macAArchive.syncVersionVector)
+        XCTAssertEqual(macAArchive.lists.first?.tasks.first?.title, "Mac A edit")
+        XCTAssertFalse(context.service.hasUnsyncedLocalChanges)
+
+        try Data(contentsOf: siblingArchiveURL).write(to: archiveURL, options: .atomic)
+        context.service.syncNow()
+
+        XCTAssertEqual(context.service.status, .conflict)
+        XCTAssertNotNil(context.service.conflict)
+        XCTAssertEqual(context.store.allTasks.first?.title, "Mac A edit")
+        XCTAssertEqual(try readArchive(at: archiveURL).lists.first?.tasks.first?.title, "Mac B edit")
+
+        context.service.resolveConflict(.keepLocal)
+
+        let resolvedArchive = try readArchive(at: archiveURL)
+        let resolvedVersionVector = try XCTUnwrap(resolvedArchive.syncVersionVector)
+        XCTAssertEqual(resolvedArchive.lists.first?.tasks.first?.title, "Mac A edit")
+        XCTAssertEqual(context.service.status, .idle)
+        for (deviceID, counter) in macAVersionVector {
+            XCTAssertGreaterThanOrEqual(resolvedVersionVector[deviceID, default: 0], counter)
+        }
+        for (deviceID, counter) in siblingVersionVector {
+            XCTAssertGreaterThanOrEqual(resolvedVersionVector[deviceID, default: 0], counter)
+        }
+    }
+
+    func testDescendantRemoteRevisionPullsWithoutFalseConflict() throws {
+        let context = try makeContext(debounceInterval: 5)
+        let task = createTask(in: context.store, title: "Original")
+
+        try context.service.enableSync(at: context.syncFolderURL)
+        context.store.updateTaskTitle(id: task.id, title: "Mac A edit")
+        context.service.syncNow()
+
+        let archiveURL = syncArchiveURL(in: context.syncFolderURL)
+        let macAArchive = try readArchive(at: archiveURL)
+        var descendantVersionVector = try XCTUnwrap(macAArchive.syncVersionVector)
+        descendantVersionVector["mac-b", default: 0] += 1
+        try writeArchive(
+            at: archiveURL,
+            updating: macAArchive,
+            title: "Mac B later edit",
+            revisionID: "mac-b-descendant",
+            updatedByDeviceID: "mac-b",
+            versionVector: descendantVersionVector
+        )
+
+        context.service.syncNow()
+
+        XCTAssertEqual(context.service.status, .idle)
+        XCTAssertNil(context.service.conflict)
+        XCTAssertEqual(context.store.allTasks.first?.title, "Mac B later edit")
     }
 
     func testRemoteNewerPullsWhenNoLocalChanges() throws {
@@ -419,6 +499,7 @@ final class TodayMdSyncServiceTests: XCTestCase {
         json.removeValue(forKey: "syncRevisionID")
         json.removeValue(forKey: "syncUpdatedAt")
         json.removeValue(forKey: "syncUpdatedByDeviceID")
+        json.removeValue(forKey: "syncVersionVector")
 
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let legacyData = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
@@ -430,7 +511,8 @@ final class TodayMdSyncServiceTests: XCTestCase {
         updating archive: TodayMdArchive,
         title: String,
         revisionID: String,
-        updatedByDeviceID: String
+        updatedByDeviceID: String,
+        versionVector: [String: Int]? = nil
     ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -441,6 +523,9 @@ final class TodayMdSyncServiceTests: XCTestCase {
         json["syncRevisionID"] = revisionID
         json["syncUpdatedAt"] = iso8601String(from: Date())
         json["syncUpdatedByDeviceID"] = updatedByDeviceID
+        if let versionVector {
+            json["syncVersionVector"] = versionVector
+        }
 
         if var lists = json["lists"] as? [[String: Any]],
            var firstList = lists.first,

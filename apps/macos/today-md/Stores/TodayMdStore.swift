@@ -757,20 +757,27 @@ final class TodayMdStore {
     }
 
     func makeArchive() -> TodayMdArchive {
-        makeArchive(syncRevisionID: nil, syncUpdatedAt: nil, syncUpdatedByDeviceID: nil)
+        makeArchive(
+            syncRevisionID: nil,
+            syncUpdatedAt: nil,
+            syncUpdatedByDeviceID: nil,
+            syncVersionVector: nil
+        )
     }
 
     func makeArchive(
         syncRevisionID: String?,
         syncUpdatedAt: Date?,
-        syncUpdatedByDeviceID: String?
+        syncUpdatedByDeviceID: String?,
+        syncVersionVector: [String: Int]? = nil
     ) -> TodayMdArchive {
         TodayMdArchive(
             lists: lists,
             unassignedTasks: unassignedTasks,
             syncRevisionID: syncRevisionID,
             syncUpdatedAt: syncUpdatedAt,
-            syncUpdatedByDeviceID: syncUpdatedByDeviceID
+            syncUpdatedByDeviceID: syncUpdatedByDeviceID,
+            syncVersionVector: syncVersionVector
         )
     }
 
