@@ -59,10 +59,9 @@ final class TodayMdDatabase: @unchecked Sendable {
         let normalized = query
             .split(whereSeparator: \.isWhitespace)
             .map { token -> String in
-                let cleaned = token.replacingOccurrences(of: "\"", with: "")
-                return cleaned.isEmpty ? cleaned : "\(cleaned)*"
+                let escaped = token.replacingOccurrences(of: "\"", with: "\"\"")
+                return "\"\(escaped)\"*"
             }
-            .filter { !$0.isEmpty }
             .joined(separator: " ")
 
         guard !normalized.isEmpty else { return [] }
@@ -80,9 +79,14 @@ final class TodayMdDatabase: @unchecked Sendable {
         try bind(normalized, at: 1, in: statement)
 
         var ids: [UUID] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        var result = sqlite3_step(statement)
+        while result == SQLITE_ROW {
+            defer { result = sqlite3_step(statement) }
             guard let taskID = columnText(statement, index: 0), let uuid = UUID(uuidString: taskID) else { continue }
             ids.append(uuid)
+        }
+        guard result == SQLITE_DONE else {
+            throw DatabaseError.stepFailed(message: String(cString: sqlite3_errmsg(db)))
         }
         return ids
     }

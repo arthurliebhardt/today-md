@@ -127,9 +127,10 @@ final class TodayMdSyncService: ObservableObject {
 
     func attach(store: TodayMdStore) {
         self.store = store
-        store.configureSyncHandler { [weak self] in
-            self?.handleLocalStoreChange()
-        }
+        store.configureSyncHandler(
+            onLocalChange: { [weak self] in self?.markLocalStoreChanged() },
+            onPersist: { [weak self] in self?.handleLocalStoreChange() }
+        )
     }
 
     func setSyncLifecycleActive(_ isActive: Bool) {
@@ -329,7 +330,7 @@ final class TodayMdSyncService: ObservableObject {
         }
     }
 
-    private func handleLocalStoreChange() {
+    private func markLocalStoreChanged() {
         guard syncEnabled else { return }
 
         updatePersistedState { state in
@@ -338,7 +339,10 @@ final class TodayMdSyncService: ObservableObject {
                 state.status = .idle
             }
         }
+    }
 
+    private func handleLocalStoreChange() {
+        guard syncEnabled else { return }
         guard isSyncLifecycleActive else { return }
         guard pendingConflict == nil else { return }
         scheduleDebouncedPush()

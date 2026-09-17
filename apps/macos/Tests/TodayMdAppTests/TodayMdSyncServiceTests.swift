@@ -4,6 +4,59 @@ import XCTest
 
 @MainActor
 final class TodayMdSyncServiceTests: XCTestCase {
+    func testDeferredLocalMoveEntersConflictBeforePersistenceCompletes() throws {
+        let context = try makeContext(debounceInterval: 5)
+        defer {
+            context.service.disableSync()
+            context.store.flushPendingPersistence()
+        }
+        let task = createTask(in: context.store, title: "Original")
+        try context.service.enableSync(at: context.syncFolderURL)
+        let archiveURL = syncArchiveURL(in: context.syncFolderURL)
+        try writeArchive(
+            at: archiveURL,
+            updating: readArchive(at: archiveURL),
+            title: "Cloud edit",
+            revisionID: "remote-revision",
+            updatedByDeviceID: "cloud-device"
+        )
+
+        context.store.moveTask(id: task.id, to: .backlog)
+        XCTAssertTrue(context.service.hasUnsyncedLocalChanges)
+        context.service.syncNow()
+        XCTAssertEqual(context.service.status, .conflict)
+        XCTAssertEqual(context.store.task(id: task.id)?.block, .backlog)
+
+        context.service.resolveConflict(.keepLocal)
+        XCTAssertEqual(context.service.status, .idle)
+        XCTAssertEqual(try readArchive(at: archiveURL).lists.first?.tasks.first?.blockRaw, "backlog")
+    }
+
+    func testPlainMarkdownImportRemainsStableAcrossReadsAndMacPaths() throws {
+        let first = try makeContext()
+        let second = try makeContext()
+        let modifiedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        var archives: [TodayMdArchive] = []
+        for context in [first, second] {
+            let directory = context.syncFolderURL.appendingPathComponent("Markdown Archive")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let file = directory.appendingPathComponent("new-task.md")
+            try "---\nlist: Work\n---\n\n# New task\n\nBody".write(to: file, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.modificationDate: modifiedAt], ofItemAtPath: file.path)
+            for _ in 0..<2 {
+                archives.append(try XCTUnwrap(TodayMdObsidianBridge.mergedArchive(baseArchive: nil, markdownDirectoryURL: directory)))
+            }
+        }
+        let firstTask = try XCTUnwrap(archives.first?.lists.first?.tasks.first)
+        let expectedRevision = try TodayMdObsidianBridge.contentRevisionID(for: archives[0])
+        for archive in archives {
+            let task = try XCTUnwrap(archive.lists.first?.tasks.first)
+            XCTAssertEqual(task.id, firstTask.id)
+            XCTAssertEqual(task.creationDate, modifiedAt)
+            XCTAssertEqual(try TodayMdObsidianBridge.contentRevisionID(for: archive), expectedRevision)
+        }
+    }
+
     func testEnableSyncCreatesSyncSnapshotAndMarkdownArchive() throws {
         let context = try makeContext()
         _ = createTask(in: context.store, title: "Write release notes", note: "# Notes")
@@ -290,6 +343,21 @@ final class TodayMdSyncServiceTests: XCTestCase {
         XCTAssertEqual(importedTask.block, .today)
         XCTAssertEqual(importedTask.note?.content, "- [ ] First imported checkbox")
         XCTAssertEqual(context.store.allTasks.count, 1)
+
+        context.service.syncNow()
+        XCTAssertEqual(context.store.allTasks.first?.id, importedTask.id)
+        XCTAssertEqual(context.store.lists.first?.id, importedTask.list?.id)
+        context.store.updateTaskTitle(id: importedTask.id, title: "Edited locally")
+        context.service.syncNow()
+        XCTAssertEqual(context.service.status, .idle)
+        XCTAssertNil(context.service.conflict)
+        let savedArchive = try readArchive(at: syncArchiveURL(in: context.syncFolderURL))
+        XCTAssertEqual(savedArchive.lists.first?.tasks.first?.title, "Edited locally")
+        XCTAssertEqual(savedArchive.lists.first?.tasks.first?.id, importedTask.id)
+
+        let markdownFiles = try FileManager.default.contentsOfDirectory(at: markdownDirectoryURL, includingPropertiesForKeys: nil)
+        let exportedMarkdown = try String(contentsOf: XCTUnwrap(markdownFiles.first), encoding: .utf8)
+        XCTAssertTrue(exportedMarkdown.contains(importedTask.id.uuidString))
     }
 
     func testRemoteNewerWithUnsyncedLocalChangesEntersConflict() throws {

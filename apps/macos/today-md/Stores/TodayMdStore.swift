@@ -42,6 +42,9 @@ final class TodayMdStore {
     private var syncHandler: (() -> Void)?
 
     @ObservationIgnored
+    private var localChangeHandler: (() -> Void)?
+
+    @ObservationIgnored
     private var markdownArchiveSyncHandler: (() -> Void)?
 
     @ObservationIgnored
@@ -73,7 +76,7 @@ final class TodayMdStore {
             }
 
             let archive = try database.loadArchive()
-            if applyArchive(archive, refreshSearch: false) {
+            if applyArchive(archive) {
                 persist()
             }
 
@@ -108,8 +111,9 @@ final class TodayMdStore {
         undoManager = manager
     }
 
-    func configureSyncHandler(_ handler: @escaping () -> Void) {
-        syncHandler = handler
+    func configureSyncHandler(onLocalChange: @escaping () -> Void, onPersist: @escaping () -> Void) {
+        localChangeHandler = onLocalChange
+        syncHandler = onPersist
     }
 
     func configureMarkdownArchiveSyncHandler(_ handler: @escaping () -> Void) {
@@ -782,12 +786,14 @@ final class TodayMdStore {
     }
 
     func applyRemoteArchive(_ archive: TodayMdArchive) {
-        applyArchive(archive, refreshSearch: true)
+        undoManager?.removeAllActions(withTarget: self)
+        applyArchive(archive)
         persist(notifySync: false, notifyMarkdownArchive: false)
     }
 
     func applyMarkdownArchive(_ archive: TodayMdArchive) {
-        applyArchive(archive, refreshSearch: true)
+        undoManager?.removeAllActions(withTarget: self)
+        applyArchive(archive)
         persist(notifySync: true, notifyMarkdownArchive: false)
     }
 
@@ -968,7 +974,6 @@ final class TodayMdStore {
         let previous = registersUndo ? makeArchive() : nil
         change()
         persist(using: persistenceMode)
-        refreshSearch()
         dataRevision += 1
 
         guard registersUndo, let previous else { return }
@@ -980,7 +985,7 @@ final class TodayMdStore {
 
     private func restore(from archive: TodayMdArchive, actionName: String) {
         let current = makeArchive()
-        applyArchive(archive, refreshSearch: true)
+        applyArchive(archive)
         persist(using: .immediate)
         undoManager?.registerUndo(withTarget: self) { target in
             target.restore(from: current, actionName: actionName)
@@ -989,16 +994,12 @@ final class TodayMdStore {
     }
 
     @discardableResult
-    private func applyArchive(_ archive: TodayMdArchive, refreshSearch shouldRefreshSearch: Bool) -> Bool {
+    private func applyArchive(_ archive: TodayMdArchive) -> Bool {
         let hydrated = archive.instantiate()
         lists = hydrated.lists
         unassignedTasks = hydrated.unassignedTasks
         let didSanitize = sanitizeHydratedDataIfNeeded()
         dataRevision += 1
-
-        if shouldRefreshSearch {
-            refreshSearch()
-        }
 
         return didSanitize
     }
@@ -1027,6 +1028,11 @@ final class TodayMdStore {
     ) {
         let archive = makeArchive()
 
+        // Conflict detection must see in-memory edits before a deferred save finishes.
+        if notifySync {
+            localChangeHandler?()
+        }
+
         switch mode {
         case .immediate:
             pendingPersistToken += 1
@@ -1050,6 +1056,7 @@ final class TodayMdStore {
             try persistenceQueue.sync {
                 try database.replaceAll(with: archive)
             }
+            refreshSearch()
             if notifySync {
                 syncHandler?()
             }
@@ -1076,7 +1083,7 @@ final class TodayMdStore {
         let gate = DeferredPersistenceGate()
         pendingPersistGate = gate
 
-        let operation: @Sendable () -> Void = { [database] in
+        let operation: @Sendable () -> Void = { [database, weak self] in
             guard !gate.isCancelled else { return }
 
             do {
@@ -1116,6 +1123,8 @@ final class TodayMdStore {
             assertionFailure("Failed to persist store: \(error.localizedDescription)")
             return
         }
+
+        refreshSearch()
 
         if shouldNotifySync {
             syncHandler?()
@@ -1280,4 +1289,3 @@ private enum StoreError: LocalizedError {
         }
     }
 }
-

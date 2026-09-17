@@ -37,7 +37,7 @@ enum TodayMdObsidianBridge {
         let archiveUpdatedAt = archive.syncUpdatedAt
 
         for document in documents {
-            let resolvedTaskID = document.taskID ?? UUID()
+            let resolvedTaskID = document.taskID
             let existingTask = locateTask(id: resolvedTaskID, lists: lists, unassignedTasks: unassignedTasks)
             if let existingTask,
                let documentUpdatedAt = document.updatedAt,
@@ -135,7 +135,9 @@ enum TodayMdObsidianBridge {
         }
 
         let newList = TaskList(
-            id: document.listID ?? UUID(),
+            id: document.listID ?? stableMarkdownID(
+                for: "list:" + listName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            ),
             name: listName,
             icon: "checklist",
             color: .blue,
@@ -166,7 +168,7 @@ enum TodayMdObsidianBridge {
             block: block,
             schedulingState: document.schedulingState ?? .unscheduled,
             sortOrder: 0,
-            creationDate: document.createdAt ?? Date(),
+            creationDate: document.createdAt ?? document.updatedAt ?? Date(timeIntervalSince1970: 0),
             isDone: document.isDone ?? false,
             note: note(from: document, existing: nil)
         )
@@ -277,8 +279,20 @@ enum TodayMdObsidianBridge {
     }
 }
 
+// Use portable names rather than absolute paths so all Macs derive the same IDs.
+// The normal Markdown export then embeds these IDs in frontmatter and filenames.
+private func stableMarkdownID(for key: String) -> UUID {
+    var bytes = Array(SHA256.hash(data: Data(key.precomposedStringWithCanonicalMapping.utf8)).prefix(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x80
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    return UUID(uuid: (
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    ))
+}
+
 private struct MarkdownTaskDocument {
-    let taskID: UUID?
+    let taskID: UUID
     let listID: UUID?
     let listName: String?
     let title: String?
@@ -296,6 +310,7 @@ private struct MarkdownTaskDocument {
         let body = parsed.body
 
         self.taskID = Self.uuidValue(frontmatter["task_id"]) ?? Self.uuidFromFilename(fileURL)
+            ?? stableMarkdownID(for: "task:" + fileURL.lastPathComponent)
         self.listID = Self.uuidValue(frontmatter["list_id"])
         self.listName = Self.stringValue(frontmatter["list"])
         self.title = Self.stringValue(frontmatter["title"])

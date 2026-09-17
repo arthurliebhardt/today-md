@@ -88,6 +88,8 @@ Each export creates a dated `today-md-eport-{date}` folder containing the JSON b
 
 Every task is mirrored automatically as a Markdown file in `~/Library/Application Support/today-md/Markdown Archive/`. Editing those files updates the app on the next archive reconciliation pass, and new `.md` files created there or inside a sync folder can be imported as tasks.
 
+New Markdown files without task IDs receive stable identities based on their filenames; the next archive export embeds those IDs in the files. Applying changes from folder sync or external Markdown clears earlier task undo/redo history so an undo cannot overwrite the imported changes. Subsequent local edits can still be undone.
+
 Search is powered by a local SQLite full-text index over task titles, markdown notes, and subtask text.
 
 ## Contributing

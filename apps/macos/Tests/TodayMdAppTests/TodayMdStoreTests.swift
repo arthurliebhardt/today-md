@@ -4,6 +4,102 @@ import XCTest
 
 @MainActor
 final class TodayMdStoreTests: XCTestCase {
+    func testExternalArchivesClearSnapshotUndoAndAllowNewEdits() throws {
+        for isRemote in [true, false] {
+            let store = try makeStore()
+            let manager = UndoManager()
+            manager.groupsByEvent = false
+            store.configureUndoManager(manager)
+            manager.beginUndoGrouping()
+            _ = store.addUnassignedTask(title: "Local", block: .today)
+            manager.endUndoGrouping()
+            XCTAssertTrue(manager.canUndo)
+
+            let externalTask = TaskItem(title: "External", block: .today, sortOrder: 1)
+            let archive = TodayMdArchive(lists: store.lists, unassignedTasks: store.unassignedTasks + [externalTask])
+            if isRemote {
+                store.applyRemoteArchive(archive)
+            } else {
+                store.applyMarkdownArchive(archive)
+            }
+
+            XCTAssertFalse(manager.canUndo)
+            XCTAssertFalse(manager.canRedo)
+            manager.beginUndoGrouping()
+            store.updateTaskTitle(id: externalTask.id, title: "Edited locally", registersUndo: true)
+            manager.endUndoGrouping()
+            manager.undo()
+            XCTAssertEqual(store.task(id: externalTask.id)?.title, "External")
+            XCTAssertEqual(store.allTasks.count, 2)
+        }
+    }
+
+    func testExternalArchiveClearsRedoHistory() throws {
+        let store = try makeStore()
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        store.configureUndoManager(manager)
+        manager.beginUndoGrouping()
+        _ = store.addUnassignedTask(title: "Local", block: .today)
+        manager.endUndoGrouping()
+        manager.undo()
+        XCTAssertTrue(manager.canRedo)
+
+        let externalTask = TaskItem(title: "External", block: .today, sortOrder: 0)
+        store.applyRemoteArchive(TodayMdArchive(lists: [TaskList](), unassignedTasks: [externalTask]))
+        XCTAssertFalse(manager.canRedo)
+        XCTAssertNotNil(store.task(id: externalTask.id))
+    }
+
+    func testSearchTreatsPunctuationAndOperatorsAsLiteralText() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Review today-md: release (v2) \"quote\" OR", block: .today)
+        _ = store.addUnassignedTask(title: "Unrelated", block: .today)
+
+        for query in ["today-md", "today-md:", "(v2)", "\"quote\"", "OR", "Review today-m"] {
+            store.searchText = query
+            XCTAssertEqual(store.persistedSearchIDs, [task.id], "Query: \(query)")
+        }
+        for query in ["*", "\"", "("] {
+            store.searchText = query
+            XCTAssertTrue(store.persistedSearchIDs.isEmpty, "Query: \(query)")
+        }
+    }
+
+    func testExternalArchivesRefreshActiveSearchAfterSaving() throws {
+        for isRemote in [true, false] {
+            let store = try makeStore()
+            let previous = store.addUnassignedTask(title: "Matching old task", block: .today)
+            store.searchText = "Matching"
+            XCTAssertEqual(store.persistedSearchIDs, [previous.id])
+            let replacement = TaskItem(title: "Matching new task", block: .today, sortOrder: 0)
+            let archive = TodayMdArchive(lists: [TaskList](), unassignedTasks: [replacement])
+            if isRemote {
+                store.applyRemoteArchive(archive)
+            } else {
+                store.applyMarkdownArchive(archive)
+            }
+            XCTAssertEqual(store.persistedSearchIDs, [replacement.id])
+        }
+    }
+
+    func testUndoAndRedoRefreshActiveSearchAfterSaving() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Original", block: .today)
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        store.configureUndoManager(manager)
+        store.searchText = "Matching"
+        manager.beginUndoGrouping()
+        store.updateTaskTitle(id: task.id, title: "Matching", registersUndo: true)
+        manager.endUndoGrouping()
+        XCTAssertEqual(store.persistedSearchIDs, [task.id])
+        manager.undo()
+        XCTAssertTrue(store.persistedSearchIDs.isEmpty)
+        manager.redo()
+        XCTAssertEqual(store.persistedSearchIDs, [task.id])
+    }
+
     func testAddUnassignedTaskCreatesTaskWithoutList() throws {
         let store = try makeStore()
 
