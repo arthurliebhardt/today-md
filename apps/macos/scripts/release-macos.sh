@@ -108,7 +108,7 @@ if "TeamIdentifier=" + os.environ["MACOS_TEAM_ID"] not in details or "runtime" n
 done < <(find "$app" -depth \( -name '*.xpc' -o -name '*.app' -o -name '*.framework' -o -name Autoupdate \) -print0)
 codesign -d --entitlements :- "$app" 2>/dev/null | python3 -c '
 import plistlib,sys
-entitlements=plistlib.load(sys.stdin.buffer)
+entitlements=plistlib.loads(sys.stdin.buffer.read())
 if entitlements.get("com.apple.security.get-task-allow",False):
     sys.exit("A release cannot carry the debugger entitlement")'
 /usr/bin/lipo "$app/Contents/MacOS/today-md" -verify_arch arm64 x86_64
