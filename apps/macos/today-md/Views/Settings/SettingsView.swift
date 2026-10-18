@@ -1,8 +1,53 @@
 import AppKit
 import SwiftUI
 
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+private struct TodayMdUpdateSettingsView: View {
+    @EnvironmentObject private var updateManager: TodayMdUpdateManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("today-md")
+                    .font(.headline)
+                Text(updateManager.versionDescription)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { updateManager.automaticallyChecksForUpdates },
+                set: updateManager.setAutomaticallyChecksForUpdates
+            ))
+            .disabled(!updateManager.isUpdaterReady)
+
+            Text("today-md checks for new GitHub releases and asks before installing an update.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Check for Updates…", action: updateManager.checkForUpdates)
+                .disabled(!updateManager.canCheckForUpdates)
+
+            if let reason = updateManager.unavailableReason {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+#endif
+
 enum SettingsSection: String, CaseIterable, Identifiable {
     case interface
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+    case updates
+#endif
     case pro
     case calendar
     case data
@@ -14,6 +59,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Interface"
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+        case .updates:
+            return "Updates"
+#endif
         case .pro:
             return "today-md Pro"
         case .calendar:
@@ -29,6 +78,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "Appearance and quick capture"
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+        case .updates:
+            return "Versions and automatic checks"
+#endif
         case .pro:
             return "One-time lifetime unlock"
         case .calendar:
@@ -44,6 +97,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return "paintbrush.pointed.fill"
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+        case .updates:
+            return "arrow.down.circle.fill"
+#endif
         case .pro:
             return "sparkles"
         case .calendar:
@@ -59,6 +116,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .interface:
             return .indigo
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+        case .updates:
+            return .blue
+#endif
         case .pro:
             return .orange
         case .calendar:
@@ -382,6 +443,11 @@ struct SettingsView: View {
 
             case .pro:
                 TodayMdProView(presentation: .settings)
+
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+            case .updates:
+                TodayMdUpdateSettingsView()
+#endif
 
             case .calendar:
                 VStack(alignment: .leading, spacing: 14) {
