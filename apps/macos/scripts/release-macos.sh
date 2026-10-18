@@ -21,6 +21,23 @@ output_dir="$repo_dir/dist/macos"
 [[ ! -e "$output_dir" ]] || { echo 'dist/macos already exists; move it aside before a new release build' >&2; exit 1; }
 work_dir=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/today-md-release.XXXXXX")
 keychain="$work_dir/signing.keychain-db"
+stapler_with_retry() {
+  local attempt status=1
+  # CloudKit connection failures return 68. Other failures remain immediate.
+  for attempt in 1 2 3; do
+    if xcrun stapler "$@"; then
+      return 0
+    else
+      status=$?
+    fi
+    [[ "$status" == 68 ]] || return "$status"
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "Stapler $1 failed with status $status; retrying ($attempt/3)" >&2
+      sleep "$((attempt * 5))"
+    fi
+  done
+  return "$status"
+}
 cleanup() {
   local status=$?
   if [[ -f "$work_dir/original-keychains.json" ]]; then
@@ -146,8 +163,8 @@ PY
   echo "Notarization diagnostics retained in $diagnostics_dir" >&2
   exit 1
 fi
-xcrun stapler staple "$app"
-xcrun stapler validate "$app"
+stapler_with_retry staple "$app"
+stapler_with_retry validate "$app"
 spctl --assess --type execute --verbose=2 "$app"
 update_dir="$work_dir/update"
 mkdir "$update_dir"
@@ -194,7 +211,7 @@ bash "$script_dir/verify-sparkle-release.sh" "$output_dir/appcast.xml" "$output_
 mkdir "$work_dir/unpacked"
 ditto -x -k "$output_dir/$zip_name" "$work_dir/unpacked"
 codesign --verify --deep --strict --verbose=2 "$work_dir/unpacked/today-md.app"
-xcrun stapler validate "$work_dir/unpacked/today-md.app"
+stapler_with_retry validate "$work_dir/unpacked/today-md.app"
 spctl --assess --type execute --verbose=2 "$work_dir/unpacked/today-md.app"
 python3 - "$output_dir/release.json" "$RELEASE_TAG" "$build" "$(git rev-parse HEAD)" <<'PY'
 import json,sys
