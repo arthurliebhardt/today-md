@@ -19,6 +19,8 @@ The App Store build detects its receipt and applies the free allowance of one li
 
 Product IDs are permanent. If the App Store Connect product ID changes, update `TodayMdPurchaseManager.lifetimeProductID` and this StoreKit configuration before shipping.
 
+The `today-md` scheme is the App Store target. Its Release configuration defines `TODAYMD_APP_STORE` and excludes Sparkle. GitHub releases use the separate `today-md-github` target and have their own updater entitlements. Shared version and build numbers live in `Config/Version.xcconfig`.
+
 ## Account-specific Xcode setup
 
 1. Select the `today-md` target, then Signing & Capabilities.

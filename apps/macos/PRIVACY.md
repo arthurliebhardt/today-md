@@ -2,13 +2,13 @@
 
 **Effective date:** July 12, 2026
 
-**Last updated:** July 12, 2026
+**Last updated:** October 18, 2026
 
 today-md is a local-first macOS application developed by Arthur Liebhardt ("today-md," "we," "us," or "our"). This Privacy Policy explains how information is handled when you use the today-md application.
 
 ## 1. Summary
 
-today-md does not require an account and does not include advertising, tracking, telemetry, or third-party analytics SDKs. We do not collect, transmit, sell, rent, or share your tasks, notes, calendar information, or other personal data through the app.
+today-md does not require an account and does not include advertising, tracking, telemetry, or third-party analytics SDKs. We do not collect, transmit, sell, rent, or share your tasks, notes, or calendar information through the app. Update checks send the limited technical request information described below.
 
 Your data stays on your Mac unless you choose to export it or place it in a folder managed by a third-party sync provider.
 
@@ -37,6 +37,8 @@ Purchases are processed by Apple through the Mac App Store and StoreKit. Apple m
 today-md receives product and transaction information needed to determine whether Pro features are unlocked. We do not receive your full payment-card or bank-account details.
 
 ## 6. Support and GitHub
+
+The GitHub download edition uses Sparkle to check for and download app updates from GitHub. Update requests include network information such as your IP address and the app version; tasks, notes, and calendar data are not included. Sparkle system profiling is disabled. You can turn off automatic checks in Settings and check manually instead. The Mac App Store edition receives app updates through Apple.
 
 If you contact us or open a support request on GitHub, you choose what information to provide. GitHub processes that information under its own privacy terms, and information posted in a public issue may be visible to others. Please do not include sensitive task, note, calendar, or payment information in a public issue.
 

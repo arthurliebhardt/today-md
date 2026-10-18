@@ -1,0 +1,78 @@
+name: Release macOS app
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable version tag (vX.Y.Z)'
+        required: true
+        type: string
+      publish:
+        description: 'Publish after verification (leave off for a signing rehearsal)'
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-stable-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: macos-release
+    permissions:
+      contents: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+      SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify release scripts
+        run: |
+          xcodebuild -version
+          swift test --package-path apps/macos
+          python3 -m unittest discover -s apps/macos/scripts/tests -v
+          bash -n apps/macos/scripts/release-macos.sh
+          bash -n apps/macos/scripts/publish-macos-release.sh
+          bash -n apps/macos/scripts/verify-sparkle-release.sh
+
+      - name: Build, sign, notarize, and verify
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_P8: ${{ secrets.ASC_PRIVATE_KEY_P8 }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: bash apps/macos/scripts/release-macos.sh
+
+      - name: Retain verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: today-md-${{ env.RELEASE_TAG }}-macos
+          path: |
+            dist/macos/*.zip
+            dist/macos/appcast.xml
+            dist/macos/release.json
+            dist/macos/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish verified assets and update feed
+        if: github.event_name == 'push' || inputs.publish
+        run: bash apps/macos/scripts/publish-macos-release.sh

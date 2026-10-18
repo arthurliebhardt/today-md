@@ -7,7 +7,7 @@ APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/today-md.app"
 
 xcodebuild \
   -project "$ROOT_DIR/today-md.xcodeproj" \
-  -scheme today-md \
+  -scheme "${TODAYMD_SCHEME:-today-md-github}" \
   -configuration Debug \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   build

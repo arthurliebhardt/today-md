@@ -2,9 +2,12 @@ import AppKit
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var updateManager: TodayMdUpdateManager?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        updateManager?.start()
     }
 }
 
@@ -23,6 +26,7 @@ struct TodayMdApp: App {
     @StateObject private var undoController = AppUndoController()
     @StateObject private var presentationState = AppPresentationState()
     @StateObject private var purchaseManager = TodayMdPurchaseManager()
+    @StateObject private var updateManager: TodayMdUpdateManager
     @StateObject private var syncService: TodayMdSyncService
     @StateObject private var calendarService = TodayMdCalendarService()
     @StateObject private var dynamicIslandController = GlobalDynamicIslandController()
@@ -55,6 +59,11 @@ struct TodayMdApp: App {
         Self.markHasLaunchedBefore(userDefaults: userDefaults)
         _syncService = StateObject(wrappedValue: syncService)
         _store = State(initialValue: store)
+        let updateManager = TodayMdUpdateManager {
+            store.flushPendingPersistence()
+        }
+        _updateManager = StateObject(wrappedValue: updateManager)
+        appDelegate.updateManager = updateManager
     }
 
     private var appearanceMode: AppAppearanceMode {
@@ -104,6 +113,13 @@ struct TodayMdApp: App {
         }
         .commands {
             WorkspaceCommands()
+
+#if TODAYMD_GITHUB && !TODAYMD_APP_STORE
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…", action: updateManager.checkForUpdates)
+                    .disabled(!updateManager.canCheckForUpdates)
+            }
+#endif
 
             CommandGroup(after: .saveItem) {
                 Button("Import...") {
@@ -155,6 +171,7 @@ struct TodayMdApp: App {
                 .environmentObject(presentationState)
                 .environmentObject(dynamicIslandController)
                 .environmentObject(purchaseManager)
+                .environmentObject(updateManager)
                 .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
 

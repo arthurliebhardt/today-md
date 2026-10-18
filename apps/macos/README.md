@@ -48,7 +48,7 @@ For a real macOS app launch with the proper app icon, build and open the `.app` 
 bash scripts/dev-run.sh
 ```
 
-Or open `today-md.xcodeproj` in Xcode and run the `today-md` target.
+Or open `today-md.xcodeproj` in Xcode and run `today-md-github` for the direct edition. The `today-md` scheme is for App Store and StoreKit development. GitHub Debug builds use local ad hoc signing, do not enable the hardened runtime, and do not check for updates. Release builds enable the hardened runtime and use the signed release pipeline. Plain `swift build` and `swift test` do not depend on Sparkle.
 
 The app stores its local data in SQLite. In development builds that is `~/Library/Application Support/today-md/today-md.sqlite`; the sandboxed app bundle stores the same data inside its macOS container. Packaged app builds seed sample data on first launch. `swift run` now launches against a dedicated showcase database in `.build` and resets it to the example dataset on every local start.
 
@@ -66,21 +66,13 @@ The app stores its local data in SQLite. In development builds that is `~/Librar
 
 Download the latest `.zip` from the [Releases](https://github.com/arthurliebhardt/today-md/releases) page.
 
-1. Unzip `today-md-v1.8.0-macos.zip`
-2. Move `today-md.app` to your Applications folder
-3. On first launch macOS will block the app because it's not notarized:
+1. Unzip the downloaded archive.
+2. Move `today-md.app` to your Applications folder.
+3. Open the app.
 
-   <img src="docs/gatekeeper-blocked.png" width="280" alt="macOS Gatekeeper blocked dialog" />
+New GitHub releases built by the signed release workflow are Developer ID signed and notarized. The first release containing Sparkle must be installed manually; later releases can update through **today-md → Check for Updates…**. Automatic checking can be changed in **Settings → Updates**.
 
-4. Open **System Settings → Privacy & Security** and click **Open Anyway**:
-
-   <img src="docs/gatekeeper-open-anyway.png" width="600" alt="macOS Privacy & Security — Open Anyway" />
-
-Alternatively, remove the quarantine flag via Terminal before opening:
-
-```bash
-xattr -d com.apple.quarantine /Applications/today-md.app
-```
+Older GitHub releases were not notarized. If macOS blocks an older release, use **System Settings → Privacy & Security → Open Anyway** after checking that you downloaded it from this repository.
 
 ## Data Portability
 
@@ -99,3 +91,7 @@ Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, w
 ## License
 
 Released under the MIT License. See [`LICENSE`](LICENSE).
+
+## GitHub releases and updates
+
+See [the release guide](RELEASE.md) for signing credentials, the one-time Sparkle key setup, release commands, and end-to-end update verification. Version and build numbers live in `Config/Version.xcconfig`. The `today-md-github` target contains Sparkle; the App Store target does not link or embed it.
