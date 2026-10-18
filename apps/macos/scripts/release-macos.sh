@@ -113,16 +113,39 @@ if entitlements.get("com.apple.security.get-task-allow",False):
     sys.exit("A release cannot carry the debugger entitlement")'
 /usr/bin/lipo "$app/Contents/MacOS/today-md" -verify_arch arm64 x86_64
 ditto -c -k --sequesterRsrc --keepParent "$app" "$work_dir/notarization.zip"
+diagnostics_dir="$output_dir/diagnostics"
+mkdir -p "$diagnostics_dir"
+notary_command_status=0
 xcrun notarytool submit "$work_dir/notarization.zip" --key "$work_dir/AuthKey.p8" \
   --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait --timeout 20m \
-  --output-format json > "$work_dir/notarization.json"
-python3 - "$work_dir/notarization.json" <<'PY'
+  --output-format json > "$diagnostics_dir/notarization.json" || notary_command_status=$?
+notary_accepted=0
+python3 - "$diagnostics_dir/notarization.json" <<'PY' && notary_accepted=1
 import json,sys
-result=json.load(open(sys.argv[1]))
+try:
+    result=json.load(open(sys.argv[1]))
+except (ValueError, OSError):
+    sys.exit("Apple notarization did not return submission JSON; inspect the command error above")
 if result.get("status") != "Accepted":
     sys.exit("Apple notarization was not Accepted; inspect submission " + str(result.get("id")))
 print("Apple notarization accepted: " + result["id"])
 PY
+if [[ "$notary_command_status" != 0 || "$notary_accepted" != 1 ]]; then
+  submission_id=$(python3 - "$diagnostics_dir/notarization.json" <<'PY'
+import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get("id", ""))
+except (ValueError, OSError):
+    pass
+PY
+  )
+  if [[ -n "$submission_id" ]]; then
+    xcrun notarytool log "$submission_id" "$diagnostics_dir/notarization-log.json" \
+      --key "$work_dir/AuthKey.p8" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" || true
+  fi
+  echo "Notarization diagnostics retained in $diagnostics_dir" >&2
+  exit 1
+fi
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"
 spctl --assess --type execute --verbose=2 "$app"

@@ -2,6 +2,7 @@ name: Release macOS app
 
 on:
   push:
+    branches: ['codex/rehearse-macos-*']
     tags: ['v[0-9]*']
   workflow_dispatch:
     inputs:
@@ -22,10 +23,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-publication-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject publication from a non-tag ref
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag ]]; then
+            echo 'Publishing requires dispatching the workflow from an existing version tag.' >&2
+            exit 1
+          fi
+
   release:
+    needs: validate-publication-ref
     runs-on: macos-15
     timeout-minutes: 60
-    environment: macos-release
+    environment: ${{ github.ref_type == 'branch' && startsWith(github.ref_name, 'codex/rehearse-macos-') && 'macos-rehearsal' || 'macos-release' }}
     permissions:
       contents: write
     env:
@@ -35,12 +48,35 @@ jobs:
       SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Check out the tagged source
+      - name: Check out the exact source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.tag || github.ref_name }}
+          ref: ${{ github.event_name == 'push' && github.ref_type == 'branch' && github.sha || inputs.tag || github.ref_name }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prepare a local version tag for the branch rehearsal
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        run: |
+          version=$(python3 apps/macos/scripts/release-metadata.py project-version --short)
+          rehearsal_tag="v$version"
+          if [[ ! "$rehearsal_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'The rehearsal needs a stable MARKETING_VERSION in the form X.Y.Z.' >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo 'The rehearsal checkout must match the triggering commit.' >&2
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/tags/$rehearsal_tag"; then
+            if [[ "$(git rev-parse "refs/tags/$rehearsal_tag^{commit}")" != "$GITHUB_SHA" ]]; then
+              echo 'The existing version tag points to another commit. Bump the version before rehearsing.' >&2
+              exit 1
+            fi
+          else
+            git -c tag.gpgSign=false tag "$rehearsal_tag" "$GITHUB_SHA"
+          fi
+          printf 'RELEASE_TAG=%s\n' "$rehearsal_tag" >> "$GITHUB_ENV"
 
       - name: Verify release scripts
         run: |
@@ -73,6 +109,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Retain notarization diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: today-md-notarization-${{ github.run_id }}
+          path: dist/macos/diagnostics/*.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Publish verified assets and update feed
-        if: github.event_name == 'push' || inputs.publish
+        if: github.ref_type == 'tag' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
         run: bash apps/macos/scripts/publish-macos-release.sh
