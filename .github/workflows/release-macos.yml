@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: today-md-direct-signing
+  group: today-md-direct-1.8.4-a302078
   cancel-in-progress: false
 
 jobs:

@@ -6,7 +6,7 @@
   "release_version": "1.8.4",
   "release_build": "35",
   "files": {
-    ".github/workflows/release-macos.yml": "b9ee4bfa4c85d8da4ecaaaf8730cd5f23a1acf3e007f3ceeeae391b4b07183e4",
+    ".github/workflows/release-macos.yml": "ee0ff707bcd9387aa3fddaec46cabf08d623b007db0b3ae6b48949edef2bcd8f",
     "apps/todaymd/apps/macos/.gitignore": "0f299048e45bba18295eaa5d0594f368f7991c553938623733c28dc8ac114bb2",
     "apps/todaymd/apps/macos/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
     "apps/todaymd/apps/macos/AppStore/README.md": "a76712c89f8071795ce263e41fe32d20fd8125c8e8c85dd96a24bc68fad24086",
@@ -202,5 +202,14 @@
     "apps/todaymd/apps/macos/outputs/research/today-md-market-strategy-2026-07-18/verification-receipt.json"
   ],
   "superseded_source_commit": "c78fea20af7c1da8de3a62c6889f50cb48c2b83f",
-  "superseded_snapshot_commit": "7240c7d11429601e4ab99c4975785f50bf352c6b"
+  "superseded_snapshot_commit": "7240c7d11429601e4ab99c4975785f50bf352c6b",
+  "workflow_only_override": {
+    "file": ".github/workflows/release-macos.yml",
+    "canonical_source": "apps/todaymd/.github/workflows/release-direct-macos.yml",
+    "original_group": "today-md-direct-signing",
+    "new_group": "today-md-direct-1.8.4-a302078",
+    "canonical_sha256": "b9ee4bfa4c85d8da4ecaaaf8730cd5f23a1acf3e007f3ceeeae391b4b07183e4",
+    "override_sha256": "ee0ff707bcd9387aa3fddaec46cabf08d623b007db0b3ae6b48949edef2bcd8f",
+    "reason": "GitHub reports old run39277437362 in_progress but rejects normal and force cancellation with409 not-in-progress, blocking the global concurrency group. This override isolates the corrected a302078 snapshot without changing app/SDK source or publishing releases."
+  }
 }
