@@ -1,6 +1,6 @@
 {
   "source_repository": "arthurliebhardt/toolstokeep",
-  "source_commit": "c78fea20af7c1da8de3a62c6889f50cb48c2b83f",
+  "source_commit": "a3020783060ef5dcdede43f4c39528e78e380ec8",
   "upstream_repository": "arthurliebhardt/today-md",
   "upstream_base_commit": "1a3a5f87b706633a434d59ab79a10cdf753d9001",
   "release_version": "1.8.4",
@@ -56,7 +56,7 @@
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdCalendarServiceTests.swift": "48ef743c01807f5d6734fcb65688aea4ece78dd5c4baf90e1640334f1b052d98",
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdFeedbackReportTests.swift": "cf74e21b509f22d0d827a966d55a97f4012485546fe4991e0d003d5e5998e2d8",
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdLicenseTests.swift": "3b92c5eead18a927dfcdb412944b46da2d7e88e1830b5795ba1d49afc9765b29",
-    "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdPurchaseManagerTests.swift": "5cbe5d8c54f4f112654b1d7478a393bc6d1a180752775c54db92e84fe67d5c26",
+    "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdPurchaseManagerTests.swift": "e062c55602035e3996a14a7deb3fddfea2ef17d45798a7885f9a4b891b25660a",
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdStoreTests.swift": "59ad0afbda341c7966e1987cf1157636274f68e1f2ed5bd3c13fe984cb899485",
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdSyncServiceTests.swift": "434e6c66d1213fd370238d93016ee6fc690b7f5d5d2f965de0c986f6b7f69b29",
     "apps/todaymd/apps/macos/Tests/TodayMdAppTests/TodayMdUpdateManagerTests.swift": "f8ccd50bde022821f70f6e513225d142ee36c75419c665fde6ba87699e658ed2",
@@ -200,5 +200,7 @@
     "apps/todaymd/apps/macos/outputs/research/today-md-market-strategy-2026-07-18/report.html",
     "apps/todaymd/apps/macos/outputs/research/today-md-market-strategy-2026-07-18/source-notes.md",
     "apps/todaymd/apps/macos/outputs/research/today-md-market-strategy-2026-07-18/verification-receipt.json"
-  ]
+  ],
+  "superseded_source_commit": "c78fea20af7c1da8de3a62c6889f50cb48c2b83f",
+  "superseded_snapshot_commit": "7240c7d11429601e4ab99c4975785f50bf352c6b"
 }

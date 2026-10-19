@@ -1,10 +1,30 @@
 import XCTest
+import ToolsToKeepKit
 @testable import TodayMdApp
 
 @MainActor
 final class TodayMdPurchaseManagerTests: XCTestCase {
+    private var store: LicenseStore!
+    private var defaultsSuite: String!
+    private var defaults: UserDefaults!
+
+    override func setUp() async throws {
+        store = LicenseStore(service: "com.today-md.app.license.purchase-tests.\(UUID().uuidString)")
+        defaultsSuite = "com.today-md.app.purchase-tests.\(UUID().uuidString)"
+        defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuite))
+    }
+
+    override func tearDown() async throws {
+        store.remove(tool: TodayMdPurchaseManager.licenseTool)
+        defaults.removePersistentDomain(forName: defaultsSuite)
+    }
+
+    private func makeManager(environment: [String: String]) -> TodayMdPurchaseManager {
+        TodayMdPurchaseManager(environment: environment, licenseStore: store, licenseCheckDefaults: defaults)
+    }
+
     func testOpenSourceBuildIncludesProAccessWithoutCommerce() {
-        let manager = TodayMdPurchaseManager(environment: [:])
+        let manager = makeManager(environment: [:])
 
         XCTAssertFalse(manager.isCommerceEnabled)
         XCTAssertEqual(manager.accessState, .pro)
@@ -12,7 +32,7 @@ final class TodayMdPurchaseManagerTests: XCTestCase {
     }
 
     func testStoreKitTestingEnvironmentEnablesCommerceMode() {
-        let manager = TodayMdPurchaseManager(
+        let manager = makeManager(
             environment: [TodayMdPurchaseManager.storeKitTestingEnvironmentKey: "1"]
         )
 
@@ -47,7 +67,7 @@ final class TodayMdPurchaseManagerTests: XCTestCase {
     }
 
     func testSixthTaskPresentsLifetimeUpgrade() {
-        let manager = TodayMdPurchaseManager(
+        let manager = makeManager(
             environment: [TodayMdPurchaseManager.storeKitTestingEnvironmentKey: "1"]
         )
 
@@ -58,7 +78,7 @@ final class TodayMdPurchaseManagerTests: XCTestCase {
     }
 
     func testSecondListPresentsLifetimeUpgrade() {
-        let manager = TodayMdPurchaseManager(
+        let manager = makeManager(
             environment: [TodayMdPurchaseManager.storeKitTestingEnvironmentKey: "1"]
         )
 
@@ -69,7 +89,7 @@ final class TodayMdPurchaseManagerTests: XCTestCase {
     }
 
     func testExistingOverLimitLibraryCannotCreateMoreFreeContent() {
-        let manager = TodayMdPurchaseManager(
+        let manager = makeManager(
             environment: [TodayMdPurchaseManager.storeKitTestingEnvironmentKey: "1"]
         )
 
