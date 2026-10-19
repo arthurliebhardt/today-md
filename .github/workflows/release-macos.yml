@@ -13,12 +13,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: today-md-direct-1.8.4-a302078
+  group: today-md-direct-1.8.4-a302078-macos26
   cancel-in-progress: false
 
 jobs:
   direct:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     environment: macos-rehearsal
     env:

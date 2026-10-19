@@ -6,7 +6,7 @@
   "release_version": "1.8.4",
   "release_build": "35",
   "files": {
-    ".github/workflows/release-macos.yml": "ee0ff707bcd9387aa3fddaec46cabf08d623b007db0b3ae6b48949edef2bcd8f",
+    ".github/workflows/release-macos.yml": "036c67257f0135e67bac9bbff704b7debe343e6cef04f280729210d774127609",
     "apps/todaymd/apps/macos/.gitignore": "0f299048e45bba18295eaa5d0594f368f7991c553938623733c28dc8ac114bb2",
     "apps/todaymd/apps/macos/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
     "apps/todaymd/apps/macos/AppStore/README.md": "a76712c89f8071795ce263e41fe32d20fd8125c8e8c85dd96a24bc68fad24086",
@@ -207,9 +207,18 @@
     "file": ".github/workflows/release-macos.yml",
     "canonical_source": "apps/todaymd/.github/workflows/release-direct-macos.yml",
     "original_group": "today-md-direct-signing",
-    "new_group": "today-md-direct-1.8.4-a302078",
+    "previous_group": "today-md-direct-1.8.4-a302078",
+    "new_group": "today-md-direct-1.8.4-a302078-macos26",
+    "original_runner_label": "macos-15",
+    "new_runner_label": "macos-26",
+    "developer_dir_unchanged": "/Applications/Xcode_26.3.app/Contents/Developer",
     "canonical_sha256": "b9ee4bfa4c85d8da4ecaaaf8730cd5f23a1acf3e007f3ceeeae391b4b07183e4",
-    "override_sha256": "ee0ff707bcd9387aa3fddaec46cabf08d623b007db0b3ae6b48949edef2bcd8f",
-    "reason": "GitHub reports old run39277437362 in_progress but rejects normal and force cancellation with409 not-in-progress, blocking the global concurrency group. This override isolates the corrected a302078 snapshot without changing app/SDK source or publishing releases."
+    "override_sha256": "036c67257f0135e67bac9bbff704b7debe343e6cef04f280729210d774127609",
+    "reason": "The shared concurrency group was gated by an old run with inconsistent GitHub read/cancel state. The isolated macos-15 run then remained queued without a runner. Use the officially supported macos-26 pool and a separate group, preserving app/SDK source and every universal signing/notarization check.",
+    "official_sources": [
+      "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md",
+      "https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary"
+    ]
   }
 }
