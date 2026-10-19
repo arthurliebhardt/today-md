@@ -1,30 +1,22 @@
 import CryptoKit
 import Foundation
 
-/// A toolstokeep license key: `TTK1.<base64url JSON>.<base64url Ed25519 signature>`.
+/// A signed offline credential: `TTK1.<base64url JSON>.<base64url Ed25519 signature>`.
 /// Checking one needs no network: the signature is verified with the public key
 /// built into the app, so a bought copy keeps working if toolstokeep.com is gone.
+/// Every license includes all updates. Keys issued before that also carry an
+/// `updates_until` date, which is ignored.
 public struct License: Codable, Equatable, Sendable {
     public let v: Int
     public let lid: String
     public let tool: String
     public let email: String
     public let issued: String
-    /// Nil grants lifetime updates; legacy licenses retain their signed cutoff.
-    public let updatesUntil: String?
     public let maxDevices: Int
 
     enum CodingKeys: String, CodingKey {
         case v, lid, tool, email, issued
-        case updatesUntil = "updates_until"
         case maxDevices = "max_devices"
-    }
-
-    /// Whether a release published on `releaseDate` (YYYY-MM-DD) is included.
-    /// A missing cutoff includes every release. Dated licenses keep their update window.
-    public func includesUpdate(releasedOn releaseDate: String) -> Bool {
-        guard let updatesUntil else { return true }
-        return releaseDate <= updatesUntil
     }
 }
 
@@ -33,6 +25,18 @@ public enum LicenseError: Error, Equatable {
     case badSignature
     case wrongTool(String)
     case unsupportedVersion(Int)
+    case activationFailed(String?)
+}
+
+/// Short purchase keys need one online activation to obtain an offline credential.
+public enum LicenseKey {
+    public static func isShort(_ key: String) -> Bool {
+        let bytes = Array(key.utf8)
+        guard bytes.count == 26, key.hasPrefix("ttk_") else { return false }
+        return bytes.dropFirst(4).allSatisfy {
+            (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95
+        }
+    }
 }
 
 public struct LicenseVerifier: Sendable {

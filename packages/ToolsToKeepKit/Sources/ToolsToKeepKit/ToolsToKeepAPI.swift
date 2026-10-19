@@ -7,7 +7,9 @@ import IOKit
 import UIKit
 #endif
 
-/// The few server calls an app makes. Everything else (checking a key) is offline.
+/// The few server calls an app makes. Short keys need one activation to obtain
+/// a signed offline credential. `LicenseCheck` repeats activation about once a
+/// week in direct-download apps to catch refunded keys.
 public struct ToolsToKeepAPI: Sendable {
     public let baseURL: URL
 
@@ -19,23 +21,27 @@ public struct ToolsToKeepAPI: Sendable {
         public let ok: Bool
         public let error: String?
         public let tool: String?
-        public let updates_until: String?
         public let max_devices: Int?
+        /// Signed offline credential returned after a license key is activated.
+        public let license: String?
 
         /// For apps that stub activation in tests or previews.
-        public init(ok: Bool, error: String?, tool: String?, updates_until: String?, max_devices: Int?) {
+        public init(ok: Bool, error: String?, tool: String?, max_devices: Int?, license: String? = nil) {
             self.ok = ok
             self.error = error
             self.tool = tool
-            self.updates_until = updates_until
             self.max_devices = max_devices
+            self.license = license
         }
     }
 
-    /// One-time device activation (optional; enforces the license's device limit).
-    /// Call once after the user enters a key, then rely on offline verification.
-    public func activate(key: String, deviceHash: String = DeviceID.hash()) async throws -> ActivationResult {
-        try await post("api/activate", ["key": key, "device": deviceHash])
+    /// Device activation (enforces the license's device limit). Call it when the
+    /// user enters a key; `LicenseCheck` calls it again about once a week, which
+    /// is a no-op for an already activated device.
+    public func activate(key: String, deviceHash: String = DeviceID.hash(), tool: String? = nil) async throws -> ActivationResult {
+        var body = ["key": key, "device": deviceHash]
+        body["tool"] = tool
+        return try await post("api/activate", body)
     }
 
     public struct RedeemResult: Decodable, Sendable {
@@ -60,7 +66,7 @@ public struct ToolsToKeepAPI: Sendable {
         public let notes: String?
     }
 
-    /// Latest release for update prompts. Compare with `License.includesUpdate(releasedOn:)`.
+    /// Latest release for update prompts. Every license includes it.
     public func latestRelease(tool: String, platform: String = "any") async throws -> Release {
         var components = URLComponents(url: baseURL.appendingPathComponent("api/releases/\(tool)/latest"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "platform", value: platform)]

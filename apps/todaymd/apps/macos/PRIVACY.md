@@ -2,15 +2,15 @@
 
 **Effective date:** July 12, 2026
 
-**Last updated:** October 18, 2026
+**Last updated:** October 19, 2026
 
 today-md is a local-first macOS application developed by Arthur Liebhardt ("today-md," "we," "us," or "our"). This Privacy Policy explains how information is handled when you use the today-md application.
 
 ## 1. Summary
 
-today-md does not require an account and does not include advertising, tracking, telemetry, or third-party analytics SDKs. We do not collect, transmit, sell, rent, or share your tasks, notes, or calendar information through the app. Update checks send the limited technical request information described below.
+today-md does not require an account and does not include advertising, tracking, telemetry, or third-party analytics SDKs. We do not collect, transmit, sell, rent, or share your tasks, notes, or calendar information through the app. Optional license activation and update checks send the limited information described below.
 
-Your data stays on your Mac unless you choose to export it or place it in a folder managed by a third-party sync provider.
+Your tasks, notes, and calendar information stay on your Mac unless you choose to export them or place them in a folder managed by a third-party sync provider.
 
 ## 2. Information stored on your Mac
 
@@ -32,9 +32,15 @@ You can change or revoke Calendar access at any time in macOS System Settings.
 
 ## 5. Purchases
 
-Purchases are processed by Apple through the Mac App Store and StoreKit. Apple may process information such as your Apple Account, payment details, purchase history, and region under [Apple's Privacy Policy](https://www.apple.com/legal/privacy/).
+In-app purchases are processed by Apple through the Mac App Store and StoreKit. Apple may process information such as your Apple Account, payment details, purchase history, and region under [Apple's Privacy Policy](https://www.apple.com/legal/privacy/).
 
 today-md receives product and transaction information needed to determine whether Pro features are unlocked. We do not receive your full payment-card or bank-account details.
+
+You can also unlock Pro with a license bought on toolstokeep.com. Entering a short key beginning with `ttk_` makes a one-time request to toolstokeep.com in either the direct-download or Mac App Store edition. The request sends your license key, the app identifier, and a SHA-256 hash derived from your Mac's hardware identifier. The server also receives network information such as your IP address. These details are used to validate the purchase, enforce its device limit, and check for refunds or revocation. The raw hardware identifier, tasks, notes, and calendar information are not sent.
+
+After activation, today-md verifies and stores a signed license credential in the macOS Keychain. It includes the license identifier, purchase email address, app identifier, issue date, and device limit. The credential lets the app stay unlocked offline. Existing long keys beginning with `TTK1.` are signed credentials and can be verified offline directly.
+
+The direct-download edition contacts toolstokeep.com when you enter a signed key and about once a week while the app is in use to check for refunded or revoked licenses. The Mac App Store edition performs no automatic license checks and does not contact toolstokeep.com when you enter an existing signed key. Removing a license in the app removes its local credential. Website purchase and activation records are described in the [toolstokeep privacy policy](https://toolstokeep.com/legal/privacy).
 
 ## 6. Support and GitHub
 
@@ -44,7 +50,7 @@ If you contact us or open a support request on GitHub, you choose what informati
 
 ## 7. Data retention and deletion
 
-Because we do not receive your app data, we do not retain it on developer-operated servers.
+Because we do not receive your tasks, notes, or calendar information, we do not retain that content on developer-operated servers. Optional license activation records are handled as described in the toolstokeep privacy policy linked above.
 
 You control local data and may:
 
@@ -62,13 +68,13 @@ today-md uses the macOS app sandbox for its Mac App Store distribution and reque
 
 ## 9. Children's privacy
 
-today-md is a general-purpose productivity app and is not directed to children. The app does not knowingly collect personal information from children or other users.
+today-md is a general-purpose productivity app and is not directed to children. The app does not knowingly collect personal information from children.
 
 ## 10. Your privacy rights
 
 Depending on where you live, you may have rights concerning personal data held by a business. We generally cannot access, correct, export, or delete data stored only on your device because we do not possess it. You can use the controls described above to manage that data directly.
 
-For information voluntarily provided in a support request, contact us using the method below.
+For license activation records or information voluntarily provided in a support request, contact us using the method below.
 
 ## 11. Changes to this policy
 
@@ -76,4 +82,4 @@ We may update this Privacy Policy if today-md's features, data practices, or leg
 
 ## 12. Contact
 
-For privacy questions or requests, open an issue at [github.com/arthurliebhardt/today-md/issues](https://github.com/arthurliebhardt/today-md/issues).
+For privacy questions or requests, email [support@todaymd.app](mailto:support@todaymd.app). General questions can also be raised at [github.com/arthurliebhardt/today-md/issues](https://github.com/arthurliebhardt/today-md/issues), but do not post personal license or purchase details in public issues.

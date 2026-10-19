@@ -41,6 +41,21 @@ public struct Unlock: Sendable {
         return license
     }
 
+    /// Resolves a short purchase key once, then saves its verified offline credential.
+    /// Existing signed keys still work without a network call.
+    @discardableResult
+    public func enter(
+        key: String,
+        activate: @Sendable (String) async throws -> ToolsToKeepAPI.ActivationResult
+    ) async throws -> License {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard LicenseKey.isShort(key) else { return try enter(key: key) }
+        let result = try await activate(key)
+        guard result.ok else { throw LicenseError.activationFailed(result.error) }
+        guard let credential = result.license else { throw LicenseError.malformed }
+        return try enter(key: credential)
+    }
+
     /// The verified StoreKit transaction for this tool's unlock, if the user owns it
     /// (purchased, restored or Family Shared; refunded purchases are excluded).
     public func appStoreTransaction() async -> Transaction? {

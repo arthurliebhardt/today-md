@@ -251,7 +251,7 @@ struct TodayMdProView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
-                    TextField("TTK1.…", text: $licenseKey)
+                    TextField("ttk_…", text: $licenseKey)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                         .disableAutocorrection(true)

@@ -79,20 +79,26 @@ final class TodayMdPurchaseManager: ObservableObject {
     private let verifier: LicenseVerifier?
     private let licenseStore: LicenseStore
     private let activate: @Sendable (String) async throws -> ToolsToKeepAPI.ActivationResult
+    private let licenseCheckDefaults: UserDefaults
     private var transactionUpdatesTask: Task<Void, Never>?
+    private var licenseCheckTask: Task<Void, Never>?
+    private var isCheckingLicense = false
+    static let lastLicenseCheckKey = "TodayMdLastLicenseCheck"
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         licensePublicKey: String = TodayMdPurchaseManager.activeLicensePublicKey,
         licenseStore: LicenseStore = LicenseStore(service: "com.today-md.app.license"),
         activate: @escaping @Sendable (String) async throws -> ToolsToKeepAPI.ActivationResult = { key in
-            try await TodayMdPurchaseManager.api.activate(key: key)
-        }
+            try await TodayMdPurchaseManager.api.activate(key: key, tool: TodayMdPurchaseManager.licenseTool)
+        },
+        licenseCheckDefaults: UserDefaults = .standard
     ) {
         edition = Self.edition(environment: environment)
         verifier = try? LicenseVerifier(publicKeyBase64: licensePublicKey)
         self.licenseStore = licenseStore
         self.activate = activate
+        self.licenseCheckDefaults = licenseCheckDefaults
         accessState = edition == .openSource ? .pro : .checking
 
         if edition != .openSource {
@@ -100,7 +106,10 @@ final class TodayMdPurchaseManager: ObservableObject {
             if license != nil { accessState = .pro }
         }
         guard edition == .appStore else {
-            if edition == .licensed, license == nil { accessState = .free }
+            if edition == .licensed {
+                if license == nil { accessState = .free }
+                licenseCheckTask = checkLicenseWhenActivated()
+            }
             return
         }
         transactionUpdatesTask = observeTransactionUpdates()
@@ -108,6 +117,7 @@ final class TodayMdPurchaseManager: ObservableObject {
 
     deinit {
         transactionUpdatesTask?.cancel()
+        licenseCheckTask?.cancel()
     }
 
     var hasProAccess: Bool {
@@ -211,7 +221,10 @@ final class TodayMdPurchaseManager: ObservableObject {
     }
 
     func prepare() async {
-        guard edition == .appStore else { return }
+        guard edition == .appStore else {
+            await checkLicenseIfDue()
+            return
+        }
 
         async let productLoad: Void = loadProduct()
         async let entitlementRefresh: Void = refreshEntitlements()
@@ -242,12 +255,10 @@ final class TodayMdPurchaseManager: ObservableObject {
     /// Whether this build can check license keys at all.
     var canUseLicenseKeys: Bool { verifier != nil && edition != .openSource }
 
-    /// "I already have a license": checks the key offline. The direct download
-    /// then activates this Mac once (the license allows a few devices); if
-    /// toolstokeep.com can't be reached the key is still accepted, and it is
-    /// only refused when the server says it was revoked or its device limit is
-    /// used up. The App Store edition never calls toolstokeep.com: it has no
-    /// network entitlement and its privacy details promise no developer server.
+    /// Short purchase keys need one online activation in either edition. The
+    /// signed credential returned by the server is verified and kept for offline
+    /// use. Existing signed keys still work offline; only the direct download
+    /// checks their activation and device limit with toolstokeep.com.
     func enterLicense(_ rawKey: String) async {
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let verifier else {
@@ -256,51 +267,122 @@ final class TodayMdPurchaseManager: ObservableObject {
         }
         guard !isActivatingLicense else { return }
         message = nil
-
-        let verified: License
-        do {
-            verified = try verifier.verify(key, tool: Self.licenseTool)
-        } catch LicenseError.wrongTool {
-            message = "That key is for a different toolstokeep app."
-            return
-        } catch {
-            message = "That doesn't look like a valid today-md license key. Paste the whole key from your email."
-            return
-        }
-
         isActivatingLicense = true
         defer { isActivatingLicense = false }
-        if edition == .licensed {
+
+        var credential = key
+        let verified: License
+        if LicenseKey.isShort(key) {
+            let result: ToolsToKeepAPI.ActivationResult
             do {
-                let result = try await activate(key)
-                if !result.ok {
-                    switch result.error {
-                    case "revoked": message = "This license was refunded or revoked."
-                    case "device_limit": message = "This license is already active on \(result.max_devices ?? verified.maxDevices) Macs. Email support@todaymd.app to move it."
-                    default: message = "toolstokeep.com didn't accept this key. Check that you pasted all of it."
-                    }
-                    return
-                }
+                result = try await activate(key)
             } catch {
-                // Offline or toolstokeep.com unreachable: the signature is valid, so unlock.
+                message = "Connect to the internet to activate this short license key. Once activated, it works offline."
+                return
+            }
+            guard result.ok else {
+                message = licenseActivationError(result)
+                return
+            }
+            guard let certificate = result.license else {
+                message = "toolstokeep.com didn't return a valid license. Try activating again."
+                return
+            }
+            do {
+                verified = try verifier.verify(certificate, tool: Self.licenseTool)
+                credential = certificate.trimmingCharacters(in: .whitespacesAndNewlines)
+            } catch LicenseError.wrongTool {
+                message = "That key is for a different toolstokeep app."
+                return
+            } catch {
+                message = "toolstokeep.com returned a license that couldn't be verified. Try activating again."
+                return
+            }
+        } else {
+            do {
+                verified = try verifier.verify(key, tool: Self.licenseTool)
+            } catch LicenseError.wrongTool {
+                message = "That key is for a different toolstokeep app."
+                return
+            } catch {
+                message = "That doesn't look like a valid today-md license key. Paste the whole key from your email."
+                return
+            }
+            if edition == .licensed {
+                do {
+                    let result = try await activate(key)
+                    guard result.ok else {
+                        message = licenseActivationError(result, maxDevices: verified.maxDevices)
+                        return
+                    }
+                } catch {
+                    // Offline or toolstokeep.com unreachable: the signature is valid, so unlock.
+                }
             }
         }
 
         do {
-            try licenseStore.save(key, tool: Self.licenseTool)
+            try licenseStore.save(credential, tool: Self.licenseTool)
         } catch {
             message = "The license is valid but couldn't be saved to the Keychain."
             return
         }
         license = verified
         accessState = .pro
+        licenseCheckDefaults.set(Date(), forKey: Self.lastLicenseCheckKey)
         message = "today-md Pro is unlocked with your license for \(verified.email)."
+    }
+
+    private func licenseActivationError(_ result: ToolsToKeepAPI.ActivationResult, maxDevices: Int? = nil) -> String {
+        switch result.error {
+        case "revoked":
+            return "This license was refunded or revoked."
+        case "device_limit":
+            if let limit = result.max_devices ?? maxDevices {
+                return "This license is already active on \(limit) Macs. Email support@todaymd.app to move it."
+            }
+            return "This license has reached its device limit. Email support@todaymd.app to move it."
+        case "wrong_tool":
+            return "That key is for a different toolstokeep app."
+        default:
+            return "toolstokeep.com didn't accept this key. Check that you pasted all of it."
+        }
     }
 
     func removeLicense() async {
         licenseStore.remove(tool: Self.licenseTool)
+        licenseCheckDefaults.removeObject(forKey: Self.lastLicenseCheckKey)
         license = nil
         await refreshEntitlements()
+    }
+
+    /// Licensed edition: about once a week, asks toolstokeep.com whether the
+    /// saved key was refunded, disputed or revoked, and turns Pro off if so.
+    /// Offline, or any answer other than "revoked", changes nothing. The App
+    /// Store edition never makes this automatic call.
+    func checkLicenseIfDue(now: Date = Date()) async {
+        guard edition == .licensed, license != nil, !isCheckingLicense,
+              let key = licenseStore.load(tool: Self.licenseTool),
+              LicenseCheck.isDue(lastChecked: licenseCheckDefaults.object(forKey: Self.lastLicenseCheckKey) as? Date, now: now)
+        else { return }
+        isCheckingLicense = true
+        defer { isCheckingLicense = false }
+
+        let status = await LicenseCheck.status(of: key, activate: activate)
+        // The key may have been replaced or removed while the check ran.
+        guard licenseStore.load(tool: Self.licenseTool) == key else { return }
+        switch status {
+        case .valid:
+            licenseCheckDefaults.set(now, forKey: Self.lastLicenseCheckKey)
+        case .revoked:
+            licenseStore.remove(tool: Self.licenseTool)
+            licenseCheckDefaults.removeObject(forKey: Self.lastLicenseCheckKey)
+            license = nil
+            accessState = .free
+            message = "Your today-md license was refunded or revoked, so Pro is turned off on this Mac."
+        case .unknown:
+            break
+        }
     }
 
     func openStore() {
@@ -408,6 +490,17 @@ final class TodayMdPurchaseManager: ObservableObject {
         } catch {
             if accessState != .pro {
                 message = Self.purchaseErrorMessage(for: error)
+            }
+        }
+    }
+
+    /// Runs the weekly license check whenever the app comes to the front, so a
+    /// Mac that keeps today-md open for weeks is checked too.
+    private func checkLicenseWhenActivated() -> Task<Void, Never> {
+        Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
+                guard !Task.isCancelled else { return }
+                await self?.checkLicenseIfDue()
             }
         }
     }

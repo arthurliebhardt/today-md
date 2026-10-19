@@ -43,7 +43,7 @@ Do not notarize the Mac App Store archive separately. App Store distribution and
 - Primary category: Productivity
 - Support URL: `https://github.com/arthurliebhardt/today-md/issues`
 - Privacy policy URL: `https://github.com/arthurliebhardt/today-md/blob/main/PRIVACY.md`
-- App privacy: `No, we do not collect data from this app`, provided no analytics or remote service is added before submission.
+- App privacy: optional short-key activation sends the license key and a hashed device identifier to toolstokeep.com for app functionality. Declare User ID and Device ID, linked to the purchase and never used for tracking. Existing signed keys activate offline in the App Store edition, and this edition performs no automatic license checks. The privacy manifest records the optional activation data.
 - Copyright: `© 2026 Arthur Liebhardt`
 
 Use the text under `metadata/en-US` for the first listing, then review it directly in App Store Connect before submission.

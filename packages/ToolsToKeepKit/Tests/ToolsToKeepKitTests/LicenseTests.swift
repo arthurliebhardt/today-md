@@ -1,13 +1,14 @@
+import Foundation
 import Testing
 @testable import ToolsToKeepKit
 
 @Suite struct LicenseTests {
     let verifier = try! LicenseVerifier(publicKeyBase64: Fixture.publicKey)
 
+    // The fixture predates lifetime updates and still carries updates_until.
     @Test func verifiesAKeySignedByTheServer() throws {
         let license = try verifier.verify(Fixture.recorderKey, tool: "recorder")
         #expect(license.email == "buyer@example.com")
-        #expect(license.updatesUntil == "2027-10-18")
         #expect(license.maxDevices == 3)
     }
 
@@ -39,11 +40,103 @@ import Testing
         #expect(throws: LicenseError.malformed) { try verifier.verify("not a key", tool: "recorder") }
     }
 
-    @Test func updatesFollowTheUpdateWindow() throws {
-        let license = try verifier.verify(Fixture.recorderKey, tool: "recorder")
-        #expect(license.includesUpdate(releasedOn: "2027-01-01"))
-        #expect(license.includesUpdate(releasedOn: "2027-10-18"))
-        #expect(!license.includesUpdate(releasedOn: "2028-01-01"))
+    @Test func recognizesOnlyCompleteShortKeys() {
+        #expect(LicenseKey.isShort("ttk_abcdefghijklmnopqrstuv"))
+        #expect(LicenseKey.isShort("ttk_Abcdef0123456789_-ABCD"))
+        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstu"))
+        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstuvw"))
+        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstu!"))
+        #expect(!LicenseKey.isShort("TTK_abcdefghijklmnopqrstuv"))
+        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstué"))
+    }
+
+    @Test func activationResultDecodesOptionalOfflineCredential() throws {
+        let data = try JSONSerialization.data(withJSONObject: ["ok": true, "license": Fixture.recorderKey])
+        let result = try JSONDecoder().decode(ToolsToKeepAPI.ActivationResult.self, from: data)
+        #expect(result.license == Fixture.recorderKey)
+        let legacy = try JSONDecoder().decode(ToolsToKeepAPI.ActivationResult.self, from: Data("{\"ok\":true}".utf8))
+        #expect(legacy.license == nil)
+    }
+
+    @Test func shortKeySavesTheVerifiedCredentialForOfflineUse() async throws {
+        let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
+        defer { store.remove(tool: "recorder") }
+        let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        let license = try await unlock.enter(key: "  ttk_abcdefghijklmnopqrstuv\n") { key in
+            #expect(key == "ttk_abcdefghijklmnopqrstuv")
+            return .init(ok: true, error: nil, tool: "recorder", max_devices: 3, license: Fixture.recorderKey)
+        }
+        #expect(license.email == "buyer@example.com")
+        #expect(store.load(tool: "recorder") == Fixture.recorderKey)
+        #expect(await unlock.current() == .license(license))
+    }
+
+    @Test func shortKeyRejectsUnverifiedCertificates() async throws {
+        let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
+        defer { store.remove(tool: "recorder") }
+        let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        let tampered = String(Fixture.recorderKey.dropLast(4)) + "AAAA"
+        for credential in [nil, "not a certificate", tampered] {
+            await #expect(throws: (any Error).self) {
+                try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+                    .init(ok: true, error: nil, tool: "recorder", max_devices: 3, license: credential)
+                }
+            }
+            #expect(store.load(tool: "recorder") == nil)
+        }
+        let otherTool = try Unlock(tool: "other", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        await #expect(throws: LicenseError.wrongTool("recorder")) {
+            try await otherTool.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+                .init(ok: true, error: nil, tool: "other", max_devices: 3, license: Fixture.recorderKey)
+            }
+        }
+        #expect(store.load(tool: "other") == nil)
+    }
+
+    @Test func shortKeyCannotUnlockOfflineOrWhenActivationIsRefused() async throws {
+        let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
+        defer { store.remove(tool: "recorder") }
+        let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        await #expect(throws: (any Error).self) {
+            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in throw URLError(.notConnectedToInternet) }
+        }
+        await #expect(throws: LicenseError.activationFailed("revoked")) {
+            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+                .init(ok: false, error: "revoked", tool: nil, max_devices: nil, license: Fixture.recorderKey)
+            }
+        }
+        #expect(store.load(tool: "recorder") == nil)
+    }
+
+    @Test func asyncEntryKeepsLegacyKeysOffline() async throws {
+        let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
+        defer { store.remove(tool: "recorder") }
+        let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        let license = try await unlock.enter(key: Fixture.recorderKey) { _ in
+            Issue.record("Legacy key entry must not contact the activation server")
+            throw URLError(.notConnectedToInternet)
+        }
+        #expect(license.email == "buyer@example.com")
+    }
+
+    @Test func checkIsDueWeekly() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(LicenseCheck.isDue(lastChecked: nil, now: now))
+        #expect(!LicenseCheck.isDue(lastChecked: now.addingTimeInterval(-6 * 86_400), now: now))
+        #expect(LicenseCheck.isDue(lastChecked: now.addingTimeInterval(-7 * 86_400), now: now))
+        // A clock set back must not postpone the check forever.
+        #expect(LicenseCheck.isDue(lastChecked: now.addingTimeInterval(86_400), now: now))
+    }
+
+    @Test func onlyAnExplicitRevocationRevokes() async {
+        func answer(_ ok: Bool, _ error: String?) -> @Sendable (String) async throws -> ToolsToKeepAPI.ActivationResult {
+            { _ in ToolsToKeepAPI.ActivationResult(ok: ok, error: error, tool: "recorder", max_devices: 3) }
+        }
+        #expect(await LicenseCheck.status(of: Fixture.recorderKey, activate: answer(true, nil)) == .valid)
+        #expect(await LicenseCheck.status(of: Fixture.recorderKey, activate: answer(false, "revoked")) == .revoked)
+        #expect(await LicenseCheck.status(of: Fixture.recorderKey, activate: answer(false, "rate_limited")) == .unknown)
+        #expect(await LicenseCheck.status(of: Fixture.recorderKey, activate: answer(false, "device_limit")) == .unknown)
+        #expect(await LicenseCheck.status(of: Fixture.recorderKey) { _ in throw URLError(.notConnectedToInternet) } == .unknown)
     }
 
     @Test func deviceHashIsStableHex() {
