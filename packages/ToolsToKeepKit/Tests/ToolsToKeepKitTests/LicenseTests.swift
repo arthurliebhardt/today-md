@@ -42,6 +42,7 @@ import Testing
     @Test func updatesFollowTheUpdateWindow() throws {
         let license = try verifier.verify(Fixture.recorderKey, tool: "recorder")
         #expect(license.includesUpdate(releasedOn: "2027-01-01"))
+        #expect(license.includesUpdate(releasedOn: "2027-10-18"))
         #expect(!license.includesUpdate(releasedOn: "2028-01-01"))
     }
 

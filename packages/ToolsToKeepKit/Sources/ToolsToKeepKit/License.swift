@@ -10,7 +10,8 @@ public struct License: Codable, Equatable, Sendable {
     public let tool: String
     public let email: String
     public let issued: String
-    public let updatesUntil: String
+    /// Nil grants lifetime updates; legacy licenses retain their signed cutoff.
+    public let updatesUntil: String?
     public let maxDevices: Int
 
     enum CodingKeys: String, CodingKey {
@@ -20,9 +21,10 @@ public struct License: Codable, Equatable, Sendable {
     }
 
     /// Whether a release published on `releaseDate` (YYYY-MM-DD) is included.
-    /// Older releases always are; the license itself never expires.
+    /// A missing cutoff includes every release. Dated licenses keep their update window.
     public func includesUpdate(releasedOn releaseDate: String) -> Bool {
-        releaseDate <= updatesUntil
+        guard let updatesUntil else { return true }
+        return releaseDate <= updatesUntil
     }
 }
 
