@@ -40,6 +40,22 @@ OUT="build/direct/$VERSION"
 mkdir -p "$OUT/export" "$OUT/diagnostics"
 work_dir=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/today-md-direct.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT
+stapler_with_retry() {
+  local attempt status=1
+  for attempt in 1 2 3; do
+    if xcrun stapler "$@"; then
+      return 0
+    else
+      status=$?
+    fi
+    [[ "$status" == 68 ]] || return "$status"
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "Stapler $1 returned network error 68; retrying ($attempt/3)" >&2
+      sleep "$((attempt * 5))"
+    fi
+  done
+  return "$status"
+}
 cp /usr/bin/true "$work_dir/signing-canary"
 python3 - "$CODESIGN_IDENTITY" "$CODESIGN_KEYCHAIN" "$work_dir/signing-canary" <<'PY'
 import subprocess, sys
@@ -99,15 +115,15 @@ if result.get("status") != "Accepted":
     sys.exit("Apple notarization was not Accepted; submission " + str(result.get("id")))
 print("Apple notarization accepted: " + result["id"])
 PY
-xcrun stapler staple "$APP"
-xcrun stapler validate "$APP"
+stapler_with_retry staple "$APP"
+stapler_with_retry validate "$APP"
 spctl --assess --type execute --verbose=2 "$APP"
 rm "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 mkdir "$work_dir/unpacked"
 ditto -x -k "$ZIP" "$work_dir/unpacked"
 codesign --verify --deep --strict --verbose=2 -R="$developer_id_requirement" "$work_dir/unpacked/today-md.app"
-xcrun stapler validate "$work_dir/unpacked/today-md.app"
+stapler_with_retry validate "$work_dir/unpacked/today-md.app"
 spctl --assess --type execute --verbose=2 "$work_dir/unpacked/today-md.app"
 ditto -c -k --sequesterRsrc --keepParent "$OUT/today-md.xcarchive/dSYMs" "$OUT/today-md-$VERSION.dSYM.zip"
 python3 - "$OUT/release.json" <<'PY'
