@@ -41,13 +41,20 @@ import Testing
     }
 
     @Test func recognizesOnlyCompleteShortKeys() {
+        #expect(LicenseKey.isShort("ttk_abcdefghijklmnopqrstuvwxyz012345"))
+        #expect(LicenseKey.isShort("ttk_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123_-"))
         #expect(LicenseKey.isShort("ttk_abcdefghijklmnopqrstuv"))
         #expect(LicenseKey.isShort("ttk_Abcdef0123456789_-ABCD"))
-        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstu"))
-        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstuvw"))
-        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstu!"))
-        #expect(!LicenseKey.isShort("TTK_abcdefghijklmnopqrstuv"))
-        #expect(!LicenseKey.isShort("ttk_abcdefghijklmnopqrstué"))
+        for length in 0...40 {
+            #expect(LicenseKey.isShort("ttk_" + String(repeating: "a", count: length)) == (length == 22 || length == 32))
+        }
+        for length in [22, 32] {
+            let payload = String(repeating: "a", count: length - 1)
+            for invalid in ["!", "=", "+", "/", ".", " ", "\n", "é"] {
+                #expect(!LicenseKey.isShort("ttk_" + payload + invalid))
+            }
+            #expect(!LicenseKey.isShort("TTK_" + payload + "a"))
+        }
     }
 
     @Test func activationResultDecodesOptionalOfflineCredential() throws {
@@ -62,7 +69,20 @@ import Testing
         let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
         defer { store.remove(tool: "recorder") }
         let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
-        let license = try await unlock.enter(key: "  ttk_abcdefghijklmnopqrstuv\n") { key in
+        let license = try await unlock.enter(key: "  ttk_abcdefghijklmnopqrstuvwxyz012345\n") { key in
+            #expect(key == "ttk_abcdefghijklmnopqrstuvwxyz012345")
+            return .init(ok: true, error: nil, tool: "recorder", max_devices: 3, license: Fixture.recorderKey)
+        }
+        #expect(license.email == "buyer@example.com")
+        #expect(store.load(tool: "recorder") == Fixture.recorderKey)
+        #expect(await unlock.current() == .license(license))
+    }
+
+    @Test func legacyShortKeyStillExchangesForAnOfflineCredential() async throws {
+        let store = LicenseStore(service: "com.toolstokeep.tests.\(UUID().uuidString)")
+        defer { store.remove(tool: "recorder") }
+        let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
+        let license = try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { key in
             #expect(key == "ttk_abcdefghijklmnopqrstuv")
             return .init(ok: true, error: nil, tool: "recorder", max_devices: 3, license: Fixture.recorderKey)
         }
@@ -78,7 +98,7 @@ import Testing
         let tampered = String(Fixture.recorderKey.dropLast(4)) + "AAAA"
         for credential in [nil, "not a certificate", tampered] {
             await #expect(throws: (any Error).self) {
-                try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+                try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuvwxyz012345") { _ in
                     .init(ok: true, error: nil, tool: "recorder", max_devices: 3, license: credential)
                 }
             }
@@ -86,7 +106,7 @@ import Testing
         }
         let otherTool = try Unlock(tool: "other", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
         await #expect(throws: LicenseError.wrongTool("recorder")) {
-            try await otherTool.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+            try await otherTool.enter(key: "ttk_abcdefghijklmnopqrstuvwxyz012345") { _ in
                 .init(ok: true, error: nil, tool: "other", max_devices: 3, license: Fixture.recorderKey)
             }
         }
@@ -98,10 +118,10 @@ import Testing
         defer { store.remove(tool: "recorder") }
         let unlock = try Unlock(tool: "recorder", productID: "test", publicKeyBase64: Fixture.publicKey, store: store)
         await #expect(throws: (any Error).self) {
-            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in throw URLError(.notConnectedToInternet) }
+            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuvwxyz012345") { _ in throw URLError(.notConnectedToInternet) }
         }
         await #expect(throws: LicenseError.activationFailed("revoked")) {
-            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuv") { _ in
+            try await unlock.enter(key: "ttk_abcdefghijklmnopqrstuvwxyz012345") { _ in
                 .init(ok: false, error: "revoked", tool: nil, max_devices: nil, license: Fixture.recorderKey)
             }
         }

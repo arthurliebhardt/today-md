@@ -32,7 +32,7 @@ public enum LicenseError: Error, Equatable {
 public enum LicenseKey {
     public static func isShort(_ key: String) -> Bool {
         let bytes = Array(key.utf8)
-        guard bytes.count == 26, key.hasPrefix("ttk_") else { return false }
+        guard (bytes.count == 26 || bytes.count == 36), key.hasPrefix("ttk_") else { return false }
         return bytes.dropFirst(4).allSatisfy {
             (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95
         }

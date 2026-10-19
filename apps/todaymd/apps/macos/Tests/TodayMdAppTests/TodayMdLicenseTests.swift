@@ -40,7 +40,7 @@ final class TodayMdLicenseTests: XCTestCase {
 
     private let licensedBuild = [TodayMdPurchaseManager.licensedEnvironmentKey: "1"]
     private let appStoreBuild = [TodayMdPurchaseManager.storeKitTestingEnvironmentKey: "1"]
-    private let shortKey = "ttk_abcdefghijklmnopqrstuv"
+    private let shortKey = "ttk_abcdefghijklmnopqrstuvwxyz012345"
     private var shortActivation: ToolsToKeepAPI.ActivationResult {
         .init(ok: true, error: nil, tool: "todaymd", max_devices: 3, license: LicenseFixture.todaymdKey)
     }
@@ -99,6 +99,19 @@ final class TodayMdLicenseTests: XCTestCase {
             await manager.enterLicense("  \(shortKey)\n")
             XCTAssertTrue(manager.hasProAccess)
             XCTAssertEqual(manager.license?.email, "buyer@example.com")
+            XCTAssertEqual(store.load(tool: TodayMdPurchaseManager.licenseTool), LicenseFixture.todaymdKey)
+
+            let relaunched = self.manager(environment: environment, activation: nil)
+            XCTAssertTrue(relaunched.hasProAccess)
+        }
+    }
+
+    func testLegacyShortKeyStillUnlocksBothEditions() async {
+        for environment in [licensedBuild, appStoreBuild] {
+            store.remove(tool: TodayMdPurchaseManager.licenseTool)
+            let manager = manager(environment: environment, activation: shortActivation)
+            await manager.enterLicense("ttk_abcdefghijklmnopqrstuv")
+            XCTAssertTrue(manager.hasProAccess)
             XCTAssertEqual(store.load(tool: TodayMdPurchaseManager.licenseTool), LicenseFixture.todaymdKey)
 
             let relaunched = self.manager(environment: environment, activation: nil)
