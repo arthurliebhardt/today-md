@@ -6,7 +6,7 @@
   "release_version": "1.8.4",
   "release_build": "35",
   "files": {
-    ".github/workflows/release-macos.yml": "036c67257f0135e67bac9bbff704b7debe343e6cef04f280729210d774127609",
+    ".github/workflows/release-macos.yml": "82d8d83b6cd0a1f38237b52ed18deb31056b338477eb7aaa457571ef6b3f3154",
     "apps/todaymd/apps/macos/.gitignore": "0f299048e45bba18295eaa5d0594f368f7991c553938623733c28dc8ac114bb2",
     "apps/todaymd/apps/macos/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
     "apps/todaymd/apps/macos/AppStore/README.md": "a76712c89f8071795ce263e41fe32d20fd8125c8e8c85dd96a24bc68fad24086",
@@ -207,18 +207,18 @@
     "file": ".github/workflows/release-macos.yml",
     "canonical_source": "apps/todaymd/.github/workflows/release-direct-macos.yml",
     "original_group": "today-md-direct-signing",
-    "previous_group": "today-md-direct-1.8.4-a302078",
-    "new_group": "today-md-direct-1.8.4-a302078-macos26",
+    "new_group": "today-md-direct-1.8.4-a302078-intel",
     "original_runner_label": "macos-15",
-    "new_runner_label": "macos-26",
+    "new_runner_label": "macos-15-intel",
     "developer_dir_unchanged": "/Applications/Xcode_26.3.app/Contents/Developer",
     "canonical_sha256": "b9ee4bfa4c85d8da4ecaaaf8730cd5f23a1acf3e007f3ceeeae391b4b07183e4",
-    "override_sha256": "036c67257f0135e67bac9bbff704b7debe343e6cef04f280729210d774127609",
-    "reason": "The shared concurrency group was gated by an old run with inconsistent GitHub read/cancel state. The isolated macos-15 run then remained queued without a runner. Use the officially supported macos-26 pool and a separate group, preserving app/SDK source and every universal signing/notarization check.",
+    "override_sha256": "82d8d83b6cd0a1f38237b52ed18deb31056b338477eb7aaa457571ef6b3f3154",
+    "reason": "One parallel Intel-pool candidate while the macos-26 candidate waits for hosted compute. Build source, Xcode version, and all universal signing/notarization checks are unchanged. Only the first independently verified candidate can be published.",
     "official_sources": [
       "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
-      "https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md",
+      "https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md",
       "https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary"
     ]
-  }
+  },
+  "candidate": "intel"
 }
