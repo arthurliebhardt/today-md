@@ -1,0 +1,801 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000054 /* TodayMdFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000057 /* TodayMdFeedbackView.swift */; };
+		AA000055 /* TodayMdFeedbackReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000058 /* TodayMdFeedbackReport.swift */; };
+		AA000001 /* TodayMdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001 /* TodayMdApp.swift */; };
+		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002 /* ContentView.swift */; };
+		AA000003 /* TaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003 /* TaskList.swift */; };
+		AA000004 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004 /* TaskItem.swift */; };
+		AA000005 /* SubTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000005 /* SubTask.swift */; };
+		AA000006 /* TaskNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000006 /* TaskNote.swift */; };
+		AA000007 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000007 /* SidebarView.swift */; };
+		AA000008 /* KanbanBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000008 /* KanbanBoardView.swift */; };
+		AA000009 /* KanbanColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000009 /* KanbanColumnView.swift */; };
+		AA000010 /* TaskCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010 /* TaskCardView.swift */; };
+		AA000011 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011 /* TaskDetailView.swift */; };
+		AA000012 /* SubTaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012 /* SubTaskListView.swift */; };
+		AA000013 /* MarkdownEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000013 /* MarkdownEditorView.swift */; };
+		AA000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB000015 /* Assets.xcassets */; };
+		AA000016 /* BacklogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018 /* BacklogView.swift */; };
+		AA000017 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019 /* WeeklyReviewView.swift */; };
+		AA000020 /* ChecklistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020 /* ChecklistSection.swift */; };
+		AA000021 /* TodayMdTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021 /* TodayMdTransferService.swift */; };
+		AA000022 /* TodayMdArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022 /* TodayMdArchive.swift */; };
+		AA000023 /* TodayMdDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023 /* TodayMdDatabase.swift */; };
+		AA000024 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024 /* libsqlite3.tbd */; };
+		AA000025 /* SearchPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025 /* SearchPresentation.swift */; };
+		AA000026 /* TodayMdSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026 /* TodayMdSyncService.swift */; };
+		AA000027 /* MarkdownInlineDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000027 /* MarkdownInlineDisplay.swift */; };
+		AA000028 /* InlineMarkdownTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028 /* InlineMarkdownTextEditor.swift */; };
+		AA000034 /* TodayMdMenuBarExtraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035 /* TodayMdMenuBarExtraView.swift */; };
+		AA000035 /* GlobalDynamicIslandController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000036 /* GlobalDynamicIslandController.swift */; };
+		AA000036 /* TodayMdCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000037 /* TodayMdCalendarService.swift */; };
+		AA000037 /* TaskCalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000038 /* TaskCalendarPlannerView.swift */; };
+		AA000038 /* TodayMdObsidianBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000039 /* TodayMdObsidianBridge.swift */; };
+		AA000039 /* TodayMdWeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000040 /* TodayMdWeekCalendar.swift */; };
+		AA000040 /* TodayMdStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000041 /* TodayMdStore.swift */; };
+		AA000041 /* TodayMdAppSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000042 /* TodayMdAppSupport.swift */; };
+		AA000042 /* WorkspaceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000043 /* WorkspaceSupport.swift */; };
+		AA000043 /* CalendarViewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000044 /* CalendarViewSupport.swift */; };
+		AA000044 /* WeekCalendarPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000045 /* WeekCalendarPanelView.swift */; };
+		AA000045 /* WeekCalendarCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000046 /* WeekCalendarCanvasView.swift */; };
+		AA000046 /* WorkspaceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000047 /* WorkspaceCommands.swift */; };
+		AA000047 /* KeyboardShortcutMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000048 /* KeyboardShortcutMonitor.swift */; };
+		AA000048 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000049 /* SettingsView.swift */; };
+		AA000049 /* TodayMdPurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000050 /* TodayMdPurchaseManager.swift */; };
+		AA000050 /* TodayMdProView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000051 /* TodayMdProView.swift */; };
+		AA000051 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AB000053 /* PrivacyInfo.xcprivacy */; };
+		AA0000F1 /* ToolsToKeepKit in Frameworks */ = {isa = PBXBuildFile; productRef = AG000012 /* ToolsToKeepKit */; };
+		AA0000F2 /* ToolsToKeepKit in Frameworks */ = {isa = PBXBuildFile; productRef = AG000012 /* ToolsToKeepKit */; };
+		AA000052 /* TodayMdUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000054 /* TodayMdUpdateManager.swift */; };
+		AA000053 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AG000002 /* Sparkle */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AB000057 /* TodayMdFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdFeedbackView.swift; sourceTree = "<group>"; };
+		AB000058 /* TodayMdFeedbackReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdFeedbackReport.swift; sourceTree = "<group>"; };
+		AB000000 /* today-md.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "today-md.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000001 /* TodayMdApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdApp.swift; sourceTree = "<group>"; };
+		AB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AB000003 /* TaskList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskList.swift; sourceTree = "<group>"; };
+		AB000004 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
+		AB000005 /* SubTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubTask.swift; sourceTree = "<group>"; };
+		AB000006 /* TaskNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskNote.swift; sourceTree = "<group>"; };
+		AB000007 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		AB000008 /* KanbanBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoardView.swift; sourceTree = "<group>"; };
+		AB000009 /* KanbanColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanColumnView.swift; sourceTree = "<group>"; };
+		AB000010 /* TaskCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCardView.swift; sourceTree = "<group>"; };
+		AB000011 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		AB000012 /* SubTaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubTaskListView.swift; sourceTree = "<group>"; };
+		AB000013 /* MarkdownEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditorView.swift; sourceTree = "<group>"; };
+		AB000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AB000016 /* today-md.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "today-md.entitlements"; sourceTree = "<group>"; };
+		AB000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AB000018 /* BacklogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklogView.swift; sourceTree = "<group>"; };
+		AB000019 /* WeeklyReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewView.swift; sourceTree = "<group>"; };
+		AB000020 /* ChecklistSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistSection.swift; sourceTree = "<group>"; };
+		AB000021 /* TodayMdTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdTransferService.swift; sourceTree = "<group>"; };
+		AB000022 /* TodayMdArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdArchive.swift; sourceTree = "<group>"; };
+		AB000023 /* TodayMdDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdDatabase.swift; sourceTree = "<group>"; };
+		AB000024 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		AB000025 /* SearchPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPresentation.swift; sourceTree = "<group>"; };
+		AB000026 /* TodayMdSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdSyncService.swift; sourceTree = "<group>"; };
+		AB000027 /* MarkdownInlineDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownInlineDisplay.swift; sourceTree = "<group>"; };
+		AB000028 /* InlineMarkdownTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownTextEditor.swift; sourceTree = "<group>"; };
+		AB000035 /* TodayMdMenuBarExtraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdMenuBarExtraView.swift; sourceTree = "<group>"; };
+		AB000036 /* GlobalDynamicIslandController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalDynamicIslandController.swift; sourceTree = "<group>"; };
+		AB000037 /* TodayMdCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdCalendarService.swift; sourceTree = "<group>"; };
+		AB000038 /* TaskCalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCalendarPlannerView.swift; sourceTree = "<group>"; };
+		AB000039 /* TodayMdObsidianBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdObsidianBridge.swift; sourceTree = "<group>"; };
+		AB000040 /* TodayMdWeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdWeekCalendar.swift; sourceTree = "<group>"; };
+		AB000041 /* TodayMdStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdStore.swift; sourceTree = "<group>"; };
+		AB000042 /* TodayMdAppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdAppSupport.swift; sourceTree = "<group>"; };
+		AB000043 /* WorkspaceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSupport.swift; sourceTree = "<group>"; };
+		AB000044 /* CalendarViewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewSupport.swift; sourceTree = "<group>"; };
+		AB000045 /* WeekCalendarPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendarPanelView.swift; sourceTree = "<group>"; };
+		AB000046 /* WeekCalendarCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendarCanvasView.swift; sourceTree = "<group>"; };
+		AB000047 /* WorkspaceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCommands.swift; sourceTree = "<group>"; };
+		AB000048 /* KeyboardShortcutMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMonitor.swift; sourceTree = "<group>"; };
+		AB000049 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AB000050 /* TodayMdPurchaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdPurchaseManager.swift; sourceTree = "<group>"; };
+		AB000051 /* TodayMdProView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdProView.swift; sourceTree = "<group>"; };
+		AB000052 /* today-md.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = "today-md.storekit"; sourceTree = "<group>"; };
+		AB000053 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AB000054 /* TodayMdUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayMdUpdateManager.swift; sourceTree = "<group>"; };
+		AB000055 /* today-md.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "today-md.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000056 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Version.xcconfig; path = Config/Version.xcconfig; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AC000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000024 /* libsqlite3.tbd in Frameworks */,
+				AA0000F1 /* ToolsToKeepKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AC000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000024 /* libsqlite3.tbd in Frameworks */,
+				AA000053 /* Sparkle in Frameworks */,
+				AA0000F2 /* ToolsToKeepKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AD000001 = {
+			isa = PBXGroup;
+			children = (
+				AD000002 /* today-md */,
+				AD000015 /* AppStore */,
+				AD000003 /* Products */,
+				AB000056 /* Version.xcconfig */,
+			);
+			sourceTree = "<group>";
+		};
+		AD000002 /* today-md */ = {
+			isa = PBXGroup;
+			children = (
+				AB000001 /* TodayMdApp.swift */,
+				AB000002 /* ContentView.swift */,
+				AB000036 /* GlobalDynamicIslandController.swift */,
+				AB000016 /* today-md.entitlements */,
+				AB000017 /* Info.plist */,
+				AB000053 /* PrivacyInfo.xcprivacy */,
+				AB000015 /* Assets.xcassets */,
+				AD000012 /* Stores */,
+				AD000013 /* Support */,
+				AD000004 /* Models */,
+				AD000005 /* Views */,
+				AD000009 /* Helpers */,
+			);
+			path = "today-md";
+			sourceTree = "<group>";
+		};
+		AD000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AB000000 /* today-md.app */,
+				AB000055 /* today-md.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AD000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AB000003 /* TaskList.swift */,
+				AB000004 /* TaskItem.swift */,
+				AB000005 /* SubTask.swift */,
+				AB000006 /* TaskNote.swift */,
+				AB000022 /* TodayMdArchive.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AD000005 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AD000016 /* Feedback */,
+				AD000006 /* Sidebar */,
+				AD000007 /* Kanban */,
+				AD000008 /* Detail */,
+				AD000011 /* MenuBar */,
+				AD000014 /* Settings */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AD000006 /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				AB000007 /* SidebarView.swift */,
+				AB000018 /* BacklogView.swift */,
+				AB000019 /* WeeklyReviewView.swift */,
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
+		AD000007 /* Kanban */ = {
+			isa = PBXGroup;
+			children = (
+				AB000008 /* KanbanBoardView.swift */,
+				AB000009 /* KanbanColumnView.swift */,
+				AB000010 /* TaskCardView.swift */,
+			);
+			path = Kanban;
+			sourceTree = "<group>";
+		};
+		AD000008 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				AB000011 /* TaskDetailView.swift */,
+				AB000012 /* SubTaskListView.swift */,
+				AB000013 /* MarkdownEditorView.swift */,
+				AB000038 /* TaskCalendarPlannerView.swift */,
+				AB000045 /* WeekCalendarPanelView.swift */,
+				AB000046 /* WeekCalendarCanvasView.swift */,
+				AB000028 /* InlineMarkdownTextEditor.swift */,
+				AB000020 /* ChecklistSection.swift */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		AD000009 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				AB000027 /* MarkdownInlineDisplay.swift */,
+				AB000025 /* SearchPresentation.swift */,
+				AB000021 /* TodayMdTransferService.swift */,
+				AB000026 /* TodayMdSyncService.swift */,
+				AB000039 /* TodayMdObsidianBridge.swift */,
+				AB000037 /* TodayMdCalendarService.swift */,
+				AB000040 /* TodayMdWeekCalendar.swift */,
+				AB000023 /* TodayMdDatabase.swift */,
+				AB000024 /* libsqlite3.tbd */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		AD000011 /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				AB000035 /* TodayMdMenuBarExtraView.swift */,
+			);
+			path = MenuBar;
+			sourceTree = "<group>";
+		};
+		AD000012 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				AB000041 /* TodayMdStore.swift */,
+				AB000050 /* TodayMdPurchaseManager.swift */,
+				AB000054 /* TodayMdUpdateManager.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		AD000013 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				AB000058 /* TodayMdFeedbackReport.swift */,
+				AB000042 /* TodayMdAppSupport.swift */,
+				AB000043 /* WorkspaceSupport.swift */,
+				AB000044 /* CalendarViewSupport.swift */,
+				AB000047 /* WorkspaceCommands.swift */,
+				AB000048 /* KeyboardShortcutMonitor.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		AD000014 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				AB000049 /* SettingsView.swift */,
+				AB000051 /* TodayMdProView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		AD000015 /* AppStore */ = {
+			isa = PBXGroup;
+			children = (
+				AB000052 /* today-md.storekit */,
+			);
+			path = AppStore;
+			sourceTree = "<group>";
+		};
+		AD000016 /* Feedback */ = {
+			isa = PBXGroup;
+			children = (
+				AB000057 /* TodayMdFeedbackView.swift */,
+			);
+			path = Feedback;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AE000001 /* today-md */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF000003 /* Build configuration list for PBXNativeTarget "today-md" */;
+			buildPhases = (
+				AE000002 /* Sources */,
+				AC000001 /* Frameworks */,
+				AE000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "today-md";
+			packageProductDependencies = (
+				AG000012 /* ToolsToKeepKit */,
+			);
+			productName = "today-md";
+			productReference = AB000000 /* today-md.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AE000021 /* today-md-github */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF000004 /* Build configuration list for PBXNativeTarget "today-md-github" */;
+			buildPhases = (
+				AE000022 /* Sources */,
+				AC000002 /* Frameworks */,
+				AE000023 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = "today-md-github";
+			packageProductDependencies = (
+				AG000002 /* Sparkle */,
+				AG000012 /* ToolsToKeepKit */,
+			);
+			productName = "today-md";
+			productReference = AB000055 /* today-md.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AE000010 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					AE000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = AF000001 /* Build configuration list for PBXProject "today-md" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AD000001;
+			packageReferences = (
+				AG000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				AG000011 /* XCLocalSwiftPackageReference "../../../../packages/ToolsToKeepKit" */,
+			);
+			productRefGroup = AD000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AE000001 /* today-md */,
+				AE000021 /* today-md-github */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AE000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000015 /* Assets.xcassets in Resources */,
+				AA000051 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE000023 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000015 /* Assets.xcassets in Resources */,
+				AA000051 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AE000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* TodayMdApp.swift in Sources */,
+				AA000002 /* ContentView.swift in Sources */,
+				AA000003 /* TaskList.swift in Sources */,
+				AA000004 /* TaskItem.swift in Sources */,
+				AA000005 /* SubTask.swift in Sources */,
+				AA000006 /* TaskNote.swift in Sources */,
+				AA000007 /* SidebarView.swift in Sources */,
+				AA000008 /* KanbanBoardView.swift in Sources */,
+				AA000009 /* KanbanColumnView.swift in Sources */,
+				AA000010 /* TaskCardView.swift in Sources */,
+				AA000011 /* TaskDetailView.swift in Sources */,
+				AA000012 /* SubTaskListView.swift in Sources */,
+				AA000013 /* MarkdownEditorView.swift in Sources */,
+				AA000016 /* BacklogView.swift in Sources */,
+				AA000017 /* WeeklyReviewView.swift in Sources */,
+				AA000020 /* ChecklistSection.swift in Sources */,
+				AA000021 /* TodayMdTransferService.swift in Sources */,
+				AA000022 /* TodayMdArchive.swift in Sources */,
+				AA000023 /* TodayMdDatabase.swift in Sources */,
+				AA000026 /* TodayMdSyncService.swift in Sources */,
+				AA000025 /* SearchPresentation.swift in Sources */,
+				AA000027 /* MarkdownInlineDisplay.swift in Sources */,
+				AA000028 /* InlineMarkdownTextEditor.swift in Sources */,
+				AA000034 /* TodayMdMenuBarExtraView.swift in Sources */,
+				AA000035 /* GlobalDynamicIslandController.swift in Sources */,
+				AA000036 /* TodayMdCalendarService.swift in Sources */,
+				AA000037 /* TaskCalendarPlannerView.swift in Sources */,
+				AA000038 /* TodayMdObsidianBridge.swift in Sources */,
+				AA000039 /* TodayMdWeekCalendar.swift in Sources */,
+				AA000040 /* TodayMdStore.swift in Sources */,
+				AA000041 /* TodayMdAppSupport.swift in Sources */,
+				AA000042 /* WorkspaceSupport.swift in Sources */,
+				AA000043 /* CalendarViewSupport.swift in Sources */,
+				AA000044 /* WeekCalendarPanelView.swift in Sources */,
+				AA000045 /* WeekCalendarCanvasView.swift in Sources */,
+				AA000046 /* WorkspaceCommands.swift in Sources */,
+				AA000047 /* KeyboardShortcutMonitor.swift in Sources */,
+				AA000048 /* SettingsView.swift in Sources */,
+				AA000049 /* TodayMdPurchaseManager.swift in Sources */,
+				AA000050 /* TodayMdProView.swift in Sources */,
+				AA000052 /* TodayMdUpdateManager.swift in Sources */,
+				AA000054 /* TodayMdFeedbackView.swift in Sources */,
+				AA000055 /* TodayMdFeedbackReport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE000022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* TodayMdApp.swift in Sources */,
+				AA000002 /* ContentView.swift in Sources */,
+				AA000003 /* TaskList.swift in Sources */,
+				AA000004 /* TaskItem.swift in Sources */,
+				AA000005 /* SubTask.swift in Sources */,
+				AA000006 /* TaskNote.swift in Sources */,
+				AA000007 /* SidebarView.swift in Sources */,
+				AA000008 /* KanbanBoardView.swift in Sources */,
+				AA000009 /* KanbanColumnView.swift in Sources */,
+				AA000010 /* TaskCardView.swift in Sources */,
+				AA000011 /* TaskDetailView.swift in Sources */,
+				AA000012 /* SubTaskListView.swift in Sources */,
+				AA000013 /* MarkdownEditorView.swift in Sources */,
+				AA000016 /* BacklogView.swift in Sources */,
+				AA000017 /* WeeklyReviewView.swift in Sources */,
+				AA000020 /* ChecklistSection.swift in Sources */,
+				AA000021 /* TodayMdTransferService.swift in Sources */,
+				AA000022 /* TodayMdArchive.swift in Sources */,
+				AA000023 /* TodayMdDatabase.swift in Sources */,
+				AA000026 /* TodayMdSyncService.swift in Sources */,
+				AA000025 /* SearchPresentation.swift in Sources */,
+				AA000027 /* MarkdownInlineDisplay.swift in Sources */,
+				AA000028 /* InlineMarkdownTextEditor.swift in Sources */,
+				AA000034 /* TodayMdMenuBarExtraView.swift in Sources */,
+				AA000035 /* GlobalDynamicIslandController.swift in Sources */,
+				AA000036 /* TodayMdCalendarService.swift in Sources */,
+				AA000037 /* TaskCalendarPlannerView.swift in Sources */,
+				AA000038 /* TodayMdObsidianBridge.swift in Sources */,
+				AA000039 /* TodayMdWeekCalendar.swift in Sources */,
+				AA000040 /* TodayMdStore.swift in Sources */,
+				AA000041 /* TodayMdAppSupport.swift in Sources */,
+				AA000042 /* WorkspaceSupport.swift in Sources */,
+				AA000043 /* CalendarViewSupport.swift in Sources */,
+				AA000044 /* WeekCalendarPanelView.swift in Sources */,
+				AA000045 /* WeekCalendarCanvasView.swift in Sources */,
+				AA000046 /* WorkspaceCommands.swift in Sources */,
+				AA000047 /* KeyboardShortcutMonitor.swift in Sources */,
+				AA000048 /* SettingsView.swift in Sources */,
+				AA000049 /* TodayMdPurchaseManager.swift in Sources */,
+				AA000050 /* TodayMdProView.swift in Sources */,
+				AA000052 /* TodayMdUpdateManager.swift in Sources */,
+				AA000054 /* TodayMdFeedbackView.swift in Sources */,
+				AA000055 /* TodayMdFeedbackReport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AF000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AB000056 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AF000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AB000056 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		AF000020 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = N338K3FTHY;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "today-md/Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AF000021 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "today-md/today-md.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = N338K3FTHY;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "today-md/Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) TODAYMD_APP_STORE";
+			};
+			name = Release;
+		};
+		AF000030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Config/GitHub.entitlements";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/GitHub-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
+				PRODUCT_NAME = "today-md";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) TODAYMD_GITHUB";
+				SPARKLE_PUBLIC_ED_KEY = "";
+			};
+			name = Debug;
+		};
+		AF000031 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Config/GitHub.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/GitHub-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Arthur Liebhardt";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.today-md.app";
+				PRODUCT_NAME = "today-md";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) TODAYMD_GITHUB";
+				SPARKLE_PUBLIC_ED_KEY = "";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AF000001 /* Build configuration list for PBXProject "today-md" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000010 /* Debug */,
+				AF000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF000003 /* Build configuration list for PBXNativeTarget "today-md" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000020 /* Debug */,
+				AF000021 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF000004 /* Build configuration list for PBXNativeTarget "today-md-github" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000030 /* Debug */,
+				AF000031 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AG000011 /* XCLocalSwiftPackageReference "../../../../packages/ToolsToKeepKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../packages/ToolsToKeepKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AG000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AG000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AG000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		AG000012 /* ToolsToKeepKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToolsToKeepKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AE000010 /* Project object */;
+}

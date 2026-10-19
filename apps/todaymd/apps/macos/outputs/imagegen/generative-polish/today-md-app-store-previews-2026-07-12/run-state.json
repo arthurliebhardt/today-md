@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "runDirectory": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12",
+  "streamPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/data/stream.json",
+  "runStatePath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/run-state.json",
+  "latestActionPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/latest-action.json",
+  "paths": {
+    "streamPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/data/stream.json",
+    "runStatePath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/run-state.json",
+    "latestActionPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/latest-action.json"
+  },
+  "itemCount": 5,
+  "items": [
+    {
+      "id": "01-plan-today",
+      "title": "Everything important, in one calm view.",
+      "caption": "Plan Today and This Week while notes and checklists stay beside every task.",
+      "tone": "Calm, native, focused",
+      "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+      "imageUrl": "/generated/mcp-thumbs/01-plan-today.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/01-plan-today.jpg",
+      "sourceImageUrl": "/generated/01-plan-today.png"
+    },
+    {
+      "id": "02-organize-projects",
+      "title": "Organize every project your way.",
+      "caption": "Create focused lists and move work between Today, This Week, and Backlog.",
+      "tone": "Calm, native, focused",
+      "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+      "imageUrl": "/generated/mcp-thumbs/02-organize-projects.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/02-organize-projects.jpg",
+      "sourceImageUrl": "/generated/02-organize-projects.png"
+    },
+    {
+      "id": "03-time-blocking",
+      "title": "Turn tasks into time blocks.",
+      "caption": "Plan beside your calendar and protect time for the work that matters.",
+      "tone": "Calm, native, focused",
+      "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+      "imageUrl": "/generated/mcp-thumbs/03-time-blocking.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/03-time-blocking.jpg",
+      "sourceImageUrl": "/generated/03-time-blocking.png"
+    },
+    {
+      "id": "04-week-view",
+      "title": "See your week without switching apps.",
+      "caption": "Keep tasks and calendar events together in one focused weekly view.",
+      "tone": "Calm, native, focused",
+      "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+      "imageUrl": "/generated/mcp-thumbs/04-week-view.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/04-week-view.jpg",
+      "sourceImageUrl": "/generated/04-week-view.png"
+    },
+    {
+      "id": "05-folder-sync",
+      "title": "Markdown files that stay yours.",
+      "caption": "Sync a readable archive to the folder you choose.",
+      "tone": "Calm, native, focused",
+      "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+      "imageUrl": "/generated/mcp-thumbs/05-folder-sync.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/05-folder-sync.jpg",
+      "sourceImageUrl": "/generated/05-folder-sync.png"
+    }
+  ],
+  "visibleItemIds": [
+    "01-plan-today",
+    "02-organize-projects",
+    "03-time-blocking",
+    "04-week-view",
+    "05-folder-sync"
+  ],
+  "hiddenImageIds": [],
+  "selectedImageIds": [],
+  "currentImageId": "01-plan-today",
+  "updatedAt": "2026-07-12T08:32:47.414811Z"
+}

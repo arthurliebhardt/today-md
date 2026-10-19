@@ -1,0 +1,279 @@
+{
+  "version": 1,
+  "exportedAt": "2026-07-12T08:00:00Z",
+  "lists": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "Product Launch",
+      "icon": "shippingbox.fill",
+      "colorName": "purple",
+      "sortOrder": 0,
+      "tasks": [
+        {
+          "id": "11000000-0000-4000-8000-000000000001",
+          "title": "Review App Store screenshots",
+          "isDone": false,
+          "blockRaw": "today",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-12T07:45:00Z",
+          "note": {
+            "content": "Make the first impression feel calm, useful, and unmistakably native.\n\n- [x] Use realistic sample data\n- [ ] Check every image at full size\n- [ ] Confirm light-mode contrast\n- [ ] Upload in story order",
+            "lastModified": "2026-07-12T07:55:00Z"
+          },
+          "subtasks": [
+            { "id": "11100000-0000-4000-8000-000000000001", "title": "Use realistic sample data", "isCompleted": true, "sortOrder": 0 },
+            { "id": "11100000-0000-4000-8000-000000000002", "title": "Check every image at full size", "isCompleted": false, "sortOrder": 1 },
+            { "id": "11100000-0000-4000-8000-000000000003", "title": "Confirm light-mode contrast", "isCompleted": false, "sortOrder": 2 },
+            { "id": "11100000-0000-4000-8000-000000000004", "title": "Upload in story order", "isCompleted": false, "sortOrder": 3 }
+          ]
+        },
+        {
+          "id": "11000000-0000-4000-8000-000000000002",
+          "title": "Run purchase flow smoke test",
+          "isDone": false,
+          "blockRaw": "today",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 1,
+          "creationDate": "2026-07-12T07:30:00Z",
+          "note": {
+            "content": "Test the lifetime unlock from a clean install.\n\n- [x] Product loads at $19.99\n- [ ] Complete sandbox purchase\n- [ ] Verify Restore Purchase",
+            "lastModified": "2026-07-12T07:40:00Z"
+          },
+          "subtasks": [
+            { "id": "11200000-0000-4000-8000-000000000001", "title": "Product loads at $19.99", "isCompleted": true, "sortOrder": 0 },
+            { "id": "11200000-0000-4000-8000-000000000002", "title": "Complete sandbox purchase", "isCompleted": false, "sortOrder": 1 },
+            { "id": "11200000-0000-4000-8000-000000000003", "title": "Verify Restore Purchase", "isCompleted": false, "sortOrder": 2 }
+          ]
+        },
+        {
+          "id": "11000000-0000-4000-8000-000000000003",
+          "title": "Submit build 1.8.0 for review",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-11T15:30:00Z",
+          "note": {
+            "content": "Final submission pass.\n\n- [x] Attach lifetime purchase\n- [ ] Select uploaded build\n- [ ] Add review contact details\n- [ ] Submit for review",
+            "lastModified": "2026-07-12T07:20:00Z"
+          },
+          "subtasks": [
+            { "id": "11300000-0000-4000-8000-000000000001", "title": "Attach lifetime purchase", "isCompleted": true, "sortOrder": 0 },
+            { "id": "11300000-0000-4000-8000-000000000002", "title": "Select uploaded build", "isCompleted": false, "sortOrder": 1 },
+            { "id": "11300000-0000-4000-8000-000000000003", "title": "Add review contact details", "isCompleted": false, "sortOrder": 2 },
+            { "id": "11300000-0000-4000-8000-000000000004", "title": "Submit for review", "isCompleted": false, "sortOrder": 3 }
+          ]
+        },
+        {
+          "id": "11000000-0000-4000-8000-000000000004",
+          "title": "Polish onboarding empty states",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 1,
+          "creationDate": "2026-07-10T10:00:00Z",
+          "subtasks": [],
+          "note": {
+            "content": "Keep the first-run experience useful without feeling like a tutorial. Focus on one clear next action per screen.",
+            "lastModified": "2026-07-10T11:00:00Z"
+          }
+        },
+        {
+          "id": "11000000-0000-4000-8000-000000000005",
+          "title": "Plan post-launch widgets",
+          "isDone": false,
+          "blockRaw": "backlog",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-08T09:00:00Z",
+          "subtasks": []
+        }
+      ]
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "name": "Marketing",
+      "icon": "megaphone.fill",
+      "colorName": "orange",
+      "sortOrder": 1,
+      "tasks": [
+        {
+          "id": "21000000-0000-4000-8000-000000000001",
+          "title": "Draft launch announcement",
+          "isDone": false,
+          "blockRaw": "today",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-12T07:15:00Z",
+          "note": {
+            "content": "# Launch message\n\nLead with the promise: a private Markdown planner that stays out of the way.\n\n- [x] Write the opening\n- [ ] Add three feature highlights\n- [ ] End with the lifetime offer",
+            "lastModified": "2026-07-12T07:25:00Z"
+          },
+          "subtasks": [
+            { "id": "21100000-0000-4000-8000-000000000001", "title": "Write the opening", "isCompleted": true, "sortOrder": 0 },
+            { "id": "21100000-0000-4000-8000-000000000002", "title": "Add three feature highlights", "isCompleted": false, "sortOrder": 1 },
+            { "id": "21100000-0000-4000-8000-000000000003", "title": "End with the lifetime offer", "isCompleted": false, "sortOrder": 2 }
+          ]
+        },
+        {
+          "id": "21000000-0000-4000-8000-000000000002",
+          "title": "Prepare Product Hunt gallery",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-11T13:00:00Z",
+          "note": {
+            "content": "Tell a simple four-frame story: capture, plan, focus, own your files.",
+            "lastModified": "2026-07-11T13:30:00Z"
+          },
+          "subtasks": []
+        },
+        {
+          "id": "21000000-0000-4000-8000-000000000003",
+          "title": "Schedule three launch posts",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 1,
+          "creationDate": "2026-07-10T14:00:00Z",
+          "subtasks": []
+        },
+        {
+          "id": "21000000-0000-4000-8000-000000000004",
+          "title": "Collect customer workflow stories",
+          "isDone": false,
+          "blockRaw": "backlog",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-07T16:00:00Z",
+          "subtasks": []
+        }
+      ]
+    },
+    {
+      "id": "30000000-0000-4000-8000-000000000003",
+      "name": "Operations",
+      "icon": "gearshape.2.fill",
+      "colorName": "teal",
+      "sortOrder": 2,
+      "tasks": [
+        {
+          "id": "31000000-0000-4000-8000-000000000001",
+          "title": "Confirm support inbox workflow",
+          "isDone": false,
+          "blockRaw": "today",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-12T06:45:00Z",
+          "subtasks": []
+        },
+        {
+          "id": "31000000-0000-4000-8000-000000000002",
+          "title": "Create launch-day checklist",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-11T11:00:00Z",
+          "note": {
+            "content": "- [x] Verify support URL\n- [ ] Watch crash reports\n- [ ] Check purchase conversion\n- [ ] Reply to first reviews",
+            "lastModified": "2026-07-12T06:30:00Z"
+          },
+          "subtasks": [
+            { "id": "31100000-0000-4000-8000-000000000001", "title": "Verify support URL", "isCompleted": true, "sortOrder": 0 },
+            { "id": "31100000-0000-4000-8000-000000000002", "title": "Watch crash reports", "isCompleted": false, "sortOrder": 1 },
+            { "id": "31100000-0000-4000-8000-000000000003", "title": "Check purchase conversion", "isCompleted": false, "sortOrder": 2 },
+            { "id": "31100000-0000-4000-8000-000000000004", "title": "Reply to first reviews", "isCompleted": false, "sortOrder": 3 }
+          ]
+        },
+        {
+          "id": "31000000-0000-4000-8000-000000000003",
+          "title": "Document Restore Purchase steps",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 1,
+          "creationDate": "2026-07-10T12:00:00Z",
+          "subtasks": []
+        },
+        {
+          "id": "31000000-0000-4000-8000-000000000004",
+          "title": "Set up weekly metrics review",
+          "isDone": false,
+          "blockRaw": "backlog",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-06T15:00:00Z",
+          "subtasks": []
+        }
+      ]
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000004",
+      "name": "Personal",
+      "icon": "person.fill",
+      "colorName": "blue",
+      "sortOrder": 3,
+      "tasks": [
+        {
+          "id": "41000000-0000-4000-8000-000000000001",
+          "title": "Book dinner for launch night",
+          "isDone": false,
+          "blockRaw": "today",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-12T06:15:00Z",
+          "subtasks": []
+        },
+        {
+          "id": "41000000-0000-4000-8000-000000000002",
+          "title": "Plan a screen-free Sunday",
+          "isDone": false,
+          "blockRaw": "thisWeek",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-09T18:00:00Z",
+          "subtasks": []
+        },
+        {
+          "id": "41000000-0000-4000-8000-000000000003",
+          "title": "Organize summer photos",
+          "isDone": false,
+          "blockRaw": "backlog",
+          "schedulingStateRaw": "unscheduled",
+          "sortOrder": 0,
+          "creationDate": "2026-07-05T17:00:00Z",
+          "subtasks": []
+        }
+      ]
+    }
+  ],
+  "unassignedTasks": [
+    {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "title": "Reply to beta tester feedback",
+      "isDone": false,
+      "blockRaw": "today",
+      "schedulingStateRaw": "unscheduled",
+      "sortOrder": 2,
+      "creationDate": "2026-07-12T07:50:00Z",
+      "note": {
+        "content": "Three testers mentioned the same friction point in folder setup. Thank them and ask one follow-up question.",
+        "lastModified": "2026-07-12T07:52:00Z"
+      },
+      "subtasks": []
+    },
+    {
+      "id": "50000000-0000-4000-8000-000000000002",
+      "title": "Choose the next roadmap theme",
+      "isDone": false,
+      "blockRaw": "thisWeek",
+      "schedulingStateRaw": "unscheduled",
+      "sortOrder": 2,
+      "creationDate": "2026-07-11T09:00:00Z",
+      "subtasks": []
+    }
+  ]
+}

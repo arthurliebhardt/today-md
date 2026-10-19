@@ -1,0 +1,6 @@
+// Throwaway key pair; keys signed by toolstokeep.com's signLicense() (site/src/lib/license.ts).
+enum LicenseFixture {
+    static let publicKey = "90K4+Cod3ChRsxFWiAFqUwopeBUQcXWIliibRf2tPe4="
+    static let todaymdKey = "TTK1.eyJ2IjoxLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwiaXNzdWVkIjoiMjAyNi0xMC0xOCIsInVwZGF0ZXNfdW50aWwiOiIyMDI3LTEwLTE4IiwibWF4X2RldmljZXMiOjMsImxpZCI6ImxpY190b2RheW1kIiwidG9vbCI6InRvZGF5bWQifQ.qp-d7ayEgyTmm8JU7wiy1ZUDw3MZ9Aso6Q4QVpEveWPWg-bv7XEXX17TPmfw7Tk_sC_-MwRFtIWLUrRvsZvHAw"
+    static let otherToolKey = "TTK1.eyJ2IjoxLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwiaXNzdWVkIjoiMjAyNi0xMC0xOCIsInVwZGF0ZXNfdW50aWwiOiIyMDI3LTEwLTE4IiwibWF4X2RldmljZXMiOjMsImxpZCI6ImxpY19vdGhlciIsInRvb2wiOiJyZWNvcmRlciJ9.LUcVARnMMASumuOMqiRCsq1tZmiSdwtEvRnOjfY7idHWyRYOvbVAYbDydyx0OwO41xvLH-mjxYnjBBaZY801DA"
+}

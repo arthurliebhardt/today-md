@@ -1,0 +1,14 @@
+{
+  "id": "review-renderer-materialized",
+  "action": "write_moodboard_widget_payload",
+  "label": "Materialized Creative Production image review",
+  "createdAt": "2026-07-12T08:32:47.414811Z",
+  "timestamp": "2026-07-12T08:32:47.414811Z",
+  "title": "Creative Production Review",
+  "summary": "Review, select, and hand off generated Creative Production images.",
+  "itemCount": 5,
+  "runDirectory": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12",
+  "streamPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/data/stream.json",
+  "runStatePath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/run-state.json",
+  "latestActionPath": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/latest-action.json"
+}

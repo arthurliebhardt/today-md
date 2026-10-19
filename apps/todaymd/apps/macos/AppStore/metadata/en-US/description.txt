@@ -1,0 +1,21 @@
+today-md is a private, native task planner for people who want to own their workflow. The free version includes one list and up to five total tasks, with local Markdown notes and backup export.
+
+PLAN AT A GLANCE
+Move work between Today, This Week, and Backlog on a focused Kanban board. Create custom lists, reorder tasks by dragging, and keep completed work close without letting it take over.
+
+WRITE IN MARKDOWN
+Give every task a proper note. Use headings, lists, checklists, emphasis, and code blocks in a keyboard-friendly Markdown editor. Checklist items stay connected to subtasks.
+
+OWN YOUR DATA
+Your tasks live locally in SQLite and are mirrored as portable Markdown files. Import and export complete JSON backups whenever you want. There is no required account and no advertising.
+
+PLAN WITH YOUR CALENDAR — PRO
+See tasks beside your week, find open time, and create calendar blocks without leaving today-md.
+
+SYNC THROUGH A FOLDER — PRO
+Choose a folder in iCloud Drive, OneDrive, or another provider. today-md keeps a shared snapshot and an Obsidian-compatible Markdown archive in a location you control.
+
+CAPTURE QUICKLY
+Add tasks from the menu bar or the optional top-of-screen quick-capture panel, then return to what you were doing.
+
+today-md Pro is a one-time lifetime unlock. No subscription.

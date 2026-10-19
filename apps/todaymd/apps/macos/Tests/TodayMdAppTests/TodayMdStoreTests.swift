@@ -1,0 +1,1166 @@
+import Foundation
+import XCTest
+@testable import TodayMdApp
+
+@MainActor
+final class TodayMdStoreTests: XCTestCase {
+    func testExternalArchivesClearSnapshotUndoAndAllowNewEdits() throws {
+        for isRemote in [true, false] {
+            let store = try makeStore()
+            let manager = UndoManager()
+            manager.groupsByEvent = false
+            store.configureUndoManager(manager)
+            manager.beginUndoGrouping()
+            _ = store.addUnassignedTask(title: "Local", block: .today)
+            manager.endUndoGrouping()
+            XCTAssertTrue(manager.canUndo)
+
+            let externalTask = TaskItem(title: "External", block: .today, sortOrder: 1)
+            let archive = TodayMdArchive(lists: store.lists, unassignedTasks: store.unassignedTasks + [externalTask])
+            if isRemote {
+                store.applyRemoteArchive(archive)
+            } else {
+                store.applyMarkdownArchive(archive)
+            }
+
+            XCTAssertFalse(manager.canUndo)
+            XCTAssertFalse(manager.canRedo)
+            manager.beginUndoGrouping()
+            store.updateTaskTitle(id: externalTask.id, title: "Edited locally", registersUndo: true)
+            manager.endUndoGrouping()
+            manager.undo()
+            XCTAssertEqual(store.task(id: externalTask.id)?.title, "External")
+            XCTAssertEqual(store.allTasks.count, 2)
+        }
+    }
+
+    func testExternalArchiveClearsRedoHistory() throws {
+        let store = try makeStore()
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        store.configureUndoManager(manager)
+        manager.beginUndoGrouping()
+        _ = store.addUnassignedTask(title: "Local", block: .today)
+        manager.endUndoGrouping()
+        manager.undo()
+        XCTAssertTrue(manager.canRedo)
+
+        let externalTask = TaskItem(title: "External", block: .today, sortOrder: 0)
+        store.applyRemoteArchive(TodayMdArchive(lists: [TaskList](), unassignedTasks: [externalTask]))
+        XCTAssertFalse(manager.canRedo)
+        XCTAssertNotNil(store.task(id: externalTask.id))
+    }
+
+    func testSearchTreatsPunctuationAndOperatorsAsLiteralText() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Review today-md: release (v2) \"quote\" OR", block: .today)
+        _ = store.addUnassignedTask(title: "Unrelated", block: .today)
+
+        for query in ["today-md", "today-md:", "(v2)", "\"quote\"", "OR", "Review today-m"] {
+            store.searchText = query
+            XCTAssertEqual(store.persistedSearchIDs, [task.id], "Query: \(query)")
+        }
+        for query in ["*", "\"", "("] {
+            store.searchText = query
+            XCTAssertTrue(store.persistedSearchIDs.isEmpty, "Query: \(query)")
+        }
+    }
+
+    func testExternalArchivesRefreshActiveSearchAfterSaving() throws {
+        for isRemote in [true, false] {
+            let store = try makeStore()
+            let previous = store.addUnassignedTask(title: "Matching old task", block: .today)
+            store.searchText = "Matching"
+            XCTAssertEqual(store.persistedSearchIDs, [previous.id])
+            let replacement = TaskItem(title: "Matching new task", block: .today, sortOrder: 0)
+            let archive = TodayMdArchive(lists: [TaskList](), unassignedTasks: [replacement])
+            if isRemote {
+                store.applyRemoteArchive(archive)
+            } else {
+                store.applyMarkdownArchive(archive)
+            }
+            XCTAssertEqual(store.persistedSearchIDs, [replacement.id])
+        }
+    }
+
+    func testUndoAndRedoRefreshActiveSearchAfterSaving() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Original", block: .today)
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        store.configureUndoManager(manager)
+        store.searchText = "Matching"
+        manager.beginUndoGrouping()
+        store.updateTaskTitle(id: task.id, title: "Matching", registersUndo: true)
+        manager.endUndoGrouping()
+        XCTAssertEqual(store.persistedSearchIDs, [task.id])
+        manager.undo()
+        XCTAssertTrue(store.persistedSearchIDs.isEmpty)
+        manager.redo()
+        XCTAssertEqual(store.persistedSearchIDs, [task.id])
+    }
+
+    func testAddUnassignedTaskCreatesTaskWithoutList() throws {
+        let store = try makeStore()
+
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+
+        XCTAssertEqual(store.unassignedTasks.count, 1)
+        XCTAssertEqual(store.unassignedTasks.first?.id, task.id)
+        XCTAssertEqual(store.allTasks.first?.id, task.id)
+        XCTAssertEqual(task.block, .today)
+        XCTAssertNil(task.list)
+    }
+
+    func testNewUnassignedTasksAreInsertedAtTopOfBlock() throws {
+        let store = try makeStore()
+
+        let first = store.addUnassignedTask(title: "First", block: .today)
+        let second = store.addUnassignedTask(title: "Second", block: .today)
+
+        let tasks = store.allTasks.filter { $0.block == .today }
+        XCTAssertEqual(tasks.map(\.title), ["Second", "First"])
+        XCTAssertEqual(second.sortOrder, 0)
+        XCTAssertEqual(first.sortOrder, 1)
+    }
+
+    func testNewListTasksAreInsertedAtTopOfBlock() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let first = try XCTUnwrap(store.addTask(title: "First", block: .today, listID: list.id))
+        let second = try XCTUnwrap(store.addTask(title: "Second", block: .today, listID: list.id))
+
+        let tasks = list.items
+            .filter { $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Second", "First"])
+        XCTAssertEqual(second.sortOrder, 0)
+        XCTAssertEqual(first.sortOrder, 1)
+    }
+
+    func testNewerTaskWinsGlobalOrderingWhenSortOrdersMatch() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let older = try XCTUnwrap(store.addTask(title: "Older", block: .today, listID: list.id))
+        older.sortOrder = 0
+        older.creationDate = Date(timeIntervalSinceReferenceDate: 100)
+
+        let newer = store.addUnassignedTask(title: "Newer", block: .today)
+        newer.sortOrder = 0
+        newer.creationDate = Date(timeIntervalSinceReferenceDate: 200)
+
+        let tasks = store.allTasks.filter { $0.block == .today }
+        XCTAssertEqual(tasks.map(\.title), ["Newer", "Older"])
+    }
+
+    func testQuickAddTaskTrimsWhitespaceBeforeCreatingTodayTask() throws {
+        let store = try makeStore()
+
+        let task = try XCTUnwrap(store.quickAddTask(title: "  Inbox task  ", to: .today))
+
+        XCTAssertEqual(task.title, "Inbox task")
+        XCTAssertEqual(task.block, .today)
+        XCTAssertEqual(store.unassignedTasks.map(\.id), [task.id])
+    }
+
+    func testQuickAddTaskCanCreateTaskInSelectedList() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        let task = try XCTUnwrap(store.quickAddTask(title: "  Inbox task  ", to: .today, listID: list.id))
+
+        XCTAssertEqual(task.title, "Inbox task")
+        XCTAssertEqual(task.block, .today)
+        XCTAssertEqual(task.list?.id, list.id)
+        XCTAssertEqual(list.items.map(\.id), [task.id])
+    }
+
+    func testQuickAddTaskRejectsBlankTitles() throws {
+        let store = try makeStore()
+
+        let task = store.quickAddTask(title: " \n\t ", to: .today)
+
+        XCTAssertNil(task)
+        XCTAssertTrue(store.allTasks.isEmpty)
+    }
+
+    func testQuickAddTaskRejectsUnknownListID() throws {
+        let store = try makeStore()
+
+        let task = store.quickAddTask(title: "Inbox task", to: .today, listID: UUID())
+
+        XCTAssertNil(task)
+        XCTAssertTrue(store.allTasks.isEmpty)
+    }
+
+    func testAssignTaskMovesUnassignedTaskIntoSelectedList() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+
+        store.assignTask(id: task.id, toListID: list.id)
+
+        XCTAssertTrue(store.unassignedTasks.isEmpty)
+        XCTAssertEqual(list.items.count, 1)
+        XCTAssertEqual(list.items.first?.id, task.id)
+        XCTAssertEqual(task.list?.id, list.id)
+    }
+
+    func testTaskVisibilityScopeFiltersTasksToSelectedList() throws {
+        let store = try makeStore()
+        let work = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let personal = store.addList(name: "Personal", icon: "person", color: .green)
+
+        let workTask = try XCTUnwrap(store.addTask(title: "Work task", block: .today, listID: work.id))
+        _ = try XCTUnwrap(store.addTask(title: "Personal task", block: .today, listID: personal.id))
+        _ = store.addUnassignedTask(title: "Inbox task", block: .today)
+
+        let visibleTasks = TaskVisibilityScope.tasks(for: .list(work.id), store: store)
+
+        XCTAssertEqual(visibleTasks.map(\.id), [workTask.id])
+    }
+
+    func testAssignTaskPreservesPositionWhenMovingIntoList() throws {
+        let store = try makeStore()
+        let list = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        _ = try XCTUnwrap(store.addTask(title: "Dest second", block: .today, listID: list.id))
+        let destinationTop = try XCTUnwrap(store.addTask(title: "Dest top", block: .today, listID: list.id))
+
+        let taskToMove = store.addUnassignedTask(title: "Move me", block: .today)
+        _ = store.addUnassignedTask(title: "Stay above", block: .today)
+
+        XCTAssertEqual(taskToMove.sortOrder, 1)
+        XCTAssertEqual(destinationTop.sortOrder, 0)
+
+        store.assignTask(id: taskToMove.id, toListID: list.id)
+
+        let tasks = list.items
+            .filter { $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Dest top", "Move me", "Dest second"])
+    }
+
+    func testAssignTaskPreservesPositionWhenMovingToUnassigned() throws {
+        let store = try makeStore()
+        let sourceList = store.addList(name: "Work", icon: "briefcase", color: .blue)
+
+        _ = try XCTUnwrap(store.addTask(title: "Source second", block: .today, listID: sourceList.id))
+        let taskToMove = try XCTUnwrap(store.addTask(title: "Move me", block: .today, listID: sourceList.id))
+
+        _ = store.addUnassignedTask(title: "Unassigned second", block: .today)
+        let unassignedTop = store.addUnassignedTask(title: "Unassigned top", block: .today)
+
+        XCTAssertEqual(taskToMove.sortOrder, 0)
+        XCTAssertEqual(unassignedTop.sortOrder, 0)
+
+        store.assignTask(id: taskToMove.id, toListID: nil)
+
+        let tasks = store.allTasks
+            .filter { $0.list == nil && $0.block == .today }
+            .sorted(by: taskSort)
+        XCTAssertEqual(tasks.map(\.title), ["Move me", "Unassigned top", "Unassigned second"])
+    }
+
+    func testAssignTaskBetweenListsPreservesGlobalAllTasksPosition() throws {
+        let store = try makeStore()
+        let work = store.addList(name: "Work", icon: "briefcase", color: .blue)
+        let privateList = store.addList(name: "Private", icon: "person", color: .green)
+
+        let workBottom = try XCTUnwrap(store.addTask(title: "Work bottom", block: .today, listID: work.id))
+        let moveMe = try XCTUnwrap(store.addTask(title: "Move me", block: .today, listID: work.id))
+        let workTop = try XCTUnwrap(store.addTask(title: "Work top", block: .today, listID: work.id))
+
+        let privateSecond = try XCTUnwrap(store.addTask(title: "Private second", block: .today, listID: privateList.id))
+        let privateTop = try XCTUnwrap(store.addTask(title: "Private top", block: .today, listID: privateList.id))
+
+        workTop.creationDate = Date(timeIntervalSinceReferenceDate: 100)
+        privateTop.creationDate = Date(timeIntervalSinceReferenceDate: 50)
+        moveMe.creationDate = Date(timeIntervalSinceReferenceDate: 200)
+        privateSecond.creationDate = Date(timeIntervalSinceReferenceDate: 150)
+        workBottom.creationDate = Date(timeIntervalSinceReferenceDate: 300)
+
+        let beforeTasks = store.allTasks.filter { $0.block == .today }
+        let beforeIndex = try XCTUnwrap(beforeTasks.firstIndex(where: { $0.id == moveMe.id }))
+        XCTAssertEqual(beforeTasks.map(\.title), ["Work top", "Private top", "Move me", "Private second", "Work bottom"])
+
+        store.assignTask(id: moveMe.id, toListID: privateList.id)
+
+        let afterTasks = store.allTasks.filter { $0.block == .today }
+        let afterIndex = try XCTUnwrap(afterTasks.firstIndex(where: { $0.id == moveMe.id }))
+        XCTAssertEqual(afterTasks.map(\.title), ["Work top", "Private top", "Move me", "Work bottom", "Private second"])
+        XCTAssertEqual(afterIndex, beforeIndex)
+    }
+
+    func testMoveActiveTaskOnBoardMovesTaskIntoTargetLaneBeforeDroppedTask() throws {
+        let store = try makeStore()
+
+        let todayBottom = store.addUnassignedTask(title: "Today bottom", block: .today)
+        _ = store.addUnassignedTask(title: "Today top", block: .today)
+        let moveMe = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveActiveTaskOnBoard(moveMe.id, to: .today, before: todayBottom.id)
+
+        XCTAssertEqual(moveMe.block, .today)
+        let todayTasks = store.allTasks
+            .filter { $0.block == .today && !$0.isDone }
+            .sorted(by: taskSort)
+        XCTAssertEqual(todayTasks.map(\.title), ["Today top", "Move me", "Today bottom"])
+    }
+
+    func testMoveActiveTaskOnBoardAppendsTaskToTargetLaneWhenDroppedPastLastCard() throws {
+        let store = try makeStore()
+
+        _ = store.addUnassignedTask(title: "Today bottom", block: .today)
+        _ = store.addUnassignedTask(title: "Today top", block: .today)
+        let moveMe = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveActiveTaskOnBoard(moveMe.id, to: .today, before: nil)
+
+        XCTAssertEqual(moveMe.block, .today)
+        let todayTasks = store.allTasks
+            .filter { $0.block == .today && !$0.isDone }
+            .sorted(by: taskSort)
+        XCTAssertEqual(todayTasks.map(\.title), ["Today top", "Today bottom", "Move me"])
+    }
+
+    func testFlushPendingPersistencePersistsDeferredMove() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Move me", block: .backlog)
+
+        store.moveTask(id: task.id, to: .today)
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let persistedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+        XCTAssertEqual(persistedTask.block, .today)
+    }
+
+    func testImmediateMutationSupersedesPendingDeferredPersistence() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Initial", block: .today)
+
+        store.moveTask(id: task.id, to: .thisWeek)
+        store.updateTaskTitle(id: task.id, title: "Latest")
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.task(id: task.id))
+        XCTAssertEqual(reloadedTask.title, "Latest")
+        XCTAssertEqual(reloadedTask.block, .thisWeek)
+    }
+
+    func testChecklistDraftPersistenceCommitsDraftIntoChecklist() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Parent", block: .today)
+        var draft = "  Follow up with design  "
+
+        ChecklistDraftPersistence.commit(&draft, taskID: task.id, store: store)
+
+        XCTAssertEqual(draft, "")
+        XCTAssertEqual(task.checklistItems.map(\.title), ["Follow up with design"])
+        XCTAssertEqual(task.subtasks.map(\.title), ["Follow up with design"])
+    }
+
+    func testMarkdownNoteDraftPersistenceFlushesPendingDraft() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Parent", block: .today)
+        var pendingSave: DispatchWorkItem? = DispatchWorkItem {}
+
+        MarkdownNoteDraftPersistence.flush(
+            saveTask: &pendingSave,
+            markdownText: "- [ ] Follow up with design",
+            taskID: task.id,
+            store: store
+        )
+
+        XCTAssertNil(pendingSave)
+        XCTAssertEqual(task.note?.content, "- [ ] Follow up with design")
+        XCTAssertEqual(task.checklistItems.map(\.title), ["Follow up with design"])
+    }
+
+    func testMoveTaskUnschedulesTaskWhenChangingLane() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.moveTask(id: task.id, to: .today)
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertFalse(task.isScheduled)
+    }
+
+    func testMoveActiveTaskOnBoardUnschedulesTaskWhenChangingLane() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.moveActiveTaskOnBoard(task.id, to: .today, before: nil)
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertFalse(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToTodayForTodayDate() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.syncTaskBlockWithScheduledDate(id: task.id, scheduledDate: Date())
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForDateInCurrentWeek() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let currentWeek = calendar.mondayBasedWeekInterval(containing: referenceDate)
+        let dateInCurrentWeek = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: currentWeek.start))
+
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: dateInCurrentWeek,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(task.block, .thisWeek)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToThisWeekForTomorrowAcrossWeekBoundary() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.firstWeekday = 2
+
+        let sunday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 29, hour: 10)))
+        let monday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 30, hour: 10)))
+
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: monday,
+            calendar: calendar,
+            referenceDate: sunday
+        )
+
+        XCTAssertEqual(task.block, .thisWeek)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSyncTaskBlockWithScheduledDateMovesTaskToBacklogForDateInNextWeek() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .today)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let currentWeek = calendar.mondayBasedWeekInterval(containing: referenceDate)
+        let dateInNextWeek = currentWeek.end
+
+        store.syncTaskBlockWithScheduledDate(
+            id: task.id,
+            scheduledDate: dateInNextWeek,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(task.block, .backlog)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testMondayBasedWeekIntervalStartsOnMondayAndEndsOnSunday() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+
+        let referenceDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 1, hour: 10)))
+        let expectedStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 30, hour: 0)))
+        let expectedEnd = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 4, day: 6, hour: 0)))
+
+        let interval = calendar.mondayBasedWeekInterval(containing: referenceDate)
+
+        XCTAssertEqual(interval.start, expectedStart)
+        XCTAssertEqual(interval.end, expectedEnd)
+    }
+
+    func testPromoteScheduledTasksToTodayPreservesSchedulingState() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Scheduled task", block: .thisWeek)
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+
+        store.promoteScheduledTasksToToday(ids: Set([task.id]))
+
+        XCTAssertEqual(task.block, .today)
+        XCTAssertTrue(task.isScheduled)
+    }
+
+    func testSetTaskSchedulingStatePersistsScheduledFlag() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+        store.flushPendingPersistence()
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let persistedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+        XCTAssertTrue(persistedTask.isScheduled)
+    }
+
+    func testSetTaskSchedulingStateClearsScheduledFlag() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Inbox task", block: .backlog)
+
+        store.setTaskSchedulingState(id: task.id, isScheduled: true)
+        store.setTaskSchedulingState(id: task.id, isScheduled: false)
+
+        XCTAssertFalse(task.isScheduled)
+    }
+
+    func testMarkdownAutoContinuationCreatesChecklistFromInitialEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- [ ]", new: "- [ ]\n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- [ ]\n- [ ] ",
+                cursorLocation: ("- [ ]\n- [ ] " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationKeepsChecklistMarkerOnNonEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- [ ] Ship update", new: "- [ ] Ship update\n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- [ ] Ship update\n- [ ] ",
+                cursorLocation: ("- [ ] Ship update\n- [ ] " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationExitsChecklistOnSecondEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- [ ]\n- [ ] ", new: "- [ ]\n- [ ] \n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- [ ]\n\n",
+                cursorLocation: ("- [ ]\n\n" as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationCreatesBulletFromInitialEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- ", new: "- \n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- \n- ",
+                cursorLocation: ("- \n- " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationKeepsBulletMarkerOnNonEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- agenda", new: "- agenda\n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- agenda\n- ",
+                cursorLocation: ("- agenda\n- " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationExitsBulletOnSecondEmptyItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "- \n- ", new: "- \n- \n"),
+            MarkdownAutoContinuation.Edit(
+                text: "- \n\n",
+                cursorLocation: ("- \n\n" as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationAdvancesNumberedList() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "1. First", new: "1. First\n"),
+            MarkdownAutoContinuation.Edit(
+                text: "1. First\n2. ",
+                cursorLocation: ("1. First\n2. " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationAdvancesEmptyInitialNumberedListItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "1. ", new: "1. \n"),
+            MarkdownAutoContinuation.Edit(
+                text: "1. \n2. ",
+                cursorLocation: ("1. \n2. " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownAutoContinuationAdvancesToThirdNumberedListItem() {
+        XCTAssertEqual(
+            MarkdownAutoContinuation.edit(old: "1. First\n2. Second", new: "1. First\n2. Second\n"),
+            MarkdownAutoContinuation.Edit(
+                text: "1. First\n2. Second\n3. ",
+                cursorLocation: ("1. First\n2. Second\n3. " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownListFormattingNumbersSelectedLines() {
+        XCTAssertEqual(
+            MarkdownListFormatting.numberLines(in: "First\nSecond\nThird"),
+            "1. First\n2. Second\n3. Third"
+        )
+    }
+
+    func testMarkdownListFormattingUsesPreviousNumberForNewLine() {
+        XCTAssertEqual(
+            MarkdownListFormatting.nextNumberedListPrefix(in: "1. First\n2. Second\n", at: ("1. First\n2. Second\n" as NSString).length),
+            "3. "
+        )
+    }
+
+    func testMarkdownListFormattingIndentsBulletListItem() {
+        XCTAssertEqual(
+            MarkdownListFormatting.indentListLines(
+                in: "• Ship update",
+                selection: NSRange(location: ("• " as NSString).length, length: 0)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • Ship update",
+                selection: NSRange(location: ("    • " as NSString).length, length: 0)
+            )
+        )
+    }
+
+    func testMarkdownListFormattingCapsIndentAtThreeLevels() {
+        XCTAssertNil(
+            MarkdownListFormatting.indentListLines(
+                in: "            • Ship update",
+                selection: NSRange(location: ("            • " as NSString).length, length: 0)
+            )
+        )
+    }
+
+    func testMarkdownListFormattingIndentsSelectedListLinesOnly() {
+        XCTAssertEqual(
+            MarkdownListFormatting.indentListLines(
+                in: "• First\nPlain paragraph\n☐ Second",
+                selection: NSRange(location: 0, length: ("• First\nPlain paragraph\n☐ Second" as NSString).length)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • First\nPlain paragraph\n    ☐ Second",
+                selection: NSRange(
+                    location: 0,
+                    length: ("    • First\nPlain paragraph\n    ☐ Second" as NSString).length
+                )
+            )
+        )
+    }
+
+    func testMarkdownListFormattingOutdentsListItem() {
+        XCTAssertEqual(
+            MarkdownListFormatting.outdentListLines(
+                in: "        • Ship update",
+                selection: NSRange(location: ("        • " as NSString).length, length: 0)
+            ),
+            MarkdownListFormatting.Edit(
+                text: "    • Ship update",
+                selection: NSRange(location: ("    • " as NSString).length, length: 0)
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayRendersChecklistAndBullets() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.display(from: "- [ ] Ship update\n- Prep release\n* Follow up"),
+            "☐ Ship update\n• Prep release\n• Follow up"
+        )
+    }
+
+    func testMarkdownInlineDisplayDoesNotRenderBareHyphenAsBullet() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.display(from: "-"),
+            "-"
+        )
+    }
+
+    func testMarkdownInlineDisplayKeepsDividerMarkdownIntact() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.display(from: "---"),
+            "---"
+        )
+    }
+
+    func testMarkdownInlineDisplayRecognizesDividerSyntax() {
+        XCTAssertTrue(MarkdownInlineDisplay.isDividerMarkdownLine("---"))
+        XCTAssertTrue(MarkdownInlineDisplay.isDividerMarkdownLine(" *** "))
+        XCTAssertTrue(MarkdownInlineDisplay.isDividerMarkdownLine("___"))
+        XCTAssertFalse(MarkdownInlineDisplay.isDividerMarkdownLine("--"))
+        XCTAssertFalse(MarkdownInlineDisplay.isDividerMarkdownLine("- "))
+    }
+
+    func testMarkdownInlineDisplayNormalizesLegacyRenderedChecklistWithoutSpace() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.display(from: "☐Ship update"),
+            "☐ Ship update"
+        )
+        XCTAssertEqual(
+            MarkdownInlineDisplay.markdown(from: "☐Ship update"),
+            "- [ ] Ship update"
+        )
+    }
+
+    func testMarkdownInlineDisplayNormalizesLegacyRenderedBulletWithoutSpace() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.display(from: "•Ship update"),
+            "• Ship update"
+        )
+        XCTAssertEqual(
+            MarkdownInlineDisplay.markdown(from: "•Ship update"),
+            "- Ship update"
+        )
+    }
+
+    func testMarkdownInlineDisplayConvertsRenderedMarkersBackToMarkdown() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.markdown(from: "☐ Ship update\n• Prep release\n☑ Done"),
+            "- [ ] Ship update\n- Prep release\n- [x] Done"
+        )
+    }
+
+    func testMarkdownInlineDisplayCanonicalizesLegacyMarkdownSpacing() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.canonicalMarkdown(from: "- [X]Ship\n*  Bullet\n1.Test"),
+            "- [x] Ship\n- Bullet\n1. Test"
+        )
+    }
+
+    func testMarkdownInlineDisplayNormalizesTypedChecklistMarkerAndSelection() {
+        let state = MarkdownInlineDisplay.normalizeEditorState(
+            text: "- [ ] ",
+            selection: NSRange(location: ("- [ ] " as NSString).length, length: 0)
+        )
+
+        XCTAssertEqual(state.text, "☐ ")
+        XCTAssertEqual(state.markdown, "- [ ] ")
+        XCTAssertEqual(state.selection, NSRange(location: ("☐ " as NSString).length, length: 0))
+    }
+
+    func testMarkdownInlineDisplayMapsChecklistAutoContinuationBackToRenderedText() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: "☐ Ship update",
+                newDisplay: "☐ Ship update\n"
+            ),
+            MarkdownAutoContinuation.Edit(
+                text: "☐ Ship update\n☐ ",
+                cursorLocation: ("☐ Ship update\n☐ " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayMapsChecklistAutoContinuationForLegacyCRLFText() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: "☐ Ship update\r\n☐ asdsa",
+                newDisplay: "☐ Ship update\r\n☐ asdsa\n"
+            ),
+            MarkdownAutoContinuation.Edit(
+                text: "☐ Ship update\n☐ asdsa\n☐ ",
+                cursorLocation: ("☐ Ship update\n☐ asdsa\n☐ " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayMapsBulletAutoContinuationBackToRenderedText() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: "• Ship update",
+                newDisplay: "• Ship update\n"
+            ),
+            MarkdownAutoContinuation.Edit(
+                text: "• Ship update\n• ",
+                cursorLocation: ("• Ship update\n• " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayMapsOrderedListAutoContinuationBackToRenderedText() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(
+                oldDisplay: "1. Ship update",
+                newDisplay: "1. Ship update\n"
+            ),
+            MarkdownAutoContinuation.Edit(
+                text: "1. Ship update\n2. ",
+                cursorLocation: ("1. Ship update\n2. " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayMapsChecklistAutoContinuationWithinLegacyMultilineNote() {
+        let oldDisplay = """
+        1. a
+
+        • 
+
+        ☐ asdsad
+        ☐ asd
+        ☐ asd
+        """
+
+        let newDisplay = """
+        1. a
+
+        • 
+
+        ☐ asdsad
+        ☐ asd
+        ☐ asd
+        
+        """
+
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForAutoContinuation(oldDisplay: oldDisplay, newDisplay: newDisplay),
+            MarkdownAutoContinuation.Edit(
+                text: """
+                1. a
+
+                • 
+
+                ☐ asdsad
+                ☐ asd
+                ☐ asd
+                ☐ 
+                """,
+                cursorLocation: 33
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayContinuesChecklistFromCaretWithinOlderLoadedNote() {
+        let display = """
+        Huffman, Keith <keith.huffman@sap.com>
+
+        # asdasd
+        ☐ asda
+
+        ☐ asdasd
+        """
+
+        let offset = ("Huffman, Keith <keith.huffman@sap.com>\n\n# asdasd\n☐ asda" as NSString).length
+
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForInsertedNewline(in: display, atEditorOffset: offset),
+            MarkdownAutoContinuation.Edit(
+                text: """
+                Huffman, Keith <keith.huffman@sap.com>
+
+                # asdasd
+                ☐ asda
+                ☐ 
+
+                ☐ asdasd
+                """,
+                cursorLocation: ("Huffman, Keith <keith.huffman@sap.com>\n\n# asdasd\n☐ asda\n☐ " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayContinuesChecklistFromCaretForLegacyEmptyChecklistBlock() {
+        let display = """
+        ☐ 
+        ☐ asd
+        ☐ asd
+        ☐ 
+        """
+
+        let offset = ("☐ \n☐ asd" as NSString).length
+
+        XCTAssertEqual(
+            MarkdownInlineDisplay.editForInsertedNewline(in: display, atEditorOffset: offset),
+            MarkdownAutoContinuation.Edit(
+                text: """
+                ☐ 
+                ☐ asd
+                ☐ 
+                ☐ asd
+                ☐ 
+                """,
+                cursorLocation: ("☐ \n☐ asd\n☐ " as NSString).length
+            )
+        )
+    }
+
+    func testMarkdownInlineDisplayTogglesChecklistFromUncheckedToChecked() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.toggledCheckbox(in: "☐ Ship update", atEditorOffset: 0),
+            "☑ Ship update"
+        )
+    }
+
+    func testMarkdownInlineDisplayTogglesChecklistFromCheckedToUnchecked() {
+        XCTAssertEqual(
+            MarkdownInlineDisplay.toggledCheckbox(in: "☑ Ship update", atEditorOffset: 0),
+            "☐ Ship update"
+        )
+    }
+
+    func testStoreNormalizesLegacyNoteMarkdownWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Legacy", block: .today)
+        store.updateTaskNote(id: task.id, content: "- [X]Ship\n*  Bullet\n1.Test")
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+        XCTAssertEqual(reloadedTask.note?.content, "- [x] Ship\n- Bullet\n1. Test")
+    }
+
+    func testStorePreservesChecklistSubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Keep subtasks", block: .today)
+
+        store.addChecklistItem(taskID: task.id, title: "Ship 1.7.5 fix")
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.allTasks.first(where: { $0.id == task.id }))
+
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Ship 1.7.5 fix"])
+        XCTAssertEqual(reloadedTask.note?.content, "- [ ] Ship 1.7.5 fix")
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.title), ["Ship 1.7.5 fix"])
+    }
+
+    func testEditingMarkdownReconcilesChecklistSubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let task = store.addUnassignedTask(title: "Edit checklist", block: .today)
+        store.addChecklistItem(taskID: task.id, title: "Old item")
+
+        store.updateTaskNote(
+            id: task.id,
+            content: "- [x] Renamed item\n- [ ] Added item"
+        )
+
+        XCTAssertEqual(task.subtasks.map(\.title), ["Renamed item", "Added item"])
+        XCTAssertEqual(task.subtasks.map(\.isCompleted), [true, false])
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.task(id: task.id))
+        XCTAssertEqual(reloadedTask.note?.content, "- [x] Renamed item\n- [ ] Added item")
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Renamed item", "Added item"])
+
+        reloaded.updateTaskNote(id: task.id, content: "")
+        let reloadedAfterDeletion = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let taskAfterDeletion = try XCTUnwrap(reloadedAfterDeletion.task(id: task.id))
+        XCTAssertNil(taskAfterDeletion.note)
+        XCTAssertTrue(taskAfterDeletion.subtasks.isEmpty)
+    }
+
+    func testMarkdownArchiveDeletionRemovesChecklistSubtasks() throws {
+        let store = try makeStore()
+        let task = store.addUnassignedTask(title: "Archive checklist", block: .today)
+        store.addChecklistItem(taskID: task.id, title: "Remove externally")
+
+        let archiveDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: archiveDirectoryURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: archiveDirectoryURL)
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let updatedAt = formatter.string(from: Date().addingTimeInterval(5))
+        let markdown = """
+        ---
+        task_id: "\(task.id.uuidString)"
+        title: "Archive checklist"
+        updated_at: "\(updatedAt)"
+        ---
+
+        """
+        let markdownURL = archiveDirectoryURL.appendingPathComponent(
+            "archive-checklist--\(task.id.uuidString).md",
+            isDirectory: false
+        )
+        try markdown.write(to: markdownURL, atomically: true, encoding: .utf8)
+
+        let mergedArchive = try XCTUnwrap(
+            TodayMdObsidianBridge.mergedArchive(
+                baseArchive: store.makeArchive(),
+                markdownDirectoryURL: archiveDirectoryURL
+            )
+        )
+        store.applyMarkdownArchive(mergedArchive)
+
+        let mergedTask = try XCTUnwrap(store.task(id: task.id))
+        XCTAssertNil(mergedTask.note)
+        XCTAssertTrue(mergedTask.subtasks.isEmpty)
+    }
+
+    func testStoreBackfillsChecklistLinesFromLegacySubtasksWhenReloaded() throws {
+        let databaseURL = try makeDatabaseURL()
+        let database = try TodayMdDatabase(url: databaseURL)
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: UUID(),
+                    title: "Legacy subtasks",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: nil,
+                    subtasks: [
+                        .init(
+                            id: UUID(),
+                            title: "Recovered item",
+                            isCompleted: true,
+                            sortOrder: 0
+                        )
+                    ]
+                )
+            ]
+        )
+        try database.replaceAll(with: archive)
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let reloadedTask = try XCTUnwrap(reloaded.allTasks.first)
+
+        XCTAssertEqual(reloadedTask.subtasks.map(\.title), ["Recovered item"])
+        XCTAssertEqual(reloadedTask.note?.content, "- [x] Recovered item")
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.title), ["Recovered item"])
+        XCTAssertEqual(reloadedTask.checklistItems.map(\.isChecked), [true])
+    }
+
+    func testApplyRemoteArchiveNormalizesLegacyNoteMarkdown() throws {
+        let store = try makeStore()
+        let taskID = UUID()
+        let archive = TodayMdArchive(
+            lists: [],
+            unassignedTasks: [
+                .init(
+                    id: taskID,
+                    title: "Remote legacy",
+                    isDone: false,
+                    blockRaw: TimeBlock.today.rawValue,
+                    sortOrder: 0,
+                    creationDate: Date(),
+                    note: .init(content: "- [X]Ship\n*  Bullet\n1.Test", lastModified: Date()),
+                    subtasks: []
+                )
+            ]
+        )
+
+        store.applyRemoteArchive(archive)
+
+        let task = try XCTUnwrap(store.allTasks.first(where: { $0.id == taskID }))
+        XCTAssertEqual(task.note?.content, "- [x] Ship\n- Bullet\n1. Test")
+    }
+
+    func testStoreCanResetToShowcaseDataOnLaunch() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        _ = store.addUnassignedTask(title: "Existing task", block: .today)
+
+        let resetStore = TodayMdStore(
+            databaseURL: databaseURL,
+            shouldSeedShowcaseData: false,
+            shouldResetShowcaseData: true
+        )
+
+        XCTAssertFalse(resetStore.allTasks.contains(where: { $0.title == "Existing task" }))
+        XCTAssertEqual(Set(resetStore.lists.map(\.name)), ["Private", "Work"])
+        XCTAssertEqual(resetStore.allTasks.count, 8)
+    }
+
+    func testMergeImportRemapsIdentifiersAndPersistsCopies() throws {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        let list = store.addList(name: "Imported", icon: "tray", color: .teal)
+        let listedTask = try XCTUnwrap(store.addTask(title: "Listed", block: .today, listID: list.id))
+        store.addChecklistItem(taskID: listedTask.id, title: "Nested")
+        _ = store.addUnassignedTask(title: "Unassigned", block: .backlog)
+        let archive = store.makeArchive()
+
+        store.applyImport(archive, mode: .merge)
+
+        XCTAssertEqual(store.lists.count, 2)
+        XCTAssertEqual(store.allTasks.count, 4)
+        XCTAssertEqual(Set(store.lists.map(\.id)).count, store.lists.count)
+        XCTAssertEqual(Set(store.allTasks.map(\.id)).count, store.allTasks.count)
+        let subtaskIDs = store.allTasks.flatMap { $0.subtasks.map(\.id) }
+        XCTAssertEqual(Set(subtaskIDs).count, subtaskIDs.count)
+
+        let reloaded = TodayMdStore(databaseURL: databaseURL, shouldSeedShowcaseData: false)
+        XCTAssertEqual(reloaded.lists.count, 2)
+        XCTAssertEqual(reloaded.allTasks.count, 4)
+        XCTAssertEqual(Set(reloaded.lists.map(\.id)).count, reloaded.lists.count)
+        XCTAssertEqual(Set(reloaded.allTasks.map(\.id)).count, reloaded.allTasks.count)
+    }
+
+    func testSyncNotesRemovesStaleMarkdownFilesWhenLocalSnapshotReplacesTasks() throws {
+        let archiveDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: archiveDirectoryURL, withIntermediateDirectories: true)
+
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: archiveDirectoryURL)
+        }
+
+        let originalStore = try makeStore()
+        let originalTask = originalStore.addUnassignedTask(title: "Old task", block: .today)
+        try TodayMdMarkdownArchiveService.syncNotes(for: originalStore.allTasks, to: archiveDirectoryURL)
+
+        let replacedStore = try makeStore()
+        _ = replacedStore.addUnassignedTask(title: "Imported task", block: .today)
+        try TodayMdMarkdownArchiveService.syncNotes(for: replacedStore.allTasks, to: archiveDirectoryURL)
+
+        let markdownFiles = try FileManager.default.contentsOfDirectory(
+            at: archiveDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        let markdownFilenames = markdownFiles
+            .filter { $0.pathExtension.lowercased() == "md" }
+            .map(\.lastPathComponent)
+
+        XCTAssertEqual(markdownFilenames.count, 1)
+        XCTAssertFalse(markdownFilenames.contains { $0.contains(originalTask.id.uuidString.lowercased()) })
+    }
+
+    private func makeStore() throws -> TodayMdStore {
+        let databaseURL = try makeDatabaseURL()
+        let store = TodayMdStore(
+            databaseURL: databaseURL,
+            shouldSeedShowcaseData: false
+        )
+        addTeardownBlock {
+            store.flushPendingPersistence()
+        }
+        return store
+    }
+
+    private func makeDatabaseURL() throws -> URL {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        return rootURL.appendingPathComponent("today-md.sqlite")
+    }
+}

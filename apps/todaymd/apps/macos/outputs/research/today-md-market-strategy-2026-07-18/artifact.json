@@ -1,0 +1,929 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "today-md: Market Strategy",
+    "description": "A research-backed launch strategy for reaching the first durable user group and building the features that strengthen retention and differentiation.",
+    "generatedAt": "2026-07-18T12:00:00Z",
+    "cards": [],
+    "charts": [
+      {
+        "id": "pricing_context",
+        "title": "Current stated price by product",
+        "subtitle": "today-md sits with the lowest-priced one-time tools. Annual subscription prices are shown at current annual-plan rates and are not total-cost equivalents.",
+        "showDescription": true,
+        "type": "bar",
+        "dataset": "pricing_context",
+        "sourceId": "pricing_sources",
+        "valueFormat": "currency",
+        "layout": "full",
+        "encodings": {
+          "x": { "field": "product", "type": "nominal", "label": "Product" },
+          "y": { "field": "price_usd", "type": "quantitative", "label": "Current stated price", "format": "currency" },
+          "color": { "field": "billing_model", "type": "nominal", "label": "Billing model" },
+          "tooltip": [
+            { "field": "billing_model", "type": "nominal", "label": "Billing model" },
+            { "field": "trial_days", "type": "quantitative", "label": "Trial days", "format": "number" },
+            { "field": "scope", "type": "nominal", "label": "Price scope" }
+          ]
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "target_segments",
+        "title": "Beachhead user segments",
+        "subtitle": "Ranked by fit with the product that exists today, message distinctiveness, and realistic reach for a small launch.",
+        "showDescription": true,
+        "dataset": "target_segments",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "target_segments_source",
+        "layout": "full",
+        "columns": [
+          { "field": "priority", "label": "Priority", "type": "number" },
+          { "field": "segment", "label": "Segment", "type": "text" },
+          { "field": "job", "label": "Job to be done", "type": "text" },
+          { "field": "why_fit", "label": "Why today-md fits", "type": "text" },
+          { "field": "proof_needed", "label": "Proof needed", "type": "text" }
+        ]
+      },
+      {
+        "id": "competitor_map",
+        "title": "Competitive pressure and usable whitespace",
+        "subtitle": "No single feature is unique; the defensible wedge is the combination of a focused planning flow, native Mac execution, visible Markdown ownership, calendar time-blocking, and lifetime pricing.",
+        "showDescription": true,
+        "dataset": "competitor_map",
+        "defaultSort": {
+          "field": "threat_rank",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "competitor_map_source",
+        "layout": "full",
+        "columns": [
+          { "field": "threat_rank", "label": "Rank", "type": "number" },
+          { "field": "alternative", "label": "Alternative", "type": "text" },
+          { "field": "current_offer", "label": "Current offer", "type": "text" },
+          { "field": "wins_on", "label": "Why users choose it", "type": "text" },
+          { "field": "opening", "label": "Opening for today-md", "type": "text" }
+        ]
+      },
+      {
+        "id": "channel_experiments",
+        "title": "Acquisition experiments in recommended order",
+        "subtitle": "Start with channels where the product story itself is useful content. Use a distinct App Store campaign link for every external channel.",
+        "showDescription": true,
+        "dataset": "channel_experiments",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "channel_experiments_source",
+        "layout": "full",
+        "columns": [
+          { "field": "priority", "label": "Priority", "type": "number" },
+          { "field": "experiment", "label": "Experiment", "type": "text" },
+          { "field": "message", "label": "Lead message", "type": "text" },
+          { "field": "readiness", "label": "Readiness gate", "type": "text" },
+          { "field": "measure", "label": "Primary measure", "type": "text" }
+        ]
+      },
+      {
+        "id": "feature_priorities",
+        "title": "Feature roadmap by commercial leverage",
+        "subtitle": "Priorities combine conversion blockers, retention fundamentals, and product-specific differentiation. They are not a request-volume ranking because usage telemetry does not exist yet.",
+        "showDescription": true,
+        "dataset": "feature_priorities",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "feature_priorities_source",
+        "layout": "full",
+        "columns": [
+          { "field": "priority", "label": "Priority", "type": "number", "sizing": "content" },
+          { "field": "horizon", "label": "Horizon", "type": "text", "sizing": "content" },
+          { "field": "feature", "label": "Feature or change", "type": "text" },
+          { "field": "commercial_job", "label": "Commercial job", "type": "text" },
+          { "field": "acceptance_signal", "label": "Evidence it worked", "type": "text" }
+        ]
+      },
+      {
+        "id": "launch_sequence",
+        "title": "Ninety-day launch sequence",
+        "subtitle": "The sequence separates trust and activation work from channel tests, then reserves the second product cycle for evidence-backed retention improvements.",
+        "showDescription": true,
+        "dataset": "launch_sequence",
+        "defaultSort": {
+          "field": "phase",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "launch_sequence_source",
+        "layout": "full",
+        "columns": [
+          { "field": "phase", "label": "Phase", "type": "number" },
+          { "field": "weeks", "label": "Weeks", "type": "text" },
+          { "field": "outcome", "label": "Required outcome", "type": "text" },
+          { "field": "moves", "label": "Key moves", "type": "text" },
+          { "field": "gate", "label": "Gate to continue", "type": "text" }
+        ]
+      },
+      {
+        "id": "learning_metrics",
+        "title": "Privacy-preserving learning scorecard",
+        "subtitle": "These are initial decision thresholds, not market benchmarks. Revise them after the first cohort and compare App Store results with Apple peer benchmarks.",
+        "showDescription": true,
+        "dataset": "learning_metrics",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "learning_metrics_source",
+        "layout": "full",
+        "columns": [
+          { "field": "priority", "label": "Priority", "type": "number" },
+          { "field": "question", "label": "Question", "type": "text" },
+          { "field": "measure", "label": "Measure", "type": "text" },
+          { "field": "initial_rule", "label": "Initial decision rule", "type": "text" },
+          { "field": "response", "label": "If missed", "type": "text" }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "target_segments_source",
+        "label": "Reviewed beachhead segment synthesis",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "competitor_map_source",
+        "label": "Reviewed official competitor comparison",
+        "href": "https://noteplan.co/pricing"
+      },
+      {
+        "id": "channel_experiments_source",
+        "label": "Reviewed channel experiment synthesis",
+        "href": "https://developer.apple.com/app-store/search/"
+      },
+      {
+        "id": "feature_priorities_source",
+        "label": "Reviewed feature-priority synthesis",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "launch_sequence_source",
+        "label": "Ninety-day strategy model",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "learning_metrics_source",
+        "label": "Privacy-preserving learning model",
+        "href": "https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links"
+      },
+      {
+        "id": "product_and_market_synthesis",
+        "label": "today-md product audit and official market sources",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "competitor_official_sources",
+        "label": "Official competitor product and pricing pages",
+        "href": "https://noteplan.co/pricing"
+      },
+      {
+        "id": "pricing_sources",
+        "label": "Official current product pricing pages",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "channel_and_platform_sources",
+        "label": "Official channel and App Store guidance",
+        "href": "https://developer.apple.com/app-store/search/"
+      },
+      {
+        "id": "strategy_model",
+        "label": "Research synthesis and launch decision model",
+        "href": "https://github.com/arthurliebhardt/today-md"
+      },
+      {
+        "id": "measurement_synthesis",
+        "label": "Apple App Analytics guidance and internal learning thresholds",
+        "href": "https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links"
+      },
+      {
+        "id": "github_metrics",
+        "label": "GitHub repository and release signals",
+        "href": "https://api.github.com/repos/arthurliebhardt/today-md"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# today-md: Market Strategy\n\nResearch date: 18 July 2026 · Audience: product stakeholders · Decision horizon: the first 90 days after a trustworthy public release"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n**Choose a narrow beachhead:** Mac-first developers, consultants, and privacy-conscious knowledge workers who already like Markdown or Obsidian, deliberately plan their week, and reject subscriptions. The broader label “productivity users” is too diffuse and puts today-md into an unwinnable feature-count contest.\n\n**Position the intersection, not a lone feature:** “A native Mac planner for Today, This Week, and Backlog. Every task stays local and readable in Markdown. No account; one-time purchase.” Local storage, Markdown, calendar planning, and lifetime pricing each have competitors; their combination inside one calm, task-first workflow is the useful opening.\n\n**Fix conversion before buying reach:** ship a signed/notarized or Mac App Store build, let people experience Pro for 14 days, guide the first board-to-calendar-to-Markdown workflow, and explain why a buyer should pay when source builds are fully unlocked. The current five-task cap and Gatekeeper workaround interrupt trust before the product's strongest moments.\n\n**Run four acquisition loops first:** a 20-person workflow cohort, r/macapps/native-Mac communities, an honest Obsidian/Markdown workflow guide, and Show HN once installation is frictionless. Support them with App Store metadata, channel-specific campaign links, and high-intent comparison pages. Broad paid social, Apple Ads, and official Homebrew distribution are poor near-term bets.\n\n**Build the habit loop next:** true task dates, recurrence, reminders, natural-language capture, duration/capacity, visible Markdown-folder workflows, and guided morning/weekly planning. Defer collaboration, generic AI chat, a knowledge graph, and a full mobile client until the core weekly habit is proven."
+      },
+      {
+        "id": "decision_frame",
+        "type": "markdown",
+        "body": "## Decision frame\n\nThis report answers two questions: who is most likely to adopt and pay for today-md now, and which product moves most improve acquisition, activation, retention, or defensibility. Evidence combines a local product/code audit, official competitor and platform documentation, current public repository signals, and qualitative channel research.\n\nThe recommendation assumes a small independent team, a **$19.99 lifetime Pro** offer, no account or behavioral telemetry, and a native macOS-only product. It optimizes first for learning and durable fit, not raw launch-day traffic."
+      },
+      {
+        "id": "beachhead_intro",
+        "type": "markdown",
+        "body": "## Key finding 1 — The beachhead is Markdown-first Mac professionals\n\nThe best early adopter is not defined by age or job title. It is a behavioral segment: someone who works on a Mac, plans across a day and week, wants rich task context, values inspectable files, and is tired of recurring productivity subscriptions. Developers and consultants are especially reachable because the Markdown files are useful to editors, scripts, Obsidian, and coding agents as well as to the app.\n\nThe recommended order below reflects present product fit and message strength. Segment boundaries overlap; use the table as a recruiting and messaging hierarchy, not as a market-size estimate."
+      },
+      {
+        "id": "target_segments_table",
+        "type": "table",
+        "tableId": "target_segments"
+      },
+      {
+        "id": "competition_intro",
+        "type": "markdown",
+        "body": "## Key finding 2 — The market is crowded; the workflow intersection is not\n\nApple now lets Notes import and export Markdown, while Reminders already covers tags, smart lists, subtasks, dates, and alerts. Things sets the native one-time-purchase quality bar. [NotePlan](https://noteplan.co/) is the closest full-stack values competitor with local Markdown, calendars, planning notes, time-blocking, and plugins. New products such as [Plainlist](https://getplainlist.com/) and [Loomline](https://loomline.paperheart.dev/) already compete on plain files and roughly $19 lifetime pricing.\n\nThat makes “local-first,” “Markdown,” and “no subscription” proof points rather than sufficient positioning. The stronger promise is a specific outcome: turn a loose task backlog into a realistic Today and This Week plan while keeping the underlying work portable."
+      },
+      {
+        "id": "competitor_map_table",
+        "type": "table",
+        "tableId": "competitor_map"
+      },
+      {
+        "id": "pricing_intro",
+        "type": "markdown",
+        "body": "## Pricing is a strength, not the first lever to change\n\nThe chart compares current sticker prices, not multi-year total cost: one-time products show their Mac purchase price, while subscriptions show the current annual-plan price. That difference is the strategic point and also the comparison limit. At **$19.99 lifetime**, today-md is aligned with direct emerging file-based rivals, below Things for Mac, and far below the annual planning suites. Improve trial and activation before reducing price."
+      },
+      {
+        "id": "pricing_context_chart",
+        "type": "chart",
+        "chartId": "pricing_context",
+        "layout": "full"
+      },
+      {
+        "id": "positioning",
+        "type": "markdown",
+        "body": "## Key finding 3 — Sell the planning outcome, then prove ownership\n\n**Recommended category sentence:** A native Mac planner for Today, This Week, and Backlog. Every task stays local and readable in Markdown. No account; one-time purchase.\n\n**Headline:** “Plan today. Own the file.”\n\n**Proof sequence:** (1) move work across Today, This Week, and Backlog; (2) time-block the week against the real calendar; (3) open the same task as Markdown in Finder or Obsidian; (4) show that export works without an account. The first 30–45 second demo and the first three App Store screenshots should follow that order. Settings screens should not carry the differentiation.\n\nUse audience variants without changing the product truth: “Native Mac planning. No account. No subscription.” for Mac-app buyers; “The Mac task manager your coding agent can read.” for developers; and “A calm daily board for a Markdown vault folder.” for Obsidian users only after compatibility boundaries are documented. Avoid claiming that today-md is a general Obsidian Tasks client."
+      },
+      {
+        "id": "app_store",
+        "type": "markdown",
+        "body": "## Key finding 4 — Mac App Store execution matters more than paid acquisition\n\nA sharper metadata test is **Name:** “today-md: Markdown Tasks” and **Subtitle:** “Plan the week. Own your files.” Candidate keywords, excluding repeated name/subtitle terms, are: `todo,kanban,calendar,timeblock,plaintext,offline,focus,backlog,checklist,private,weekly`. Validate the final string in App Store Connect.\n\nFor a Mac-only app, Apple Ads eligibility, Custom Product Pages, and Product Page Optimization are not available in the same way as for iPhone and iPad apps. Useful levers are the core metadata, screenshots, ratings, localization, App Tags where available, editorial nominations, and external referrals. [Apple says search uses the name, subtitle, keywords, and other metadata](https://developer.apple.com/app-store/search/); its keyword field is limited to 100 characters.\n\nUse a separate [App Store campaign link](https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links) for every external launch, tutorial, partner, or comparison page. This preserves the no-telemetry product promise while still measuring acquisition and downstream App Store outcomes."
+      },
+      {
+        "id": "channels_intro",
+        "type": "markdown",
+        "body": "## Key finding 5 — Use four trust-rich acquisition loops before broad reach\n\nThe channel sequence starts with direct observation, then moves through communities where native Mac quality, Markdown workflows, and maker transparency are already valued. Stagger launches instead of firing every channel on the same day; this creates clean learning windows and leaves time to fix onboarding or sync problems.\n\n[Show HN](https://news.ycombinator.com/showhn.html) is a good fit only when visitors can run the product without signup or security workarounds and the maker is present for technical questions. Obsidian communities reward useful tutorials and participation more than promotional announcements. Product Hunt is an amplifier after the message is proven, not the primary engine."
+      },
+      {
+        "id": "channel_experiments_table",
+        "type": "table",
+        "tableId": "channel_experiments"
+      },
+      {
+        "id": "conversion",
+        "type": "markdown",
+        "sourceId": "github_metrics",
+        "body": "## Key finding 6 — Fix the commercial and trust story before scaling traffic\n\nPublic signals are still early: on 18 July 2026 the repository showed **28 stars and 2 forks**, and the latest release asset had **23 downloads**. These are noisy awareness signals, not user or retention counts, so the correct near-term objective is a high-contact learning cohort rather than paid reach.\n\nThree conversion blockers matter most. First, the direct build is not notarized and asks users to bypass Gatekeeper. Second, the free App Store tier stops at one list and five tasks, likely before a user can experience a real week. Third, source and GitHub builds include all Pro features while the App Store charges $19.99, which is rational for open source but commercially ambiguous.\n\nRecommended policy: keep the source MIT and self-builds unlocked, but align distributed prebuilt binaries with the same Free/Pro model; make the App Store build the signed, supported, automatically updated binary. If unrestricted GitHub binaries remain, say explicitly that the purchase funds development and buys trusted installation and updates. Test a **14-day full-Pro preview** before revisiting the lifetime price. Things offers a 15-day Mac trial and Plainlist offers 14 days, so this matches the evaluation norm without discounting the product."
+      },
+      {
+        "id": "features_intro",
+        "type": "markdown",
+        "body": "## Key finding 7 — Build the weekly habit loop before adding breadth\n\nToday.md already has a coherent spine: Today / This Week / Backlog, custom lists, subtasks, Markdown task detail, full-text search, quick capture, calendar time-blocking, local storage, export, and folder reconciliation. The largest product gap is that tasks lack independent due dates, recurrence, priorities, reminders, and natural-language scheduling—the fundamentals users expect when a planner becomes trusted.\n\nThe second opportunity is more distinctive: make Markdown ownership visible and useful throughout the workflow. Let a user choose a vault subfolder and hierarchy, see and open the exact task file, understand frontmatter, and reconcile edits confidently. Then add a lightweight morning plan, shutdown, and weekly review that turns features into a repeatable habit."
+      },
+      {
+        "id": "feature_priorities_table",
+        "type": "table",
+        "tableId": "feature_priorities"
+      },
+      {
+        "id": "avoid_features",
+        "type": "markdown",
+        "body": "## What not to build yet\n\nDo not lead the next cycle with team collaboration, generic AI chat, meeting transcription, a knowledge graph, or a full mobile application. Each expands the competitive set and operating burden before the Mac weekly-planning habit is validated.\n\nA smaller exception may be useful later: local or bring-your-own-key subtask suggestions inside an existing task. Treat it as an optional accelerant only after interviews show repeated demand. Near-term “AI” differentiation is better expressed as open, agent-readable Markdown plus documented file semantics."
+      },
+      {
+        "id": "launch_intro",
+        "type": "markdown",
+        "body": "## Next steps — A ninety-day launch sequence\n\nThe critical path is trust → activation → focused distribution → retention. Do not wait for the full task-fundamentals roadmap before recruiting the first cohort, but do remove Gatekeeper friction and expose the complete workflow before a public launch. Reserve capacity after every channel experiment for support and small fixes."
+      },
+      {
+        "id": "launch_sequence_table",
+        "type": "table",
+        "tableId": "launch_sequence"
+      },
+      {
+        "id": "measurement_intro",
+        "type": "markdown",
+        "body": "## Measure learning without weakening privacy\n\nUse App Store Connect acquisition, usage, sales, and peer benchmarks; channel-specific campaign reporting becomes available after at least five first-time downloads. Supplement it with opt-in interviews, a short in-app “send feedback” path, support categories, and a voluntary one-week diary for the first cohort. No third-party behavioral tracker is required.\n\nThe thresholds below are hypotheses chosen to force decisions. They are not claims about category benchmarks. Record the numerator and denominator, cohort date, product version, source, and any onboarding changes so comparisons remain interpretable."
+      },
+      {
+        "id": "learning_metrics_table",
+        "type": "table",
+        "tableId": "learning_metrics"
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Further questions\n\n1. Which current behavior creates the strongest return trigger: moving tasks into Today, time-blocking them, or seeing the same task in an external Markdown tool?\n2. Do target users expect Markdown files to be the source of truth, or is a reliable mirror sufficient? This affects the sync architecture and the honesty of “own the file.”\n3. Which missing fundamental most blocks trust: recurrence, deadlines, reminders, priority, or mobile capture?\n4. Does the unrestricted GitHub binary materially reduce App Store purchases, or does it create credibility and paid support?\n5. Will users pay $19.99 after a real two-week workflow, and which three moments do buyers cite?\n6. Which compatibility contract is required for Obsidian: generic Markdown, a documented frontmatter schema, or interoperability with the Obsidian Tasks plugin?"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "body": "## Caveats and assumptions\n\nThis is desk research, product inspection, and strategy synthesis—not a user survey or statistically representative demand study. Pricing, platform rules, community policies, and competitor capabilities were checked against current official pages where available on 18 July 2026 and can change. Emerging competitors sometimes publish inconsistent roadmap language.\n\nGitHub stars, forks, and release downloads undercount installs and do not reveal active use. App Store results were not available as an indexed live listing, and internal purchase, retention, or support data was not supplied. Feature priorities therefore express expected commercial leverage and should be revised after the 20-user cohort.\n\nThe tables intentionally avoid numeric opportunity scores. The evidence is multi-attribute and qualitative; exact lookup and explicit decision rules are more honest than bars or weighted rankings with invented precision."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-18T12:00:00Z",
+    "status": "ready",
+    "datasets": {
+      "target_segments": [
+        {
+          "priority": 1,
+          "segment": "Markdown-first Mac professionals",
+          "job": "Turn a long backlog into a realistic day and week without surrendering files to a SaaS account.",
+          "why_fit": "Native Mac workflow, focused lanes, calendar planning, local Markdown, one-time price.",
+          "proof_needed": "Show one task moving from capture to time-block to an inspectable file."
+        },
+        {
+          "priority": 2,
+          "segment": "Developers and coding-agent users",
+          "job": "Use a human-friendly task UI while editors, scripts, and agents can read the underlying work context.",
+          "why_fit": "Open-source credibility, Markdown mirror, local SQLite/FTS, global capture.",
+          "proof_needed": "Publish the file schema and a safe agent/editor workflow; avoid vague AI claims."
+        },
+        {
+          "priority": 3,
+          "segment": "Solo consultants and freelancers",
+          "job": "Plan client work across today and this week, then protect time on the calendar.",
+          "why_fit": "Visual triage plus calendar time-blocking and rich task notes in one app.",
+          "proof_needed": "Demonstrate a Monday planning ritual and realistic capacity, not a feature tour."
+        },
+        {
+          "priority": 4,
+          "segment": "Native Mac app buyers",
+          "job": "Replace a subscription task service with a polished, private, account-free Mac utility.",
+          "why_fit": "$19.99 lifetime pricing, native interface, offline data ownership.",
+          "proof_needed": "Trusted installation, keyboard/accessibility polish, clear purchase story, ratings."
+        }
+      ],
+      "pricing_context": [
+        {
+          "product": "today-md",
+          "price_usd": 19.99,
+          "billing_model": "One-time",
+          "trial_days": 14,
+          "scope": "Recommended Pro preview, then lifetime Mac unlock",
+          "markdown_model": "Task Markdown mirror and folder reconciliation",
+          "calendar_model": "External calendar time-blocking and week view",
+          "source_url": "https://github.com/arthurliebhardt/today-md"
+        },
+        {
+          "product": "Plainlist",
+          "price_usd": 19.99,
+          "billing_model": "One-time",
+          "trial_days": 14,
+          "scope": "Lifetime Mac license",
+          "markdown_model": "One local TaskPaper-compatible plain-text file",
+          "calendar_model": "Dates and planning; no comparable external calendar proof found",
+          "source_url": "https://getplainlist.com/"
+        },
+        {
+          "product": "Loomline",
+          "price_usd": 19,
+          "billing_model": "One-time",
+          "trial_days": 0,
+          "scope": "Stated Mac purchase price",
+          "markdown_model": "Markdown-native project files",
+          "calendar_model": "No comparable today/week calendar planning proof found",
+          "source_url": "https://loomline.paperheart.dev/"
+        },
+        {
+          "product": "Things for Mac",
+          "price_usd": 49.99,
+          "billing_model": "One-time",
+          "trial_days": 15,
+          "scope": "Mac license only",
+          "markdown_model": "Markdown formatting in notes, not user-owned task files",
+          "calendar_model": "Calendar events in Today; no full week time-blocking planner",
+          "source_url": "https://culturedcode.com/things/support/articles/2803552/"
+        },
+        {
+          "product": "NotePlan",
+          "price_usd": 99.99,
+          "billing_model": "Annual",
+          "trial_days": 7,
+          "scope": "Annual subscription",
+          "markdown_model": "Local Markdown notes and tasks",
+          "calendar_model": "Calendar, time-blocking, and planning notes",
+          "source_url": "https://noteplan.co/pricing"
+        },
+        {
+          "product": "Morgen",
+          "price_usd": 180,
+          "billing_model": "Annual",
+          "trial_days": 14,
+          "scope": "Current annual plan",
+          "markdown_model": "Not positioned around user-owned Markdown files",
+          "calendar_model": "Calendar/task aggregation and planning",
+          "source_url": "https://www.morgen.so/pricing"
+        },
+        {
+          "product": "Sunsama",
+          "price_usd": 204,
+          "billing_model": "Annual",
+          "trial_days": 14,
+          "scope": "Current annual plan",
+          "markdown_model": "Not positioned around user-owned Markdown files",
+          "calendar_model": "Guided daily planning and timeboxing",
+          "source_url": "https://sunsama.com/pricing"
+        },
+        {
+          "product": "Akiflow",
+          "price_usd": 228,
+          "billing_model": "Annual",
+          "trial_days": 7,
+          "scope": "Current annual plan",
+          "markdown_model": "Not positioned around user-owned Markdown files",
+          "calendar_model": "Task aggregation and time-blocking",
+          "source_url": "https://akiflow.com/pricing"
+        }
+      ],
+      "competitor_map": [
+        {
+          "threat_rank": 1,
+          "alternative": "Apple Reminders + Notes",
+          "current_offer": "Included with Apple devices; Reminders has dates, alerts, tags, smart lists, and subtasks; Notes imports/exports Markdown.",
+          "wins_on": "Zero cost, installed base, system integration, mobile coverage.",
+          "opening": "A single opinionated Today / This Week / Backlog flow with richer task context and calendar planning."
+        },
+        {
+          "threat_rank": 2,
+          "alternative": "Things",
+          "current_offer": "$49.99 for Mac; one-time purchase; 15-day full Mac trial.",
+          "wins_on": "Native quality, fast capture, Today, recurrence, deadlines, reminders, natural-language dates.",
+          "opening": "Visible Markdown file ownership, week time-blocking, lower lifetime price, open source."
+        },
+        {
+          "threat_rank": 3,
+          "alternative": "NotePlan",
+          "current_offer": "$99.99 per year or $12 per month; local Markdown, calendars, daily/weekly notes, time-blocking, Kanban, plugins.",
+          "wins_on": "Closest all-in-one match for technical professionals and Markdown planners.",
+          "opening": "Task-first calm, smaller surface area, no subscription, simpler learning curve."
+        },
+        {
+          "threat_rank": 4,
+          "alternative": "Plainlist",
+          "current_offer": "$19.99 once; 14-day trial; one local TaskPaper-compatible file with Plan / Focus / Done.",
+          "wins_on": "Extremely clear plain-text ownership, natural-language capture, habits and estimates.",
+          "opening": "Richer Markdown context, visual board, external calendar time-blocking, multi-list workflow."
+        },
+        {
+          "threat_rank": 5,
+          "alternative": "Obsidian plus plugins",
+          "current_offer": "Free core app; local Markdown and a large plugin ecosystem; optional Sync starts at $4 per month billed annually.",
+          "wins_on": "Maximum extensibility, existing vaults, notes/tasks in one knowledge base.",
+          "opening": "A coherent workflow without plugin assembly, query maintenance, or dashboard configuration."
+        },
+        {
+          "threat_rank": 6,
+          "alternative": "Loomline",
+          "current_offer": "$19 once; Markdown-native project files and a Focus / Backlog / Done board.",
+          "wins_on": "Direct file-based positioning and a similar lifetime price.",
+          "opening": "Today/week planning, calendar time-blocking, mature capture/search, clearer workflow proof."
+        },
+        {
+          "threat_rank": 7,
+          "alternative": "Sunsama, Morgen, Akiflow",
+          "current_offer": "Premium planners at roughly $180–$228 per year with guided planning, integrations, and time-blocking.",
+          "wins_on": "Strong daily rituals, capacity guidance, cross-service aggregation.",
+          "opening": "Private, focused, one-time-price alternative for users who do not need a SaaS command center."
+        }
+      ],
+      "channel_experiments": [
+        {
+          "priority": 1,
+          "experiment": "Recruit a 20-person one-week workflow cohort from LinkedIn, GitHub, and direct outreach.",
+          "message": "Use today-md for your real Monday planning; show us where the workflow breaks.",
+          "readiness": "Trusted build, full-Pro access, onboarding script, interview consent.",
+          "measure": "Week completion, return behavior, top three blockers, willingness to pay."
+        },
+        {
+          "priority": 2,
+          "experiment": "Launch in r/macapps and adjacent native-Mac communities.",
+          "message": "Native Mac planning, private Markdown, $19.99 lifetime; factual competitor comparison.",
+          "readiness": "Community-rule compliance, disclosure, polished screenshots, campaign link.",
+          "measure": "Qualified installs, week-two return, Pro purchases, support topics."
+        },
+        {
+          "priority": 3,
+          "experiment": "Improve App Store metadata/screenshots and submit an editorial nomination.",
+          "message": "Plan Today → Shape the Week → Keep the Markdown.",
+          "readiness": "Live product page, accurate privacy/pricing, launch narrative three weeks ahead where possible.",
+          "measure": "Search impressions, product-page conversion, downloads, proceeds, peer benchmarks."
+        },
+        {
+          "priority": 4,
+          "experiment": "Publish an Obsidian/Markdown workflow guide and starter template before community promotion.",
+          "message": "A calm daily board for a documented vault subfolder—not a generic Tasks-plugin client.",
+          "readiness": "Configurable folder layout, stable reconciliation, documented compatibility and migration.",
+          "measure": "Qualified referrals, retained users, sync/compatibility support rate."
+        },
+        {
+          "priority": 5,
+          "experiment": "Run Show HN with a technical maker story.",
+          "message": "Open file format, native Swift/SQLite, no SaaS, agent-readable work context.",
+          "readiness": "Immediately runnable signed build, simple trial, maker available for questions.",
+          "measure": "Substantive feedback, installs, retained users, stars; ignore points as the primary KPI."
+        },
+        {
+          "priority": 6,
+          "experiment": "Build high-intent comparison and workflow pages.",
+          "message": "Things alternative with Markdown; NotePlan without a subscription; Obsidian tasks without plugin assembly.",
+          "readiness": "Factual comparisons, 30–45 second demo, migration/export proof, unique campaign links.",
+          "measure": "Non-brand impressions, qualified referrals, download-to-Pro by page."
+        },
+        {
+          "priority": 7,
+          "experiment": "Use Product Hunt and open-source Mac directories as launch amplifiers.",
+          "message": "Working product, transparent lifetime price, founder story, portable files.",
+          "readiness": "Message proven in earlier cohorts; press kit, changelog, live support.",
+          "measure": "Incremental referrals and purchases; ranking is secondary."
+        }
+      ],
+      "feature_priorities": [
+        {
+          "priority": 1,
+          "horizon": "P0 · Before broad launch",
+          "feature": "14-day full-Pro preview plus guided first-run workflow.",
+          "commercial_job": "Let users reach calendar and folder-sync value before the paywall; shorten time to the first completed planning loop.",
+          "acceptance_signal": "Most cohort users move a task, time-block it, and find/open its Markdown file in the first session."
+        },
+        {
+          "priority": 2,
+          "horizon": "P0 · Before broad launch",
+          "feature": "Resolve binary/monetization policy; sign and notarize direct distribution if it remains.",
+          "commercial_job": "Remove Gatekeeper fear and explain why App Store Pro is worth paying for alongside MIT source.",
+          "acceptance_signal": "Near-zero install support and no interview confusion about free versus paid builds."
+        },
+        {
+          "priority": 3,
+          "horizon": "P1 · First retention cycle",
+          "feature": "True task dates/deadlines, recurrence, reminders, and natural-language capture.",
+          "commercial_job": "Meet baseline trust requirements so today-md can replace, not merely complement, another task app.",
+          "acceptance_signal": "Target users manage repeated and time-sensitive work without keeping a second task manager."
+        },
+        {
+          "priority": 4,
+          "horizon": "P1 · First retention cycle",
+          "feature": "Task duration, daily/weekly capacity, unfinished-task rollover, optional WIP limits.",
+          "commercial_job": "Make week planning realistic and strengthen the outcome beyond a Kanban board.",
+          "acceptance_signal": "Users adjust overloaded days and cite the capacity view as a reason to return."
+        },
+        {
+          "priority": 5,
+          "horizon": "P1 · Differentiation",
+          "feature": "First-class Markdown folder workflow: configurable hierarchy/frontmatter, open exact file, Edit in Obsidian, reliable reconciliation.",
+          "commercial_job": "Turn an invisible implementation virtue into visible ownership and ecosystem leverage.",
+          "acceptance_signal": "Markdown/Obsidian users complete external edits without duplicates, lost fields, or schema confusion."
+        },
+        {
+          "priority": 6,
+          "horizon": "P1 · Differentiation",
+          "feature": "Guided morning plan, end-of-day shutdown, and weekly review with carryover decisions.",
+          "commercial_job": "Create a repeatable habit comparable to premium planning services without becoming a SaaS suite.",
+          "acceptance_signal": "Week-two interviews show a named ritual and a clear return trigger."
+        },
+        {
+          "priority": 7,
+          "horizon": "P2 · Capture ecosystem",
+          "feature": "Shortcuts/App Intents, share-sheet capture, and Reminders import before a full mobile app.",
+          "commercial_job": "Close capture gaps at much lower scope than iPhone parity.",
+          "acceptance_signal": "Fewer requests for mobile capture and meaningful shortcut/import adoption among opt-in testers."
+        },
+        {
+          "priority": 8,
+          "horizon": "P2 · Polish",
+          "feature": "Workflow templates plus keyboard and accessibility alternatives for pointer-heavy calendar interactions.",
+          "commercial_job": "Improve repeatability, inclusivity, and native-Mac quality signals.",
+          "acceptance_signal": "Core planning is fully operable without drag-and-drop; templates recur in real projects."
+        }
+      ],
+      "launch_sequence": [
+        {
+          "phase": 1,
+          "weeks": "0–2",
+          "outcome": "A trustworthy product that exposes the complete value proposition.",
+          "moves": "Resolve paid/free binary policy; notarize or ship Mac App Store build; add 14-day Pro preview and onboarding; record a 45-second demo; reorder screenshots; create campaign links.",
+          "gate": "A new user can install, plan, time-block, see Markdown, and understand pricing without help."
+        },
+        {
+          "phase": 2,
+          "weeks": "2–4",
+          "outcome": "Evidence from real weekly use, not feature reactions.",
+          "moves": "Recruit 20 target users; run a one-week diary plus interviews; label blockers by acquisition, activation, retention, and trust; fix the top two high-frequency issues.",
+          "gate": "At least 10 complete the week and can name a repeatable planning moment; at least 5 say they would pay $19.99."
+        },
+        {
+          "phase": 3,
+          "weeks": "4–8",
+          "outcome": "A repeatable message and two qualified acquisition channels.",
+          "moves": "Stagger r/macapps, App Store editorial/ASO, Obsidian guide, and Show HN; publish factual comparison pages; remain available after each launch; use unique campaign links.",
+          "gate": "Two sources produce retained target users and at least one produces credible Pro purchases without abnormal support load."
+        },
+        {
+          "phase": 4,
+          "weeks": "8–12",
+          "outcome": "A stronger weekly habit and a focused next roadmap.",
+          "moves": "Build the top retention pair—likely task fundamentals plus planning ritual or Markdown hierarchy; publish user workflows/testimonials; repeat only channels that delivered qualified use.",
+          "gate": "Week-two return and purchase intent improve versus the first cohort; top compatibility and trust issues decline."
+        }
+      ],
+      "learning_metrics": [
+        {
+          "priority": 1,
+          "question": "Does the complete workflow create a real weekly habit?",
+          "measure": "Target cohort members who return and complete the second weekly plan.",
+          "initial_rule": "10 of 20 return in week two and can name the trigger.",
+          "response": "If missed, pause reach work and fix the top activation/retention break."
+        },
+        {
+          "priority": 2,
+          "question": "Is the $19.99 value legible after use?",
+          "measure": "Cohort willingness to pay plus 30-day download-to-Pro conversion by source.",
+          "initial_rule": "5 of 20 cohort users would pay; use 5% conversion as a provisional post-launch hypothesis, not a benchmark.",
+          "response": "Separate product-value objections from trial/paywall and free-binary confusion before changing price."
+        },
+        {
+          "priority": 3,
+          "question": "Which channels attract the intended behavior, not just clicks?",
+          "measure": "First-time downloads, week-two return, and Pro purchases per campaign link.",
+          "initial_rule": "Wait for at least 5 first-time downloads per link—the Apple reporting threshold—then compare quality and support burden.",
+          "response": "Rewrite the promise or stop a channel that repeatedly sends mismatched users."
+        },
+        {
+          "priority": 4,
+          "question": "Can the trust promise survive contact with the product?",
+          "measure": "Gatekeeper, sync, data-loss, duplicate-file, and privacy-related support cases.",
+          "initial_rule": "Zero data-loss incidents; near-zero Gatekeeper issues after trusted distribution; declining sync confusion.",
+          "response": "Treat any data-loss pattern as a release blocker and documentation-only fixes as insufficient."
+        },
+        {
+          "priority": 5,
+          "question": "Does the App Store page communicate the workflow?",
+          "measure": "Search impressions, product-page views, downloads, proceeds, and Apple peer benchmarks by version.",
+          "initial_rule": "The workflow-led creative should outperform the prior settings-led page after enough volume for a stable comparison.",
+          "response": "Change one metadata or creative hypothesis at a time and preserve dated baselines."
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "target_segments_source",
+      "label": "Reviewed beachhead segment synthesis",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "SQLite over reviewed research values",
+        "language": "sql",
+        "id": "target_segments_2026_07_18",
+        "sql": "WITH reviewed_segments(priority, segment, job, why_fit, proof_needed) AS (\n  VALUES\n    (1, 'Markdown-first Mac professionals', 'Turn a long backlog into a realistic day and week without surrendering files to a SaaS account.', 'Native Mac workflow, focused lanes, calendar planning, local Markdown, one-time price.', 'Show one task moving from capture to time-block to an inspectable file.'),\n    (2, 'Developers and coding-agent users', 'Use a human-friendly task UI while editors, scripts, and agents can read the underlying work context.', 'Open-source credibility, Markdown mirror, local SQLite/FTS, global capture.', 'Publish the file schema and a safe agent/editor workflow; avoid vague AI claims.'),\n    (3, 'Solo consultants and freelancers', 'Plan client work across today and this week, then protect time on the calendar.', 'Visual triage plus calendar time-blocking and rich task notes in one app.', 'Demonstrate a Monday planning ritual and realistic capacity, not a feature tour.'),\n    (4, 'Native Mac app buyers', 'Replace a subscription task service with a polished, private, account-free Mac utility.', '$19.99 lifetime pricing, native interface, offline data ownership.', 'Trusted installation, keyboard/accessibility polish, clear purchase story, ratings.')\n)\nSELECT priority, segment, job, why_fit, proof_needed\nFROM reviewed_segments\nORDER BY priority ASC;",
+        "description": "Behavioral segments ranked from the local today-md product audit, official competitor research, and reachable early-adopter communities. This is a strategic prioritization, not a population estimate.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "macOS-first users",
+          "individual rather than team workflows",
+          "segments reachable by a small independent launch"
+        ],
+        "tables_used": ["reviewed_segments"]
+      }
+    },
+    {
+      "id": "competitor_map_source",
+      "label": "Reviewed official competitor comparison",
+      "href": "https://noteplan.co/pricing",
+      "query": {
+        "engine": "SQLite over reviewed official-source values",
+        "language": "sql",
+        "id": "competitor_map_2026_07_18",
+        "sql": "WITH reviewed_competitors(threat_rank, alternative, current_offer, wins_on, opening) AS (\n  VALUES\n    (1, 'Apple Reminders + Notes', 'Included with Apple devices; Reminders has dates, alerts, tags, smart lists, and subtasks; Notes imports/exports Markdown.', 'Zero cost, installed base, system integration, mobile coverage.', 'A single opinionated Today / This Week / Backlog flow with richer task context and calendar planning.'),\n    (2, 'Things', '$49.99 for Mac; one-time purchase; 15-day full Mac trial.', 'Native quality, fast capture, Today, recurrence, deadlines, reminders, natural-language dates.', 'Visible Markdown file ownership, week time-blocking, lower lifetime price, open source.'),\n    (3, 'NotePlan', '$99.99 per year or $12 per month; local Markdown, calendars, daily/weekly notes, time-blocking, Kanban, plugins.', 'Closest all-in-one match for technical professionals and Markdown planners.', 'Task-first calm, smaller surface area, no subscription, simpler learning curve.'),\n    (4, 'Plainlist', '$19.99 once; 14-day trial; one local TaskPaper-compatible file with Plan / Focus / Done.', 'Extremely clear plain-text ownership, natural-language capture, habits and estimates.', 'Richer Markdown context, visual board, external calendar time-blocking, multi-list workflow.'),\n    (5, 'Obsidian plus plugins', 'Free core app; local Markdown and a large plugin ecosystem; optional Sync starts at $4 per month billed annually.', 'Maximum extensibility, existing vaults, notes/tasks in one knowledge base.', 'A coherent workflow without plugin assembly, query maintenance, or dashboard configuration.'),\n    (6, 'Loomline', '$19 once; Markdown-native project files and a Focus / Backlog / Done board.', 'Direct file-based positioning and a similar lifetime price.', 'Today/week planning, calendar time-blocking, mature capture/search, clearer workflow proof.'),\n    (7, 'Sunsama, Morgen, Akiflow', 'Premium planners at roughly $180–$228 per year with guided planning, integrations, and time-blocking.', 'Strong daily rituals, capacity guidance, cross-service aggregation.', 'Private, focused, one-time-price alternative for users who do not need a SaaS command center.')\n)\nSELECT threat_rank, alternative, current_offer, wins_on, opening\nFROM reviewed_competitors\nORDER BY threat_rank ASC;",
+        "description": "Comparison synthesized from official Apple, Things, NotePlan, Obsidian, Plainlist, Loomline, Sunsama, Morgen, and Akiflow product and pricing pages. Checked 2026-07-18.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "direct task planners and strongest adjacent substitutes",
+          "current public product capabilities and public US pricing where available"
+        ],
+        "tables_used": ["reviewed_competitors"]
+      }
+    },
+    {
+      "id": "channel_experiments_source",
+      "label": "Reviewed channel experiment synthesis",
+      "href": "https://developer.apple.com/app-store/search/",
+      "query": {
+        "engine": "SQLite over reviewed research values",
+        "language": "sql",
+        "id": "channel_experiments_2026_07_18",
+        "sql": "WITH reviewed_channels(priority, experiment, message, readiness, measure) AS (\n  VALUES\n    (1, 'Recruit a 20-person one-week workflow cohort from LinkedIn, GitHub, and direct outreach.', 'Use today-md for your real Monday planning; show us where the workflow breaks.', 'Trusted build, full-Pro access, onboarding script, interview consent.', 'Week completion, return behavior, top three blockers, willingness to pay.'),\n    (2, 'Launch in r/macapps and adjacent native-Mac communities.', 'Native Mac planning, private Markdown, $19.99 lifetime; factual competitor comparison.', 'Community-rule compliance, disclosure, polished screenshots, campaign link.', 'Qualified installs, week-two return, Pro purchases, support topics.'),\n    (3, 'Improve App Store metadata/screenshots and submit an editorial nomination.', 'Plan Today → Shape the Week → Keep the Markdown.', 'Live product page, accurate privacy/pricing, launch narrative three weeks ahead where possible.', 'Search impressions, product-page conversion, downloads, proceeds, peer benchmarks.'),\n    (4, 'Publish an Obsidian/Markdown workflow guide and starter template before community promotion.', 'A calm daily board for a documented vault subfolder—not a generic Tasks-plugin client.', 'Configurable folder layout, stable reconciliation, documented compatibility and migration.', 'Qualified referrals, retained users, sync/compatibility support rate.'),\n    (5, 'Run Show HN with a technical maker story.', 'Open file format, native Swift/SQLite, no SaaS, agent-readable work context.', 'Immediately runnable signed build, simple trial, maker available for questions.', 'Substantive feedback, installs, retained users, stars; ignore points as the primary KPI.'),\n    (6, 'Build high-intent comparison and workflow pages.', 'Things alternative with Markdown; NotePlan without a subscription; Obsidian tasks without plugin assembly.', 'Factual comparisons, 30–45 second demo, migration/export proof, unique campaign links.', 'Non-brand impressions, qualified referrals, download-to-Pro by page.'),\n    (7, 'Use Product Hunt and open-source Mac directories as launch amplifiers.', 'Working product, transparent lifetime price, founder story, portable files.', 'Message proven in earlier cohorts; press kit, changelog, live support.', 'Incremental referrals and purchases; ranking is secondary.')\n)\nSELECT priority, experiment, message, readiness, measure\nFROM reviewed_channels\nORDER BY priority ASC;",
+        "description": "Channel sequence derived from current App Store tooling and eligibility, Show HN rules, Product Hunt launch guidance, Homebrew requirements, and current Mac/Obsidian community policies. Checked 2026-07-18.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "low-cost channels suitable for a small independent launch",
+          "Mac-only platform constraints",
+          "channels that can be measured without third-party in-app telemetry"
+        ],
+        "tables_used": ["reviewed_channels"]
+      }
+    },
+    {
+      "id": "feature_priorities_source",
+      "label": "Reviewed feature-priority synthesis",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "SQLite over reviewed research values",
+        "language": "sql",
+        "id": "feature_priorities_2026_07_18",
+        "sql": "WITH reviewed_features(priority, horizon, feature, commercial_job, acceptance_signal) AS (\n  VALUES\n    (1, 'P0 · Before broad launch', '14-day full-Pro preview plus guided first-run workflow.', 'Let users reach calendar and folder-sync value before the paywall; shorten time to the first completed planning loop.', 'Most cohort users move a task, time-block it, and find/open its Markdown file in the first session.'),\n    (2, 'P0 · Before broad launch', 'Resolve binary/monetization policy; sign and notarize direct distribution if it remains.', 'Remove Gatekeeper fear and explain why App Store Pro is worth paying for alongside MIT source.', 'Near-zero install support and no interview confusion about free versus paid builds.'),\n    (3, 'P1 · First retention cycle', 'True task dates/deadlines, recurrence, reminders, and natural-language capture.', 'Meet baseline trust requirements so today-md can replace, not merely complement, another task app.', 'Target users manage repeated and time-sensitive work without keeping a second task manager.'),\n    (4, 'P1 · First retention cycle', 'Task duration, daily/weekly capacity, unfinished-task rollover, optional WIP limits.', 'Make week planning realistic and strengthen the outcome beyond a Kanban board.', 'Users adjust overloaded days and cite the capacity view as a reason to return.'),\n    (5, 'P1 · Differentiation', 'First-class Markdown folder workflow: configurable hierarchy/frontmatter, open exact file, Edit in Obsidian, reliable reconciliation.', 'Turn an invisible implementation virtue into visible ownership and ecosystem leverage.', 'Markdown/Obsidian users complete external edits without duplicates, lost fields, or schema confusion.'),\n    (6, 'P1 · Differentiation', 'Guided morning plan, end-of-day shutdown, and weekly review with carryover decisions.', 'Create a repeatable habit comparable to premium planning services without becoming a SaaS suite.', 'Week-two interviews show a named ritual and a clear return trigger.'),\n    (7, 'P2 · Capture ecosystem', 'Shortcuts/App Intents, share-sheet capture, and Reminders import before a full mobile app.', 'Close capture gaps at much lower scope than iPhone parity.', 'Fewer requests for mobile capture and meaningful shortcut/import adoption among opt-in testers.'),\n    (8, 'P2 · Polish', 'Workflow templates plus keyboard and accessibility alternatives for pointer-heavy calendar interactions.', 'Improve repeatability, inclusivity, and native-Mac quality signals.', 'Core planning is fully operable without drag-and-drop; templates recur in real projects.')\n)\nSELECT priority, horizon, feature, commercial_job, acceptance_signal\nFROM reviewed_features\nORDER BY priority ASC;",
+        "description": "Feature priorities derived from the local code/product audit, direct competitor capabilities, conversion dependencies, and likely retention leverage. They are hypotheses pending cohort evidence.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "individual macOS workflow",
+          "commercial leverage within the first two product cycles",
+          "exclude collaboration, generic AI chat, knowledge graph, and full mobile parity"
+        ],
+        "tables_used": ["reviewed_features"]
+      }
+    },
+    {
+      "id": "launch_sequence_source",
+      "label": "Ninety-day strategy model",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "SQLite over reviewed strategy values",
+        "language": "sql",
+        "id": "launch_sequence_2026_07_18",
+        "sql": "WITH launch_plan(phase, weeks, outcome, moves, gate) AS (\n  VALUES\n    (1, '0–2', 'A trustworthy product that exposes the complete value proposition.', 'Resolve paid/free binary policy; notarize or ship Mac App Store build; add 14-day Pro preview and onboarding; record a 45-second demo; reorder screenshots; create campaign links.', 'A new user can install, plan, time-block, see Markdown, and understand pricing without help.'),\n    (2, '2–4', 'Evidence from real weekly use, not feature reactions.', 'Recruit 20 target users; run a one-week diary plus interviews; label blockers by acquisition, activation, retention, and trust; fix the top two high-frequency issues.', 'At least 10 complete the week and can name a repeatable planning moment; at least 5 say they would pay $19.99.'),\n    (3, '4–8', 'A repeatable message and two qualified acquisition channels.', 'Stagger r/macapps, App Store editorial/ASO, Obsidian guide, and Show HN; publish factual comparison pages; remain available after each launch; use unique campaign links.', 'Two sources produce retained target users and at least one produces credible Pro purchases without abnormal support load.'),\n    (4, '8–12', 'A stronger weekly habit and a focused next roadmap.', 'Build the top retention pair—likely task fundamentals plus planning ritual or Markdown hierarchy; publish user workflows/testimonials; repeat only channels that delivered qualified use.', 'Week-two return and purchase intent improve versus the first cohort; top compatibility and trust issues decline.')\n)\nSELECT phase, weeks, outcome, moves, gate\nFROM launch_plan\nORDER BY phase ASC;",
+        "description": "Sequenced strategy model based on trust and activation dependencies, learning needs, channel readiness, and product scope. Dates are recommended execution windows rather than forecasts.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "90-day horizon",
+          "small independent team",
+          "no broad paid acquisition before activation evidence"
+        ],
+        "tables_used": ["launch_plan"]
+      }
+    },
+    {
+      "id": "learning_metrics_source",
+      "label": "Privacy-preserving learning model",
+      "href": "https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links",
+      "query": {
+        "engine": "SQLite over official platform facts and internal hypotheses",
+        "language": "sql",
+        "id": "learning_metrics_2026_07_18",
+        "sql": "WITH learning_rules(priority, question, measure, initial_rule, response) AS (\n  VALUES\n    (1, 'Does the complete workflow create a real weekly habit?', 'Target cohort members who return and complete the second weekly plan.', '10 of 20 return in week two and can name the trigger.', 'If missed, pause reach work and fix the top activation/retention break.'),\n    (2, 'Is the $19.99 value legible after use?', 'Cohort willingness to pay plus 30-day download-to-Pro conversion by source.', '5 of 20 cohort users would pay; use 5% conversion as a provisional post-launch hypothesis, not a benchmark.', 'Separate product-value objections from trial/paywall and free-binary confusion before changing price.'),\n    (3, 'Which channels attract the intended behavior, not just clicks?', 'First-time downloads, week-two return, and Pro purchases per campaign link.', 'Wait for at least 5 first-time downloads per link—the Apple reporting threshold—then compare quality and support burden.', 'Rewrite the promise or stop a channel that repeatedly sends mismatched users.'),\n    (4, 'Can the trust promise survive contact with the product?', 'Gatekeeper, sync, data-loss, duplicate-file, and privacy-related support cases.', 'Zero data-loss incidents; near-zero Gatekeeper issues after trusted distribution; declining sync confusion.', 'Treat any data-loss pattern as a release blocker and documentation-only fixes as insufficient.'),\n    (5, 'Does the App Store page communicate the workflow?', 'Search impressions, product-page views, downloads, proceeds, and Apple peer benchmarks by version.', 'The workflow-led creative should outperform the prior settings-led page after enough volume for a stable comparison.', 'Change one metadata or creative hypothesis at a time and preserve dated baselines.')\n)\nSELECT priority, question, measure, initial_rule, response\nFROM learning_rules\nORDER BY priority ASC;",
+        "description": "Apple campaign reporting facts combined with explicitly labeled internal decision thresholds for the first cohort and launch. The five-first-time-download threshold is a platform rule; the other thresholds are hypotheses.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "privacy-preserving measurement",
+          "first 90 days",
+          "small cohorts and channel-specific campaign links"
+        ],
+        "metric_definitions": [
+          "week-two return means the same target user completes another weekly planning session",
+          "download-to-Pro conversion is Pro purchases divided by first-time downloads for the same source and observation window"
+        ],
+        "tables_used": ["learning_rules"]
+      }
+    },
+    {
+      "id": "product_and_market_synthesis",
+      "label": "today-md product audit and official market sources",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "code audit and desk research",
+        "description": "Local inspection of the today-md repository, App Store metadata, feature gates, distribution instructions, and tests, combined with the official competitor and platform sources listed in the research notes. Retrieved 2026-07-18.",
+        "tables_used": [
+          "today-md repository",
+          "official competitor pages",
+          "official Apple documentation"
+        ]
+      }
+    },
+    {
+      "id": "competitor_official_sources",
+      "label": "Official competitor product and pricing pages",
+      "href": "https://noteplan.co/pricing",
+      "query": {
+        "engine": "official web sources",
+        "description": "Cross-product synthesis using official Apple Reminders and Notes guides; Things product, pricing, and trial pages; NotePlan product and pricing; Obsidian product and pricing; Plainlist; Loomline; Sunsama; Morgen; and Akiflow. Prices and capabilities checked 2026-07-18.",
+        "tables_used": [
+          "Apple Support",
+          "Things",
+          "NotePlan",
+          "Obsidian",
+          "Plainlist",
+          "Loomline",
+          "Sunsama",
+          "Morgen",
+          "Akiflow"
+        ]
+      }
+    },
+    {
+      "id": "pricing_sources",
+      "label": "Official current product pricing pages",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "SQLite over reviewed official-source values",
+        "language": "sql",
+        "id": "pricing_context_2026_07_18",
+        "sql": "WITH reviewed_pricing(product, price_usd, billing_model, trial_days, scope, markdown_model, calendar_model, source_url) AS (\n  VALUES\n    ('today-md', 19.99, 'One-time', 14, 'Recommended Pro preview, then lifetime Mac unlock', 'Task Markdown mirror and folder reconciliation', 'External calendar time-blocking and week view', 'https://github.com/arthurliebhardt/today-md'),\n    ('Plainlist', 19.99, 'One-time', 14, 'Lifetime Mac license', 'One local TaskPaper-compatible plain-text file', 'Dates and planning; no comparable external calendar proof found', 'https://getplainlist.com/'),\n    ('Loomline', 19.00, 'One-time', 0, 'Stated Mac purchase price', 'Markdown-native project files', 'No comparable today/week calendar planning proof found', 'https://loomline.paperheart.dev/'),\n    ('Things for Mac', 49.99, 'One-time', 15, 'Mac license only', 'Markdown formatting in notes, not user-owned task files', 'Calendar events in Today; no full week time-blocking planner', 'https://culturedcode.com/things/support/articles/2803552/'),\n    ('NotePlan', 99.99, 'Annual', 7, 'Annual subscription', 'Local Markdown notes and tasks', 'Calendar, time-blocking, and planning notes', 'https://noteplan.co/pricing'),\n    ('Morgen', 180.00, 'Annual', 14, 'Current annual plan', 'Not positioned around user-owned Markdown files', 'Calendar/task aggregation and planning', 'https://www.morgen.so/pricing'),\n    ('Sunsama', 204.00, 'Annual', 14, 'Current annual plan', 'Not positioned around user-owned Markdown files', 'Guided daily planning and timeboxing', 'https://sunsama.com/pricing'),\n    ('Akiflow', 228.00, 'Annual', 7, 'Current annual plan', 'Not positioned around user-owned Markdown files', 'Task aggregation and time-blocking', 'https://akiflow.com/pricing')\n)\nSELECT product, price_usd, billing_model, trial_days, scope, markdown_model, calendar_model, source_url\nFROM reviewed_pricing\nORDER BY price_usd ASC, product ASC;",
+        "description": "Current stated prices, billing models, and trial windows from the today-md repository and official Things, NotePlan, Plainlist, Loomline, Morgen, Sunsama, and Akiflow pages. Checked 2026-07-18. The chart compares displayed purchase or annual-plan prices and does not annualize one-time licenses.",
+        "executed_at": "2026-07-18T12:00:00Z",
+        "filters": [
+          "Mac-relevant products with a public numeric price",
+          "One-time licenses use purchase price",
+          "Subscriptions use current annual-plan price",
+          "Apple Reminders and Obsidian omitted because core use is included/free rather than a comparable paid planner license"
+        ],
+        "metric_definitions": [
+          "price_usd is the current public sticker price in US dollars for the stated scope; it is not total cost of ownership"
+        ],
+        "tables_used": [
+          "reviewed_pricing"
+        ]
+      }
+    },
+    {
+      "id": "channel_and_platform_sources",
+      "label": "Official channel and App Store guidance",
+      "href": "https://developer.apple.com/app-store/search/",
+      "query": {
+        "engine": "official web sources",
+        "description": "Apple App Store search, metadata, app tags, campaign links, analytics, editorial nominations, Apple Ads eligibility, product-page tooling; Show HN guidance; Product Hunt launch guidance; Homebrew Cask rules; and current community policies. Checked 2026-07-18.",
+        "tables_used": [
+          "Apple Developer",
+          "Apple Ads",
+          "Hacker News",
+          "Product Hunt",
+          "Homebrew",
+          "community policies"
+        ]
+      }
+    },
+    {
+      "id": "strategy_model",
+      "label": "Research synthesis and launch decision model",
+      "href": "https://github.com/arthurliebhardt/today-md",
+      "query": {
+        "engine": "strategy synthesis",
+        "description": "Recommended sequence derived from product readiness, trust dependencies, current audience access, channel rules, and the requirement to learn before scaling. These are strategic recommendations rather than observed outcomes.",
+        "tables_used": [
+          "product audit",
+          "competitor research",
+          "channel research"
+        ]
+      }
+    },
+    {
+      "id": "measurement_synthesis",
+      "label": "Apple App Analytics guidance and internal learning thresholds",
+      "href": "https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links",
+      "query": {
+        "engine": "official documentation and internal decision model",
+        "description": "Apple campaign-link and App Analytics capabilities plus explicitly labeled internal learning thresholds for the first cohort. The five-first-time-download reporting condition is an Apple platform rule; all other thresholds are hypotheses.",
+        "tables_used": [
+          "App Store Connect Analytics",
+          "internal cohort decision rules"
+        ]
+      }
+    },
+    {
+      "id": "github_metrics",
+      "label": "GitHub repository and release signals",
+      "href": "https://api.github.com/repos/arthurliebhardt/today-md",
+      "query": {
+        "engine": "GitHub public API",
+        "description": "Repository stars and forks from the repository endpoint and download count from the latest release asset endpoint, retrieved 2026-07-18. Counts are public repository signals and do not represent unique users or active installs.",
+        "tables_used": [
+          "repos/arthurliebhardt/today-md",
+          "repos/arthurliebhardt/today-md/releases/latest"
+        ]
+      }
+    }
+  ]
+}

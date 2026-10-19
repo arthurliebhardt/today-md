@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "html": "report.html",
+  "stages": {
+    "validation": "passed",
+    "package": "passed",
+    "verification": "passed"
+  },
+  "counts": {
+    "blocks": 23,
+    "charts": 1,
+    "html": 0,
+    "metrics": 0,
+    "tables": 6
+  },
+  "sourceDialog": "passed",
+  "sourceInteraction": "keyboard_menu_semantic_click",
+  "viewports": [
+    1440,
+    390
+  ]
+}

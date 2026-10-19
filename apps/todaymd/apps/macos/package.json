@@ -1,0 +1,10 @@
+{
+  "name": "@today-md/macos",
+  "private": true,
+  "scripts": {
+    "build": "swift build",
+    "dev": "bash scripts/dev-run.sh",
+    "test": "swift test",
+    "type-check": "swift build"
+  }
+}

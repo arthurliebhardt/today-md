@@ -1,0 +1,131 @@
+{
+  "exportedAt" : "2026-03-22T07:39:13Z",
+  "lists" : [
+    {
+      "colorName" : "blue",
+      "icon" : "person",
+      "id" : "E5509F3C-D9E8-412C-9864-6FEBF8C2D84F",
+      "name" : "Private",
+      "sortOrder" : 0,
+      "tasks" : [
+        {
+          "blockRaw" : "today",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "AF9DA425-DD43-41C6-805A-E3318AF680ED",
+          "isDone" : false,
+          "note" : {
+            "content" : "Call the clinic and lock in a morning slot.\n\n- [x] Check insurance card\n- [ ] Call dentist office\n- [ ] Add appointment to calendar",
+            "lastModified" : "2026-03-22T07:38:24Z"
+          },
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Book dentist appointment"
+        },
+        {
+          "blockRaw" : "today",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "19E4ACC5-0C8F-4560-B459-9F90EDFF31A8",
+          "isDone" : false,
+          "sortOrder" : 1,
+          "subtasks" : [
+
+          ],
+          "title" : "Buy groceries for dinner party"
+        },
+        {
+          "blockRaw" : "thisWeek",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "7C96183B-4D0B-4F12-861A-6009B47EFD86",
+          "isDone" : false,
+          "note" : {
+            "content" : "Keep this lightweight and easy to book.\n\n- [x] Pick travel dates\n- [ ] Compare train options\n- [ ] Reserve hotel near the center",
+            "lastModified" : "2026-03-22T07:38:24Z"
+          },
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Plan weekend trip to Hamburg"
+        },
+        {
+          "blockRaw" : "backlog",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "F6A70647-7E51-4123-B5CA-4EEA76D09E1F",
+          "isDone" : false,
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Declutter photo library"
+        }
+      ]
+    },
+    {
+      "colorName" : "purple",
+      "icon" : "briefcase",
+      "id" : "78114C4B-82D6-47D1-B359-5A2792A10DB8",
+      "name" : "Work",
+      "sortOrder" : 1,
+      "tasks" : [
+        {
+          "blockRaw" : "today",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "A5022C49-94D1-4120-8CE0-6719041D6E68",
+          "isDone" : false,
+          "note" : {
+            "content" : "Focus on final UX details before merge.\n\n- [x] Verify empty states\n- [ ] Check keyboard shortcuts\n- [ ] Confirm analytics events",
+            "lastModified" : "2026-03-22T07:38:24Z"
+          },
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Review onboarding polish PR"
+        },
+        {
+          "blockRaw" : "today",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "B0386491-8CAC-4310-B55F-2079484B4CB3",
+          "isDone" : false,
+          "sortOrder" : 1,
+          "subtasks" : [
+
+          ],
+          "title" : "Draft release notes for v1.2"
+        },
+        {
+          "blockRaw" : "thisWeek",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "A3A1AB3C-C0F8-44FB-9A11-BA6C6CF8FA3D",
+          "isDone" : false,
+          "note" : {
+            "content" : "Keep this at a theme level before turning it into a slide deck.\n\n- [ ] Gather feedback from sales\n- [ ] Summarize open platform bets\n- [ ] Draft rough milestones",
+            "lastModified" : "2026-03-22T07:38:24Z"
+          },
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Prepare Q2 roadmap outline"
+        },
+        {
+          "blockRaw" : "backlog",
+          "creationDate" : "2026-03-22T07:38:24Z",
+          "id" : "91AB88EC-8DB0-437E-857F-698FA8E39637",
+          "isDone" : false,
+          "sortOrder" : 0,
+          "subtasks" : [
+
+          ],
+          "title" : "Evaluate new analytics vendor"
+        }
+      ]
+    }
+  ],
+  "unassignedTasks" : [
+
+  ],
+  "version" : 1
+}

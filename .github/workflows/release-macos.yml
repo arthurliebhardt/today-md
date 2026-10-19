@@ -1,123 +1,118 @@
-name: Release macOS app
+name: Build signed toolstokeep direct edition
 
 on:
-  push:
-    branches: ['codex/rehearse-macos-*']
-    tags: ['v[0-9]*']
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Existing stable version tag (vX.Y.Z)'
+      version:
+        description: 'Version in Config/Version.xcconfig'
         required: true
+        default: '1.8.1'
         type: string
-      publish:
-        description: 'Publish after verification (leave off for a signing rehearsal)'
-        default: false
-        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: macos-stable-release
+  group: today-md-direct-signing
   cancel-in-progress: false
 
 jobs:
-  validate-publication-ref:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Reject publication from a non-tag ref
-        if: github.event_name == 'workflow_dispatch' && inputs.publish
-        run: |
-          if [[ "$GITHUB_REF_TYPE" != tag ]]; then
-            echo 'Publishing requires dispatching the workflow from an existing version tag.' >&2
-            exit 1
-          fi
-
-  release:
-    needs: validate-publication-ref
+  direct:
     runs-on: macos-15
     timeout-minutes: 60
-    environment: ${{ github.ref_type == 'branch' && startsWith(github.ref_name, 'codex/rehearse-macos-') && 'macos-rehearsal' || 'macos-release' }}
-    permissions:
-      contents: write
+    environment: macos-rehearsal
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-      MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
-      SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
-      GH_TOKEN: ${{ github.token }}
+      DIRECT_VERSION: ${{ inputs.version }}
+      TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
     steps:
-      - name: Check out the exact source
+      - name: Check out the exact signing source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ github.event_name == 'push' && github.ref_type == 'branch' && github.sha || inputs.tag || github.ref_name }}
-          fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare a local version tag for the branch rehearsal
-        if: github.event_name == 'push' && github.ref_type == 'branch'
+      - name: Verify the app and direct-release script
         run: |
-          version=$(python3 apps/macos/scripts/release-metadata.py project-version --short)
-          rehearsal_tag="v$version"
-          if [[ ! "$rehearsal_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo 'The rehearsal needs a stable MARKETING_VERSION in the form X.Y.Z.' >&2
-            exit 1
-          fi
-          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
-            echo 'The rehearsal checkout must match the triggering commit.' >&2
-            exit 1
-          fi
-          if git show-ref --verify --quiet "refs/tags/$rehearsal_tag"; then
-            if [[ "$(git rev-parse "refs/tags/$rehearsal_tag^{commit}")" != "$GITHUB_SHA" ]]; then
-              echo 'The existing version tag points to another commit. Bump the version before rehearsing.' >&2
-              exit 1
-            fi
-          else
-            git -c tag.gpgSign=false tag "$rehearsal_tag" "$GITHUB_SHA"
-          fi
-          printf 'RELEASE_TAG=%s\n' "$rehearsal_tag" >> "$GITHUB_ENV"
+          swift test --package-path apps/todaymd/apps/macos
+          swift test --package-path packages/ToolsToKeepKit
+          bash -n apps/todaymd/apps/macos/scripts/build-direct.sh
 
-      - name: Verify release scripts
-        run: |
-          xcodebuild -version
-          swift test --package-path apps/macos
-          python3 -m unittest discover -s apps/macos/scripts/tests -v
-          bash -n apps/macos/scripts/release-macos.sh
-          bash -n apps/macos/scripts/publish-macos-release.sh
-          bash -n apps/macos/scripts/verify-sparkle-release.sh
-
-      - name: Build, sign, notarize, and verify
+      - name: Prepare isolated signing, build, and notarize
         env:
           MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
           MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY_P8: ${{ secrets.ASC_PRIVATE_KEY_P8 }}
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: bash apps/macos/scripts/release-macos.sh
+        run: |
+          set -euo pipefail
+          set +vx
+          umask 077
+          work_dir=$(mktemp -d "$RUNNER_TEMP/today-md-direct-signing.XXXXXX")
+          keychain="$work_dir/signing.keychain-db"
+          cleanup() {
+            local status=$?
+            if [[ -f "$work_dir/original-keychains.json" ]]; then
+              python3 - "$work_dir/original-keychains.json" <<'PY' || true
+          import json, subprocess, sys
+          subprocess.run(["security", "list-keychains", "-d", "user", "-s", *json.load(open(sys.argv[1]))], check=True)
+          PY
+            fi
+            security delete-keychain "$keychain" >/dev/null 2>&1 || true
+            rm -rf "$work_dir"
+            exit "$status"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          security list-keychains -d user | python3 -c 'import json,shlex,sys; json.dump(shlex.split(sys.stdin.read()),sys.stdout)' > "$work_dir/original-keychains.json"
+          python3 - "$work_dir" <<'PY'
+          import base64, os, pathlib, sys
+          for name in ("MACOS_SIGNING_P12", "MACOS_SIGNING_P12_PASSWORD", "ASC_PRIVATE_KEY_P8", "ASC_KEY_ID", "ASC_ISSUER_ID", "TEAM_ID"):
+              if not os.environ.get(name):
+                  sys.exit("Missing signing configuration: " + name)
+          directory=pathlib.Path(sys.argv[1])
+          (directory / "certificate.p12").write_bytes(base64.b64decode(os.environ["MACOS_SIGNING_P12"].strip(), validate=True))
+          (directory / "AuthKey.p8").write_text(os.environ["ASC_PRIVATE_KEY_P8"])
+          PY
+          keychain_password=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$work_dir/certificate.p12" -k "$keychain" -P "$MACOS_SIGNING_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          python3 - "$work_dir/original-keychains.json" "$keychain" <<'PY'
+          import json, subprocess, sys
+          subprocess.run(["security", "list-keychains", "-d", "user", "-s", sys.argv[2], *json.load(open(sys.argv[1]))], check=True)
+          PY
+          unset MACOS_SIGNING_P12 MACOS_SIGNING_P12_PASSWORD ASC_PRIVATE_KEY_P8 keychain_password
+          CODESIGN_IDENTITY=$(security find-identity -v -p codesigning "$keychain" | python3 -c '
+          import os,re,sys
+          identities=re.findall(r"([A-F0-9]{40}) \"Developer ID Application: [^\"]+ \(" + re.escape(os.environ["TEAM_ID"]) + r"\)\"",sys.stdin.read())
+          if len(identities) != 1:
+              sys.exit("Import exactly one valid Developer ID Application identity for TEAM_ID")
+          print(identities[0])')
+          CODESIGN_KEYCHAIN="$keychain"
+          NOTARY_KEY_FILE="$work_dir/AuthKey.p8"
+          export CODESIGN_IDENTITY CODESIGN_KEYCHAIN NOTARY_KEY_FILE
+          bash apps/todaymd/apps/macos/scripts/build-direct.sh "$DIRECT_VERSION"
 
-      - name: Retain verified release files
+      - name: Retain verified direct-release files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: today-md-${{ env.RELEASE_TAG }}-macos
+          name: today-md-direct-${{ inputs.version }}
           path: |
-            dist/macos/*.zip
-            dist/macos/appcast.xml
-            dist/macos/release.json
-            dist/macos/SHA256SUMS
+            apps/todaymd/apps/macos/build/direct/${{ inputs.version }}/*.zip
+            apps/todaymd/apps/macos/build/direct/${{ inputs.version }}/release.json
+            apps/todaymd/apps/macos/build/direct/${{ inputs.version }}/SHA256SUMS
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
-      - name: Retain notarization diagnostics
+      - name: Retain Apple notarization diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: today-md-notarization-${{ github.run_id }}
-          path: dist/macos/diagnostics/*.json
+          name: today-md-direct-notarization-${{ github.run_id }}
+          path: apps/todaymd/apps/macos/build/direct/${{ inputs.version }}/diagnostics/*.json
           if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Publish verified assets and update feed
-        if: github.ref_type == 'tag' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
-        run: bash apps/macos/scripts/publish-macos-release.sh
+          retention-days: 7

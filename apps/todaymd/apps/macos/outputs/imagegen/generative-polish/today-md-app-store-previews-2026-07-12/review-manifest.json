@@ -1,0 +1,67 @@
+[
+  {
+    "id": "01-plan-today",
+    "index": 1,
+    "title": "Everything important, in one calm view.",
+    "label": "BOARD + TASK DETAILS",
+    "caption": "Plan Today and This Week while notes and checklists stay beside every task.",
+    "src": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/01-plan-today.png",
+    "href": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/01-plan-today.png",
+    "output": "01-plan-today.png",
+    "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+    "family": "App Store preview",
+    "tone": "Calm, native, focused"
+  },
+  {
+    "id": "02-organize-projects",
+    "index": 2,
+    "title": "Organize every project your way.",
+    "label": "LISTS",
+    "caption": "Create focused lists and move work between Today, This Week, and Backlog.",
+    "src": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/02-organize-projects.png",
+    "href": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/02-organize-projects.png",
+    "output": "02-organize-projects.png",
+    "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+    "family": "App Store preview",
+    "tone": "Calm, native, focused"
+  },
+  {
+    "id": "03-time-blocking",
+    "index": 3,
+    "title": "Turn tasks into time blocks.",
+    "label": "CALENDAR PLANNER \u00b7 PRO",
+    "caption": "Plan beside your calendar and protect time for the work that matters.",
+    "src": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/03-time-blocking.png",
+    "href": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/03-time-blocking.png",
+    "output": "03-time-blocking.png",
+    "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+    "family": "App Store preview",
+    "tone": "Calm, native, focused"
+  },
+  {
+    "id": "04-week-view",
+    "index": 4,
+    "title": "See your week without switching apps.",
+    "label": "WEEK VIEW \u00b7 PRO",
+    "caption": "Keep tasks and calendar events together in one focused weekly view.",
+    "src": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/04-week-view.png",
+    "href": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/04-week-view.png",
+    "output": "04-week-view.png",
+    "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+    "family": "App Store preview",
+    "tone": "Calm, native, focused"
+  },
+  {
+    "id": "05-folder-sync",
+    "index": 5,
+    "title": "Markdown files that stay yours.",
+    "label": "FOLDER SYNC \u00b7 PRO",
+    "caption": "Sync a readable archive to the folder you choose.",
+    "src": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/05-folder-sync.png",
+    "href": "/Users/arthur/dev/macaps/today-md/outputs/imagegen/generative-polish/today-md-app-store-previews-2026-07-12/final/05-folder-sync.png",
+    "output": "05-folder-sync.png",
+    "prompt": "Deterministic final composite; product screenshot and copy preserved exactly.",
+    "family": "App Store preview",
+    "tone": "Calm, native, focused"
+  }
+]
