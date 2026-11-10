@@ -31,6 +31,7 @@ You can also open `today-md.xcodeproj` in Xcode and run the `today-md` target.
 - Data is stored locally in SQLite.
 - Search is backed by SQLite full-text search.
 - Markdown notes are mirrored to Application Support during normal app use.
+ - Obsidian sync exports today-md files to a `Markdown Archive` folder by default.
 
 ## Contribution Guidelines
 
